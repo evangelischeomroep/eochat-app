@@ -1,4 +1,4 @@
-package app.cogwheel.conduit
+package nl.eo.eochat
 
 import android.service.voice.VoiceInteractionSession
 import android.service.voice.VoiceInteractionSessionService

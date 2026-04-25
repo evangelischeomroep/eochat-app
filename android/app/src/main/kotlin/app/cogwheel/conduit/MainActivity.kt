@@ -1,4 +1,4 @@
-package app.cogwheel.conduit
+package nl.eo.eochat
 
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -24,7 +24,7 @@ class MainActivity : FlutterActivity() {
         windowInsetsController.isAppearanceLightNavigationBars = false
     }
     
-    private val CHANNEL = "app.cogwheel.conduit/assistant"
+    private val CHANNEL = "nl.eo.eochat/assistant"
     private var methodChannel: io.flutter.plugin.common.MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -39,7 +39,7 @@ class MainActivity : FlutterActivity() {
         // Setup cookie manager channel for WebView cookie access
         val cookieChannel = io.flutter.plugin.common.MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "com.conduit.app/cookies"
+            "nl.eo.eochat/cookies"
         )
         
         cookieChannel.setMethodCallHandler { call, result ->

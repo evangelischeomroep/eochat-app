@@ -1,4 +1,4 @@
-package app.cogwheel.conduit
+package nl.eo.eochat
 
 import android.app.Application
 import android.app.Notification
@@ -35,7 +35,7 @@ class ConduitApplication : Application() {
             notificationManager,
             channelId = BackgroundStreamingService.CHANNEL_ID,
             channelName = "Background Service",
-            description = "Background service for Conduit",
+            description = "Background service for EOchat",
             importance = NotificationManager.IMPORTANCE_LOW,
             recreateIfImportanceChanged = true,
         )

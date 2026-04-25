@@ -2,20 +2,25 @@ import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:conduit/l10n/app_localizations.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../providers/app_providers.dart';
+
 part 'callkit_service.g.dart';
 
 /// Thin wrapper around `flutter_callkit_incoming` for voice calls.
 class CallKitService {
-  CallKitService({Uuid? uuid})
+  CallKitService({Uuid? uuid, ui.Locale? appLocale})
     : _uuid = uuid ?? const Uuid(),
+      _appLocale = appLocale,
       _callKitAllowed = _computeCallKitAllowed();
 
   final Uuid _uuid;
+  final ui.Locale? _appLocale;
   final bool _callKitAllowed;
   bool _loggedCallKitDisabled = false;
   static const int _defaultCallDurationMs = 2 * 60 * 60 * 1000; // 2 hours
@@ -26,15 +31,16 @@ class CallKitService {
   /// Requests the notification/full-screen intent permissions needed on Android.
   Future<void> requestPermissions() async {
     if (!_shouldUseCallKit('request permissions')) return;
+    final l10n = _resolveL10n();
 
     await _safe(
       () => FlutterCallkitIncoming.requestNotificationPermission(
         <String, dynamic>{
-          'title': 'Notification permission',
+          'title': l10n.callkitNotificationPermissionTitle,
           'rationaleMessagePermission':
-              'Call alerts need notification permission.',
+              l10n.callkitNotificationPermissionRationale,
           'postNotificationMessageRequired':
-              'Allow notifications to show incoming calls.',
+              l10n.callkitNotificationPermissionPostMessage,
         },
       ),
     );
@@ -170,6 +176,7 @@ class CallKitService {
     String? avatar,
     int durationMs = _defaultCallDurationMs,
   }) {
+    final l10n = _resolveL10n();
     return CallKitParams(
       id: id,
       nameCaller: callerName,
@@ -178,29 +185,30 @@ class CallKitService {
       handle: handle,
       type: 0, // 0 = audio call
       duration: durationMs,
-      textAccept: 'Accept',
-      textDecline: 'Decline',
-      missedCallNotification: const NotificationParams(
+      textAccept: l10n.callkitActionAccept,
+      textDecline: l10n.callkitActionDecline,
+      missedCallNotification: NotificationParams(
         showNotification: true,
         isShowCallback: true,
-        subtitle: 'Missed call',
-        callbackText: 'Call back',
+        subtitle: l10n.callkitMissedCallSubtitle,
+        callbackText: l10n.callkitCallBackAction,
       ),
-      callingNotification: const NotificationParams(
+      callingNotification: NotificationParams(
         showNotification: true,
         isShowCallback: true,
-        subtitle: 'Calling...',
-        callbackText: 'Hang up',
+        subtitle: l10n.callkitCallingSubtitle,
+        callbackText: l10n.callkitHangUpAction,
       ),
       extra: const <String, dynamic>{'transport': 'voice'},
-      android: const AndroidParams(
+      android: AndroidParams(
         isCustomNotification: true,
         isShowLogo: true,
         ringtonePath: 'system_ringtone_default',
         backgroundColor: '#0D1726',
         actionColor: '#4CAF50',
-        incomingCallNotificationChannelName: 'Incoming Call',
-        missedCallNotificationChannelName: 'Missed Call',
+        incomingCallNotificationChannelName:
+            l10n.callkitIncomingCallChannelName,
+        missedCallNotificationChannelName: l10n.callkitMissedCallChannelName,
       ),
       ios: const IOSParams(
         iconName: '',
@@ -259,7 +267,19 @@ class CallKitService {
     final country = locale.countryCode?.toUpperCase();
     return country == 'CN';
   }
+
+  AppLocalizations _resolveL10n() {
+    final locale = _appLocale ?? ui.PlatformDispatcher.instance.locale;
+    try {
+      return lookupAppLocalizations(locale);
+    } catch (_) {
+      return lookupAppLocalizations(const ui.Locale('en'));
+    }
+  }
 }
 
 @Riverpod(keepAlive: true)
-CallKitService callKitService(Ref ref) => CallKitService();
+CallKitService callKitService(Ref ref) {
+  final locale = ref.watch(appLocaleProvider);
+  return CallKitService(appLocale: locale);
+}

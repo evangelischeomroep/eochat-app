@@ -1,6 +1,6 @@
 {
   "@@locale": "nl",
-  "appTitle": "Conduit",
+  "appTitle": "EOchat",
   "retry": "Opnieuw proberen",
   "back": "Terug",
   "you": "Jij",
@@ -16,11 +16,11 @@
   },
   "account": "Account",
   "supportConduit": "Ondersteun Conduit",
-  "supportConduitSubtitle": "Houd Conduit onafhankelijk door doorlopende ontwikkeling te financieren.",
+  "supportConduitSubtitle": "Houd Conduit (open source systeem achter EOchat-app) onafhankelijk door doorlopende ontwikkeling te financieren.",
   "githubSponsorsTitle": "GitHub Sponsors",
-  "githubSponsorsSubtitle": "Word een terugkerende sponsor om roadmap-items te financieren.",
-  "buyMeACoffeeTitle": "Buy Me a Coffee",
-  "buyMeACoffeeSubtitle": "Doe een eenmalige donatie om bedankt te zeggen.",
+  "githubSponsorsSubtitle": "Word een doorlopende sponsor om roadmap-items te financieren.",
+  "buyMeACoffeeTitle": "Buy me a Coffee",
+  "buyMeACoffeeSubtitle": "Doe een eenmalige donatie aan Conduit om te bedanken.",
   "signOut": "Uitloggen",
   "endYourSession": "Beëindig je sessie",
   "defaultModel": "Standaardmodel",
@@ -103,7 +103,7 @@
   "voicePromptTapStart": "Tik op Start om te beginnen",
   "voiceActionStop": "Stop",
   "voiceActionStart": "Start",
-  "messageHintText": "Vraag Conduit",
+  "messageHintText": "Vraag EOchat",
   "stopGenerating": "Stop met genereren",
   "codeCopiedToClipboard": "Code gekopieerd naar klembord.",
   "send": "Verzenden",
@@ -191,7 +191,7 @@
   "deleteFolderMessage": "Deze map en zijn toewijzingen worden verwijderd.",
   "failedToDeleteFolder": "Kan map niet verwijderen",
   "aboutApp": "Over",
-  "aboutAppSubtitle": "Conduit informatie en links",
+  "aboutAppSubtitle": "EOchat informatie en links",
   "web": "Web",
   "imageGen": "Afbeeldingsgeneratie",
   "pinned": "Vastgepind",
@@ -280,7 +280,7 @@
   "themeLight": "Licht",
   "currentlyUsingDarkTheme": "Momenteel donker thema in gebruik",
   "currentlyUsingLightTheme": "Momenteel licht thema in gebruik",
-  "aboutConduit": "Over Conduit",
+  "aboutConduit": "Over EOchat",
   "versionLabel": "Versie: {version} ({build})",
   "@versionLabel": {
     "placeholders": {
@@ -319,7 +319,7 @@
   "androidAssistantTitle": "Android digital assistant",
   "androidAssistantDescription": "Choose what happens when you trigger the Android digital assistant.",
   "androidAssistantOverlayOption": "Show quick overlay (default)",
-  "androidAssistantNewChatOption": "Open Conduit with a new chat",
+  "androidAssistantNewChatOption": "Open EOchat with a new chat",
   "androidAssistantVoiceCallOption": "Start a voice call",
   "sttSettings": "Spraak naar tekst",
   "sttEngineLabel": "Herkenningsengine",
@@ -409,6 +409,50 @@
   "voiceCallEnd": "Oproep beëindigen",
   "@voiceCallEnd": {
     "description": "Button label to end the voice call session."
+  },
+  "callkitNotificationPermissionTitle": "Meldingstoestemming",
+  "@callkitNotificationPermissionTitle": {
+    "description": "Title for the CallKit notification permission prompt."
+  },
+  "callkitNotificationPermissionRationale": "Oproepmeldingen vereisen meldingstoestemming.",
+  "@callkitNotificationPermissionRationale": {
+    "description": "Rationale shown before requesting notification permission for call alerts."
+  },
+  "callkitNotificationPermissionPostMessage": "Sta meldingen toe om inkomende oproepen te tonen.",
+  "@callkitNotificationPermissionPostMessage": {
+    "description": "Follow-up message explaining why notification permission is needed for incoming calls."
+  },
+  "callkitActionAccept": "Accepteren",
+  "@callkitActionAccept": {
+    "description": "CallKit action label to accept a call."
+  },
+  "callkitActionDecline": "Weigeren",
+  "@callkitActionDecline": {
+    "description": "CallKit action label to decline a call."
+  },
+  "callkitMissedCallSubtitle": "Gemiste oproep",
+  "@callkitMissedCallSubtitle": {
+    "description": "Subtitle for missed call notifications."
+  },
+  "callkitCallBackAction": "Terugbellen",
+  "@callkitCallBackAction": {
+    "description": "Action label to call back from a missed call notification."
+  },
+  "callkitCallingSubtitle": "Bellen...",
+  "@callkitCallingSubtitle": {
+    "description": "Subtitle shown while placing an outgoing call."
+  },
+  "callkitHangUpAction": "Ophangen",
+  "@callkitHangUpAction": {
+    "description": "Action label to end an ongoing outgoing call notification."
+  },
+  "callkitIncomingCallChannelName": "Inkomende oproep",
+  "@callkitIncomingCallChannelName": {
+    "description": "Android notification channel name for incoming calls."
+  },
+  "callkitMissedCallChannelName": "Gemiste oproep",
+  "@callkitMissedCallChannelName": {
+    "description": "Android notification channel name for missed calls."
   },
   "chooseDifferentFile": "Ander bestand kiezen",
   "@chooseDifferentFile": {
@@ -652,13 +696,13 @@
   "@nextLabel": {
     "description": "Label for navigating to the next item."
   },
-  "themePaletteConduitLabel": "Conduit",
+  "themePaletteConduitLabel": "EOchat",
   "@themePaletteConduitLabel": {
-    "description": "Palette name for the default Conduit theme."
+    "description": "Palette name for the default EOchat theme."
   },
-  "themePaletteConduitDescription": "Strak neutraal thema ontworpen voor Conduit.",
+  "themePaletteConduitDescription": "Strak neutraal thema ontworpen voor EOchat.",
   "@themePaletteConduitDescription": {
-    "description": "Description of the Conduit palette."
+    "description": "Description of the EOchat palette."
   },
   "themePaletteClaudeLabel": "Claude",
   "@themePaletteClaudeLabel": {

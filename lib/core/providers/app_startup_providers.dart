@@ -6,6 +6,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../config/fork_overrides.dart';
 import '../providers/app_providers.dart';
 import '../../features/auth/providers/unified_auth_providers.dart';
 import '../services/navigation_service.dart';
@@ -46,6 +47,42 @@ class _ConversationWarmupLastAttemptNotifier extends Notifier<DateTime?> {
   DateTime? build() => null;
 
   void set(DateTime? value) => state = value;
+}
+
+Future<void> _ensureForkDefaultServer(Ref ref) async {
+  if (!ForkOverrides.hasPreconfiguredServer) {
+    return;
+  }
+
+  final storage = ref.read(optimizedStorageServiceProvider);
+  final existingConfigs = await storage.getServerConfigs();
+  if (existingConfigs.isNotEmpty) {
+    return;
+  }
+
+  final defaultUrl = ForkOverrides.normalizedPreconfiguredServerUrl;
+  if (defaultUrl.isEmpty) {
+    return;
+  }
+
+  final uri = Uri.tryParse(defaultUrl);
+  final host = uri?.host;
+  final serverName = (host != null && host.isNotEmpty) ? host : 'Open WebUI';
+  final defaultConfig = ServerConfig(
+    id: ForkOverrides.defaultServerId,
+    name: serverName,
+    url: defaultUrl,
+    isActive: true,
+  );
+
+  await storage.saveServerConfigs([defaultConfig]);
+  await storage.setActiveServerId(defaultConfig.id);
+  ref.invalidate(serverConfigsProvider);
+  ref.invalidate(activeServerProvider);
+  DebugLogger.info(
+    'Fork default server configured: ${defaultConfig.url}',
+    scope: 'startup',
+  );
 }
 
 void _scheduleConversationWarmup(Ref ref, {bool force = false}) {
@@ -260,6 +297,19 @@ class AppStartupFlow extends _$AppStartupFlow {
     void keepAlive<T>(ProviderListenable<T> provider) {
       ref.listen<T>(provider, (previous, value) {});
     }
+
+    Future.microtask(() async {
+      try {
+        await _ensureForkDefaultServer(ref);
+      } catch (error, stackTrace) {
+        DebugLogger.error(
+          'fork-default-server-bootstrap',
+          scope: 'startup',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    });
 
     // Ensure token integration listeners are active
     keepAlive(authApiIntegrationProvider);

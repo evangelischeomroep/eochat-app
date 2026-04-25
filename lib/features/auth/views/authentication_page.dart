@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/models/backend_config.dart';
+import '../../../core/config/fork_overrides.dart';
 import '../../../core/models/server_config.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/input_validation_service.dart';
@@ -52,6 +53,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
   String? _loginError;
   bool _isSigningIn = false;
   bool _serverConfigSaved = false;
+  bool _didAutoOpenSso = false;
 
   /// Whether the server has OAuth/SSO providers configured.
   bool get _hasSsoEnabled =>
@@ -68,8 +70,15 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
   OAuthProviders get _oauthProviders =>
       widget.backendConfig?.oauthProviders ?? const OAuthProviders();
 
+  bool get _forceSsoOnly => ForkOverrides.forceSsoOnly;
+
+  bool get _canUseSsoFlow => _hasSsoEnabled || isWebViewSupported;
+
   /// Available auth modes for the segmented control.
   List<AuthMode> get _availableAuthModes {
+    if (_forceSsoOnly && _canUseSsoFlow) {
+      return const [AuthMode.sso];
+    }
     final modes = <AuthMode>[];
     if (_hasLoginFormEnabled) modes.add(AuthMode.credentials);
     if (isWebViewSupported && !_hasSsoEnabled) modes.add(AuthMode.sso);
@@ -106,6 +115,11 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
 
   /// Set the default auth mode based on what the server supports.
   void _setDefaultAuthMode() {
+    if (_forceSsoOnly && _canUseSsoFlow) {
+      _authMode = AuthMode.sso;
+      return;
+    }
+
     // Priority: SSO > Credentials > LDAP > Token
     if (_hasSsoEnabled && _oauthProviders.enabledProviders.length == 1) {
       // If only one SSO provider, that's probably the intended method
@@ -134,6 +148,9 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
   }
 
   Future<void> _loadSavedCredentials() async {
+    if (_forceSsoOnly) {
+      return;
+    }
     final storage = ref.read(optimizedStorageServiceProvider);
     final savedCredentials = await storage.getSavedCredentials();
     if (savedCredentials != null) {
@@ -292,37 +309,37 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
                         right: Spacing.pagePadding,
                         top: safePadding.top + Spacing.md,
                       ),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Back button row
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: _buildBackButton(),
-                          ),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Back button row
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: _buildBackButton(),
+                            ),
 
-                          const SizedBox(height: Spacing.xl),
+                            const SizedBox(height: Spacing.xl),
 
-                          // Brand icon + title header
-                          _buildHeader(),
+                            // Brand icon + title header
+                            _buildHeader(),
 
-                          const SizedBox(height: Spacing.xxl),
+                            const SizedBox(height: Spacing.xxl),
 
-                          // Auth mode selector
-                          if (_availableAuthModes.length > 1) ...[
-                            _buildAuthModeSelector(),
-                            const SizedBox(height: Spacing.lg),
+                            // Auth mode selector
+                            if (_availableAuthModes.length > 1) ...[
+                              _buildAuthModeSelector(),
+                              const SizedBox(height: Spacing.lg),
+                            ],
+
+                            // Authentication form
+                            _buildAuthForm(),
                           ],
-
-                          // Authentication form
-                          _buildAuthForm(),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 ),
               ),
             ),
@@ -444,10 +461,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
       decoration: BoxDecoration(
         color: theme.surfaceContainer,
         borderRadius: BorderRadius.circular(AppBorderRadius.button),
-        border: Border.all(
-          color: theme.cardBorder,
-          width: BorderWidth.thin,
-        ),
+        border: Border.all(color: theme.cardBorder, width: BorderWidth.thin),
       ),
       padding: const EdgeInsets.all(3),
       child: Row(
@@ -515,6 +529,23 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
   Widget _buildAuthForm() {
     final l10n = AppLocalizations.of(context)!;
 
+    if (_forceSsoOnly) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_hasSsoEnabled) ...[
+            _buildSsoButtons(l10n),
+          ] else ...[
+            _buildSsoPrompt(),
+          ],
+          if (_loginError != null) ...[
+            const SizedBox(height: Spacing.md),
+            _buildErrorMessage(_loginError!),
+          ],
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -576,7 +607,11 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
   }
 
   Widget _buildSsoButtons(AppLocalizations l10n) {
-    final providers = _oauthProviders.enabledProviders;
+    var providers = _oauthProviders.enabledProviders;
+    if (_forceSsoOnly &&
+        providers.contains(ForkOverrides.preferredSsoProvider)) {
+      providers = [ForkOverrides.preferredSsoProvider];
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -651,9 +686,8 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
         AdaptiveTextFormField(
           controller: _apiKeyController,
           placeholder: 'eyJ...',
-          validator: (value) => _validateJwtToken(
-            value ?? _apiKeyController.text,
-          ),
+          validator: (value) =>
+              _validateJwtToken(value ?? _apiKeyController.text),
           obscureText: _obscurePassword,
           prefixIcon: Icon(
             Platform.isIOS
@@ -666,24 +700,18 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
                 ? (Platform.isIOS
                       ? CupertinoIcons.eye_slash
                       : Icons.visibility_off)
-                : (Platform.isIOS
-                      ? CupertinoIcons.eye
-                      : Icons.visibility),
+                : (Platform.isIOS ? CupertinoIcons.eye : Icons.visibility),
             iconColor: context.conduitTheme.iconSecondary,
             onPressed: () =>
                 setState(() => _obscurePassword = !_obscurePassword),
-            tooltip: _obscurePassword
-                ? 'Show password'
-                : 'Hide password',
+            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
             isCompact: true,
           ),
           onSubmitted: (_) => _signIn(),
           autofillHints: const [AutofillHints.password],
           cupertinoDecoration: BoxDecoration(
             color: CupertinoColors.tertiarySystemBackground,
-            border: Border.all(
-              color: context.conduitTheme.inputBorder,
-            ),
+            border: Border.all(color: context.conduitTheme.inputBorder),
             borderRadius: BorderRadius.circular(8),
           ),
         ),
@@ -721,9 +749,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
             autofillHints: const [AutofillHints.username, AutofillHints.email],
             cupertinoDecoration: BoxDecoration(
               color: CupertinoColors.tertiarySystemBackground,
-              border: Border.all(
-                color: context.conduitTheme.inputBorder,
-              ),
+              border: Border.all(color: context.conduitTheme.inputBorder),
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -752,24 +778,18 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
                   ? (Platform.isIOS
                         ? CupertinoIcons.eye_slash
                         : Icons.visibility_off)
-                  : (Platform.isIOS
-                        ? CupertinoIcons.eye
-                        : Icons.visibility),
+                  : (Platform.isIOS ? CupertinoIcons.eye : Icons.visibility),
               iconColor: context.conduitTheme.iconSecondary,
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
-              tooltip: _obscurePassword
-                  ? 'Show password'
-                  : 'Hide password',
+              tooltip: _obscurePassword ? 'Show password' : 'Hide password',
               isCompact: true,
             ),
             onSubmitted: (_) => _signIn(),
             autofillHints: const [AutofillHints.password],
             cupertinoDecoration: BoxDecoration(
               color: CupertinoColors.tertiarySystemBackground,
-              border: Border.all(
-                color: context.conduitTheme.inputBorder,
-              ),
+              border: Border.all(color: context.conduitTheme.inputBorder),
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -799,9 +819,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
             autofillHints: const [AutofillHints.username],
             cupertinoDecoration: BoxDecoration(
               color: CupertinoColors.tertiarySystemBackground,
-              border: Border.all(
-                color: context.conduitTheme.inputBorder,
-              ),
+              border: Border.all(color: context.conduitTheme.inputBorder),
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -830,24 +848,18 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
                   ? (Platform.isIOS
                         ? CupertinoIcons.eye_slash
                         : Icons.visibility_off)
-                  : (Platform.isIOS
-                        ? CupertinoIcons.eye
-                        : Icons.visibility),
+                  : (Platform.isIOS ? CupertinoIcons.eye : Icons.visibility),
               iconColor: context.conduitTheme.iconSecondary,
               onPressed: () =>
                   setState(() => _obscurePassword = !_obscurePassword),
-              tooltip: _obscurePassword
-                  ? 'Show password'
-                  : 'Hide password',
+              tooltip: _obscurePassword ? 'Show password' : 'Hide password',
               isCompact: true,
             ),
             onSubmitted: (_) => _signIn(),
             autofillHints: const [AutofillHints.password],
             cupertinoDecoration: BoxDecoration(
               color: CupertinoColors.tertiarySystemBackground,
-              border: Border.all(
-                color: context.conduitTheme.inputBorder,
-              ),
+              border: Border.all(color: context.conduitTheme.inputBorder),
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -929,7 +941,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
     final l10n = AppLocalizations.of(context)!;
 
     // Don't show sign-in button for SSO mode (it has its own button)
-    if (_authMode == AuthMode.sso) {
+    if (_authMode == AuthMode.sso || _forceSsoOnly) {
       return const SizedBox.shrink();
     }
 
@@ -953,9 +965,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
       text: buttonText,
       icon: _isSigningIn
           ? null
-          : (Platform.isIOS
-                ? CupertinoIcons.arrow_right
-                : Icons.arrow_forward),
+          : (Platform.isIOS ? CupertinoIcons.arrow_right : Icons.arrow_forward),
       onPressed: _isSigningIn ? null : _signIn,
       isLoading: _isSigningIn,
       isFullWidth: true,
@@ -998,5 +1008,24 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
         ),
       ),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _tryAutoOpenSso();
+  }
+
+  void _tryAutoOpenSso() {
+    if (_didAutoOpenSso || !_forceSsoOnly || !_canUseSsoFlow) {
+      return;
+    }
+    _didAutoOpenSso = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _navigateToSso();
+    });
   }
 }

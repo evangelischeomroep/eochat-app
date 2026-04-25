@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/auth_state_manager.dart';
+import '../config/fork_overrides.dart';
 import '../providers/app_providers.dart';
 import '../services/connectivity_service.dart';
 import '../services/navigation_service.dart';
@@ -97,6 +98,14 @@ class RouterNotifier extends ChangeNotifier {
     final activeServer = activeServerAsync.asData?.value;
     final hasActiveServer = activeServer != null;
     if (!hasActiveServer) {
+      // Fork behavior: when a server is preconfigured, don't send users to the
+      // setup screen. Keep them on splash while startup bootstrap writes the
+      // default server configuration.
+      if (ForkOverrides.hasPreconfiguredServer &&
+          ForkOverrides.skipSetupScreenWhenPreconfigured) {
+        return location == Routes.splash ? null : Routes.splash;
+      }
+
       // No server configured - redirect to server connection
       // Exception: allow staying on server connection, authentication,
       // proxy auth, and SSO pages during the connection/auth flow.
@@ -117,10 +126,15 @@ class RouterNotifier extends ChangeNotifier {
     // Allow staying on server connection page
     if (location == Routes.serverConnection) {
       // If authenticated but on server connection page, go to chat
-      // Otherwise stay on server connection page (for back navigation)
-      return authState == AuthNavigationState.authenticated
-          ? Routes.chat
-          : null;
+      if (authState == AuthNavigationState.authenticated) {
+        return Routes.chat;
+      }
+      if (ForkOverrides.hasPreconfiguredServer &&
+          authState == AuthNavigationState.needsLogin) {
+        return Routes.authentication;
+      }
+      // Otherwise stay on server connection page (for manual configuration)
+      return null;
     }
 
     // Check connectivity status to determine if we should show connection issue

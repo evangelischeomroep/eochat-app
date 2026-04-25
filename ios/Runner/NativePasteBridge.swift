@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 final class NativePasteBridge {
     static let shared = NativePasteBridge()
 
-    private static let channelName = "conduit/native_paste"
+    private static let channelName = "eochat/native_paste"
     private static var didSwizzle = false
 
     private var channel: FlutterMethodChannel?

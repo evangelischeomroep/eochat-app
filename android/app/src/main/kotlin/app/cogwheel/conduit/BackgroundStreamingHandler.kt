@@ -1,4 +1,4 @@
-package app.cogwheel.conduit
+package nl.eo.eochat
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -58,8 +58,10 @@ class BackgroundStreamingService : Service() {
         const val EXTRA_REQUIRES_MICROPHONE = "requiresMicrophone"
         const val EXTRA_STREAM_COUNT = "streamCount"
         
-        const val ACTION_TIME_LIMIT_APPROACHING = "app.cogwheel.conduit.TIME_LIMIT_APPROACHING"
-        const val ACTION_MIC_PERMISSION_FALLBACK = "app.cogwheel.conduit.MIC_PERMISSION_FALLBACK"
+        const val ACTION_TIME_LIMIT_APPROACHING =
+            "nl.eo.eochat.TIME_LIMIT_APPROACHING"
+        const val ACTION_MIC_PERMISSION_FALLBACK =
+            "nl.eo.eochat.MIC_PERMISSION_FALLBACK"
         const val EXTRA_REMAINING_MINUTES = "remainingMinutes"
     }
 
@@ -96,7 +98,7 @@ class BackgroundStreamingService : Service() {
                 // Otherwise startForeground throws "Bad notification" error
                 ensureNotificationChannel()
                 val fallbackNotification = NotificationCompat.Builder(this, CHANNEL_ID)
-                    .setContentTitle("Conduit")
+                    .setContentTitle("EOchat")
                     .setSmallIcon(R.drawable.ic_hub)
                     .setSilent(true)
                     .setOngoing(true)  // Prevent user from dismissing foreground service notification
@@ -210,7 +212,7 @@ class BackgroundStreamingService : Service() {
     
     private fun sendFailureNotification(e: Exception) {
         // Send broadcast intent to notify MainActivity
-        val intent = Intent("app.cogwheel.conduit.FOREGROUND_SERVICE_FAILED")
+        val intent = Intent("nl.eo.eochat.FOREGROUND_SERVICE_FAILED")
         intent.putExtra("error", e.message ?: "Unknown error")
         intent.putExtra("errorType", e.javaClass.simpleName)
         sendBroadcast(intent)
@@ -266,7 +268,7 @@ class BackgroundStreamingService : Service() {
 
         // Create a minimal, silent notification (required for foreground service)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Conduit")
+            .setContentTitle("EOchat")
             .setContentText("Background service active")
             .setSmallIcon(R.drawable.ic_hub)
             .setContentIntent(pendingIntent)
@@ -291,7 +293,7 @@ class BackgroundStreamingService : Service() {
             "Background Service",
             NotificationManager.IMPORTANCE_LOW,
         ).apply {
-            description = "Background service for Conduit"
+            description = "Background service for EOchat"
             setShowBadge(false)
             enableLights(false)
             enableVibration(false)
@@ -326,7 +328,7 @@ class BackgroundStreamingService : Service() {
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
-            "Conduit::StreamingWakeLock"
+            "EOchat::StreamingWakeLock"
         ).apply {
             // Disable reference counting for deterministic single-holder behavior
             // This prevents accumulation if acquireWakeLock is called multiple times
@@ -494,7 +496,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
     }
     
     companion object {
-        private const val CHANNEL_NAME = "conduit/background_streaming"
+        private const val CHANNEL_NAME = "eochat/background_streaming"
     }
 
     fun setup(flutterEngine: FlutterEngine) {
@@ -525,7 +527,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
         broadcastReceiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    "app.cogwheel.conduit.FOREGROUND_SERVICE_FAILED" -> {
+                    "nl.eo.eochat.FOREGROUND_SERVICE_FAILED" -> {
                         val error = intent.getStringExtra("error") ?: "Unknown error"
                         val errorType = intent.getStringExtra("errorType") ?: "Exception"
                         
@@ -563,7 +565,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
         }
         
         val filter = android.content.IntentFilter().apply {
-            addAction("app.cogwheel.conduit.FOREGROUND_SERVICE_FAILED")
+            addAction("nl.eo.eochat.FOREGROUND_SERVICE_FAILED")
             addAction(BackgroundStreamingService.ACTION_TIME_LIMIT_APPROACHING)
             addAction(BackgroundStreamingService.ACTION_MIC_PERMISSION_FALLBACK)
         }
@@ -777,7 +779,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val name = "Background Service"
-            val descriptionText = "Background service for Conduit"
+            val descriptionText = "Background service for EOchat"
             val importance = NotificationManager.IMPORTANCE_LOW
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val existingChannel = notificationManager.getNotificationChannel(

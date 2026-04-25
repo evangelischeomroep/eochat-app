@@ -1,4 +1,4 @@
-package app.cogwheel.conduit
+package nl.eo.eochat
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -8,7 +8,7 @@ import android.widget.RemoteViews
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 
 /**
- * Home screen widget provider for Conduit.
+ * Home screen widget provider for EOchat.
  * 
  * Provides quick actions:
  * - New Chat: Start a fresh conversation
@@ -59,7 +59,7 @@ class ConduitWidgetProvider : AppWidgetProvider() {
                 HomeWidgetLaunchIntent.getActivity(
                     context,
                     MainActivity::class.java,
-                    Uri.parse("conduit://$ACTION_NEW_CHAT?homeWidget=true")
+                    Uri.parse("eochat://$ACTION_NEW_CHAT?homeWidget=true")
                 )
             )
             views.setOnClickPendingIntent(
@@ -67,7 +67,7 @@ class ConduitWidgetProvider : AppWidgetProvider() {
                 HomeWidgetLaunchIntent.getActivity(
                     context,
                     MainActivity::class.java,
-                    Uri.parse("conduit://$ACTION_NEW_CHAT?homeWidget=true")
+                    Uri.parse("eochat://$ACTION_NEW_CHAT?homeWidget=true")
                 )
             )
             views.setOnClickPendingIntent(
@@ -75,7 +75,7 @@ class ConduitWidgetProvider : AppWidgetProvider() {
                 HomeWidgetLaunchIntent.getActivity(
                     context,
                     MainActivity::class.java,
-                    Uri.parse("conduit://$ACTION_MIC?homeWidget=true")
+                    Uri.parse("eochat://$ACTION_MIC?homeWidget=true")
                 )
             )
             views.setOnClickPendingIntent(
@@ -83,7 +83,7 @@ class ConduitWidgetProvider : AppWidgetProvider() {
                 HomeWidgetLaunchIntent.getActivity(
                     context,
                     MainActivity::class.java,
-                    Uri.parse("conduit://$ACTION_CAMERA?homeWidget=true")
+                    Uri.parse("eochat://$ACTION_CAMERA?homeWidget=true")
                 )
             )
             views.setOnClickPendingIntent(
@@ -91,7 +91,7 @@ class ConduitWidgetProvider : AppWidgetProvider() {
                 HomeWidgetLaunchIntent.getActivity(
                     context,
                     MainActivity::class.java,
-                    Uri.parse("conduit://$ACTION_PHOTOS?homeWidget=true")
+                    Uri.parse("eochat://$ACTION_PHOTOS?homeWidget=true")
                 )
             )
             views.setOnClickPendingIntent(
@@ -99,7 +99,7 @@ class ConduitWidgetProvider : AppWidgetProvider() {
                 HomeWidgetLaunchIntent.getActivity(
                     context,
                     MainActivity::class.java,
-                    Uri.parse("conduit://$ACTION_CLIPBOARD?homeWidget=true")
+                    Uri.parse("eochat://$ACTION_CLIPBOARD?homeWidget=true")
                 )
             )
 
@@ -107,4 +107,3 @@ class ConduitWidgetProvider : AppWidgetProvider() {
         }
     }
 }
-

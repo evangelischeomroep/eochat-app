@@ -1,4 +1,4 @@
-package app.cogwheel.conduit
+package nl.eo.eochat
 
 import android.app.Activity
 import android.content.Intent
@@ -28,4 +28,3 @@ class ProcessTextActivity : Activity() {
         finish()
     }
 }
-

@@ -13,6 +13,7 @@ import 'package:uuid/uuid.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 
 import '../../../core/auth/webview_cookie_helper.dart';
+import '../../../core/config/fork_overrides.dart';
 import '../../../core/models/server_config.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
@@ -62,7 +63,14 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
 
   Future<void> _prefillFromState() async {
     final activeServer = await ref.read(activeServerProvider.future);
-    if (!mounted || activeServer == null) return;
+    if (!mounted) return;
+    if (activeServer == null) {
+      if (ForkOverrides.hasPreconfiguredServer &&
+          _urlController.text.trim().isEmpty) {
+        _urlController.text = ForkOverrides.normalizedPreconfiguredServerUrl;
+      }
+      return;
+    }
     setState(() {
       _urlController.text = activeServer.url;
       _customHeaders

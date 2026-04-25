@@ -18,25 +18,25 @@ final class VoiceBackgroundAudioManager {
 
     private var isActive = false
     private let lock = NSLock()
-    
+
     /// Flag indicating another component (e.g., speech_to_text plugin) owns the audio session.
     /// When true, this manager will skip activation to avoid conflicts.
     private var externalSessionOwner = false
 
     private init() {}
-    
+
     /// Mark that an external component (e.g., speech_to_text) is managing the audio session.
     /// Call this before starting local STT to prevent conflicts.
     func setExternalSessionOwner(_ isExternal: Bool) {
         lock.lock()
         defer { lock.unlock() }
         externalSessionOwner = isExternal
-        
+
         if isExternal {
             print("VoiceBackgroundAudioManager: External session owner active, deferring to external management")
         }
     }
-    
+
     /// Check if an external component owns the audio session.
     var hasExternalSessionOwner: Bool {
         lock.lock()
@@ -47,9 +47,9 @@ final class VoiceBackgroundAudioManager {
     func activate() {
         lock.lock()
         defer { lock.unlock() }
-        
+
         guard !isActive else { return }
-        
+
         // Skip if another component is managing the audio session
         if externalSessionOwner {
             print("VoiceBackgroundAudioManager: Skipping activation - external session owner active")
@@ -62,7 +62,7 @@ final class VoiceBackgroundAudioManager {
             // This helps prevent conflicts if speech_to_text already configured the session
             let currentCategory = session.category
             let needsReconfiguration = currentCategory != .playAndRecord
-            
+
             if needsReconfiguration {
                 try session.setCategory(
                     .playAndRecord,
@@ -85,9 +85,9 @@ final class VoiceBackgroundAudioManager {
     func deactivate() {
         lock.lock()
         defer { lock.unlock() }
-        
+
         guard isActive else { return }
-        
+
         // Don't deactivate if external owner - they manage their own lifecycle
         if externalSessionOwner {
             print("VoiceBackgroundAudioManager: Skipping deactivation - external session owner active")
@@ -104,7 +104,7 @@ final class VoiceBackgroundAudioManager {
 
         isActive = false
     }
-    
+
     /// Check if audio session is currently active (thread-safe).
     var isSessionActive: Bool {
         lock.lock()
@@ -121,17 +121,17 @@ class BackgroundStreamingHandler: NSObject {
     private var microphoneStreams: Set<String> = []
     private var channel: FlutterMethodChannel?
 
-    static let processingTaskIdentifier = "app.cogwheel.conduit.refresh"
+    static let processingTaskIdentifier = "nl.eo.eochat.refresh"
 
     override init() {
         super.init()
         setupNotifications()
     }
-    
+
     func setup(with channel: FlutterMethodChannel) {
         self.channel = channel
     }
-    
+
     private func setupNotifications() {
         NotificationCenter.default.addObserver(
             self,
@@ -139,7 +139,7 @@ class BackgroundStreamingHandler: NSObject {
             name: UIApplication.didEnterBackgroundNotification,
             object: nil
         )
-        
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(appWillEnterForeground),
@@ -147,18 +147,18 @@ class BackgroundStreamingHandler: NSObject {
             object: nil
         )
     }
-    
+
     @objc private func appDidEnterBackground() {
         if !activeStreams.isEmpty {
             startBackgroundTask()
             scheduleBGProcessingTask()
         }
     }
-    
+
     @objc private func appWillEnterForeground() {
         endBackgroundTask()
     }
-    
+
     func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "startBackgroundExecution":
@@ -170,7 +170,7 @@ class BackgroundStreamingHandler: NSObject {
             } else {
                 result(FlutterError(code: "INVALID_ARGS", message: "Invalid arguments", details: nil))
             }
-            
+
         case "stopBackgroundExecution":
             if let args = call.arguments as? [String: Any],
                let streamIds = args["streamIds"] as? [String] {
@@ -179,11 +179,11 @@ class BackgroundStreamingHandler: NSObject {
             } else {
                 result(FlutterError(code: "INVALID_ARGS", message: "Invalid arguments", details: nil))
             }
-            
+
         case "keepAlive":
             keepAlive()
             result(nil)
-            
+
         case "checkBackgroundRefreshStatus":
             // Check if background app refresh is enabled by the user
             let status = UIApplication.shared.backgroundRefreshStatus
@@ -195,7 +195,7 @@ class BackgroundStreamingHandler: NSObject {
             @unknown default:
                 result(true) // Assume available for future cases
             }
-        
+
         case "setExternalAudioSessionOwner":
             // Coordinate with speech_to_text plugin to prevent audio session conflicts
             if let args = call.arguments as? [String: Any],
@@ -205,30 +205,30 @@ class BackgroundStreamingHandler: NSObject {
             } else {
                 result(FlutterError(code: "INVALID_ARGS", message: "Missing isExternal argument", details: nil))
             }
-            
+
         case "getActiveStreamCount":
             // Return count for Flutter-native state reconciliation
             result(activeStreams.count)
-            
+
         case "stopAllBackgroundExecution":
             // Stop all streams (used for reconciliation when orphaned service detected)
             let allStreams = Array(activeStreams)
             stopBackgroundExecution(streamIds: allStreams)
             result(nil)
-            
+
         default:
             result(FlutterMethodNotImplemented)
         }
     }
-    
+
     private func startBackgroundExecution(streamIds: [String], requiresMic: Bool) {
         // Add new stream IDs to active set
         activeStreams.formUnion(streamIds)
-        
+
         // Clean up any mic streams that are no longer active (e.g., completed streams)
         // This ensures microphoneStreams stays in sync with activeStreams
         microphoneStreams.formIntersection(activeStreams)
-        
+
         // If these new streams require microphone, add them to the mic set
         if requiresMic {
             microphoneStreams.formUnion(streamIds)
@@ -259,10 +259,10 @@ class BackgroundStreamingHandler: NSObject {
             VoiceBackgroundAudioManager.shared.deactivate()
         }
     }
-    
+
     private func startBackgroundTask() {
         guard backgroundTask == .invalid else { return }
-        
+
         backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "ConduitStreaming") { [weak self] in
             guard let self = self else { return }
             // Notify Flutter about streams being suspended before task expires
@@ -271,20 +271,20 @@ class BackgroundStreamingHandler: NSObject {
             self.endBackgroundTask()
         }
     }
-    
+
     private func endBackgroundTask() {
         guard backgroundTask != .invalid else { return }
-        
+
         UIApplication.shared.endBackgroundTask(backgroundTask)
         backgroundTask = .invalid
     }
-    
+
     private func keepAlive() {
         // Use atomic task refresh: start new task before ending old one
         // This prevents the brief window where iOS could suspend the app
         if backgroundTask != .invalid {
             let oldTask = backgroundTask
-            
+
             // Begin a new task BEFORE marking old one invalid
             // This ensures continuous background execution coverage
             let newTask = UIApplication.shared.beginBackgroundTask(withName: "ConduitStreaming") { [weak self] in
@@ -297,7 +297,7 @@ class BackgroundStreamingHandler: NSObject {
                     self.backgroundTask = .invalid
                 }
             }
-            
+
             // Only update state if we successfully got a new task
             if newTask != .invalid {
                 backgroundTask = newTask
@@ -315,7 +315,7 @@ class BackgroundStreamingHandler: NSObject {
             VoiceBackgroundAudioManager.shared.activate()
         }
     }
-    
+
     private func notifyStreamsSuspending(reason: String) {
         guard !activeStreams.isEmpty else { return }
         channel?.invokeMethod("streamsSuspending", arguments: [
@@ -444,7 +444,7 @@ final class AppIntentMethodChannel {
 
     init(messenger: FlutterBinaryMessenger) {
         channel = FlutterMethodChannel(
-            name: "conduit/app_intents",
+            name: "eochat/app_intents",
             binaryMessenger: messenger
         )
     }
@@ -484,16 +484,16 @@ enum AppIntentError: Error {
 
 @available(iOS 16.0, *)
 struct AskConduitIntent: AppIntent {
-    static var title: LocalizedStringResource = "Ask Conduit"
+    static var title: LocalizedStringResource = "Ask EOchat"
     static var description = IntentDescription(
-        "Start a Conduit chat with an optional prompt."
+        "Start an EOchat chat with an optional prompt."
     )
     static var isDiscoverable = true
     static var openAppWhenRun = true
 
     @Parameter(
         title: "Prompt",
-        requestValueDialog: IntentDialog("What should Conduit answer?")
+        requestValueDialog: IntentDialog("What should EOchat answer?")
     )
     var prompt: String?
 
@@ -514,7 +514,7 @@ struct AskConduitIntent: AppIntent {
             ? ["prompt": prompt ?? ""]
             : [:]
         let result = await channel.invokeIntent(
-            identifier: "app.cogwheel.conduit.ask_chat",
+            identifier: "nl.eo.eochat.ask_chat",
             parameters: parameters
         )
 
@@ -524,16 +524,16 @@ struct AskConduitIntent: AppIntent {
         }
 
         let message = result["error"] as? String
-            ?? "Unable to open Conduit chat"
+            ?? "Kan EOchat niet openen"
         throw AppIntentError.executionFailed(message)
     }
 }
 
 @available(iOS 16.0, *)
 struct StartVoiceCallIntent: AppIntent {
-    static var title: LocalizedStringResource = "Start Voice Call"
+    static var title: LocalizedStringResource = "Live gesprek starten"
     static var description = IntentDescription(
-        "Start a live voice call with Conduit."
+        "Start een live gesprek EOchat."
     )
     static var isDiscoverable = true
     static var openAppWhenRun = true
@@ -546,7 +546,7 @@ struct StartVoiceCallIntent: AppIntent {
         }
 
         let result = await channel.invokeIntent(
-            identifier: "app.cogwheel.conduit.start_voice_call",
+            identifier: "nl.eo.eochat.start_voice_call",
             parameters: [:]
         )
 
@@ -563,16 +563,16 @@ struct StartVoiceCallIntent: AppIntent {
 
 @available(iOS 16.0, *)
 struct ConduitSendTextIntent: AppIntent {
-    static var title: LocalizedStringResource = "Send to Conduit"
+    static var title: LocalizedStringResource = "Stuur naar EOchat"
     static var description = IntentDescription(
-        "Start a Conduit chat with provided text."
+        "Start een EOchat met deze text."
     )
     static var isDiscoverable = true
     static var openAppWhenRun = true
 
     @Parameter(
         title: "Text",
-        requestValueDialog: IntentDialog("What should Conduit process?")
+        requestValueDialog: IntentDialog("Wat moet EOchat verwerken?")
     )
     var text: String?
 
@@ -585,12 +585,12 @@ struct ConduitSendTextIntent: AppIntent {
 
         let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines)
         let result = await channel.invokeIntent(
-            identifier: "app.cogwheel.conduit.send_text",
+            identifier: "nl.eo.eochat.send_text",
             parameters: ["text": trimmed ?? ""]
         )
 
         if let success = result["success"] as? Bool, success {
-            let value = result["value"] as? String ?? "Sent to Conduit"
+            let value = result["value"] as? String ?? "Stuur naar EOchat"
             return .result(value: value)
         }
 
@@ -601,16 +601,16 @@ struct ConduitSendTextIntent: AppIntent {
 
 @available(iOS 16.0, *)
 struct ConduitSendUrlIntent: AppIntent {
-    static var title: LocalizedStringResource = "Send Link to Conduit"
+    static var title: LocalizedStringResource = "Stuur link naar EOchat"
     static var description = IntentDescription(
-        "Send a URL into Conduit for summary or analysis."
+        "Stuur een URL naar EOchat om mee te werken."
     )
     static var isDiscoverable = true
     static var openAppWhenRun = true
 
     @Parameter(
         title: "URL",
-        requestValueDialog: IntentDialog("Which link should Conduit analyze?")
+        requestValueDialog: IntentDialog("Welke link moet EOchat uitlezen?")
     )
     var url: URL
 
@@ -622,12 +622,12 @@ struct ConduitSendUrlIntent: AppIntent {
         }
 
         let result = await channel.invokeIntent(
-            identifier: "app.cogwheel.conduit.send_url",
+            identifier: "nl.eo.eochat.send_url",
             parameters: ["url": url.absoluteString]
         )
 
         if let success = result["success"] as? Bool, success {
-            let value = result["value"] as? String ?? "Sent link to Conduit"
+            let value = result["value"] as? String ?? "Stuur link naar EOchat"
             return .result(value: value)
         }
 
@@ -638,16 +638,16 @@ struct ConduitSendUrlIntent: AppIntent {
 
 @available(iOS 16.0, *)
 struct ConduitSendImageIntent: AppIntent {
-    static var title: LocalizedStringResource = "Send Image to Conduit"
+    static var title: LocalizedStringResource = "Stuur afbeelding naar EOchat"
     static var description = IntentDescription(
-        "Send an image into Conduit for analysis."
+        "Stuur een afbeelding naar EOchat om mee te werken."
     )
     static var isDiscoverable = true
     static var openAppWhenRun = true
 
     @Parameter(
         title: "Image",
-        requestValueDialog: IntentDialog("Choose an image for Conduit.")
+        requestValueDialog: IntentDialog("Kies een afbeelding voor EOchat.")
     )
     var image: IntentFile
 
@@ -669,7 +669,7 @@ struct ConduitSendImageIntent: AppIntent {
         let name = image.filename ?? "shared_image.jpg"
 
         let result = await channel.invokeIntent(
-            identifier: "app.cogwheel.conduit.send_image",
+            identifier: "nl.eo.eochat.send_image",
             parameters: [
                 "filename": name,
                 "bytes": base64,
@@ -677,7 +677,7 @@ struct ConduitSendImageIntent: AppIntent {
         )
 
         if let success = result["success"] as? Bool, success {
-            let value = result["value"] as? String ?? "Sent image to Conduit"
+            let value = result["value"] as? String ?? "Stuur een afbeelding naar EOchat"
             return .result(value: value)
         }
 
@@ -774,7 +774,7 @@ struct AppShortcuts: AppShortcutsProvider {
     // Setup background streaming handler
     let bgRegistrar = engineBridge.applicationRegistrar
     let channel = FlutterMethodChannel(
-      name: "conduit/background_streaming",
+      name: "eochat/background_streaming",
       binaryMessenger: bgRegistrar.messenger()
     )
 
@@ -792,7 +792,7 @@ struct AppShortcuts: AppShortcutsProvider {
     // Setup cookie manager channel for WebView cookie access
     let cookieRegistrar = engineBridge.applicationRegistrar
     let cookieChannel = FlutterMethodChannel(
-      name: "com.conduit.app/cookies",
+      name: "nl.eo.eochat/cookies",
       binaryMessenger: cookieRegistrar.messenger()
     )
 

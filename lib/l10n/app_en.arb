@@ -1,6 +1,6 @@
 {
   "@@locale": "en",
-  "appTitle": "Conduit",
+  "appTitle": "EOchat",
   "@appTitle": {
     "description": "Application name displayed in the app and OS UI."
   },
@@ -506,7 +506,51 @@
   "@voiceCallErrorHelp": {
     "description": "Guidance shown when the voice call encounters an error."
   },
-  "messageHintText": "Ask Conduit",
+  "callkitNotificationPermissionTitle": "Notification permission",
+  "@callkitNotificationPermissionTitle": {
+    "description": "Title for the CallKit notification permission prompt."
+  },
+  "callkitNotificationPermissionRationale": "Call alerts need notification permission.",
+  "@callkitNotificationPermissionRationale": {
+    "description": "Rationale shown before requesting notification permission for call alerts."
+  },
+  "callkitNotificationPermissionPostMessage": "Allow notifications to show incoming calls.",
+  "@callkitNotificationPermissionPostMessage": {
+    "description": "Follow-up message explaining why notification permission is needed for incoming calls."
+  },
+  "callkitActionAccept": "Accept",
+  "@callkitActionAccept": {
+    "description": "CallKit action label to accept a call."
+  },
+  "callkitActionDecline": "Decline",
+  "@callkitActionDecline": {
+    "description": "CallKit action label to decline a call."
+  },
+  "callkitMissedCallSubtitle": "Missed call",
+  "@callkitMissedCallSubtitle": {
+    "description": "Subtitle for missed call notifications."
+  },
+  "callkitCallBackAction": "Call back",
+  "@callkitCallBackAction": {
+    "description": "Action label to call back from a missed call notification."
+  },
+  "callkitCallingSubtitle": "Calling...",
+  "@callkitCallingSubtitle": {
+    "description": "Subtitle shown while placing an outgoing call."
+  },
+  "callkitHangUpAction": "Hang up",
+  "@callkitHangUpAction": {
+    "description": "Action label to end an ongoing outgoing call notification."
+  },
+  "callkitIncomingCallChannelName": "Incoming Call",
+  "@callkitIncomingCallChannelName": {
+    "description": "Android notification channel name for incoming calls."
+  },
+  "callkitMissedCallChannelName": "Missed Call",
+  "@callkitMissedCallChannelName": {
+    "description": "Android notification channel name for missed calls."
+  },
+  "messageHintText": "Ask EOchat",
   "@messageHintText": {
     "description": "Short placeholder text in the message input."
   },
@@ -876,7 +920,7 @@
   "@aboutApp": {
     "description": "Settings tile title to view app information."
   },
-  "aboutAppSubtitle": "Conduit information and links",
+  "aboutAppSubtitle": "EOchat information and links",
   "@aboutAppSubtitle": {
     "description": "Subtitle/description for the About section."
   },
@@ -1181,13 +1225,13 @@
   "@themePalette": {
     "description": "Title for selecting the app color palette."
   },
-  "themePaletteConduitLabel": "Conduit",
+  "themePaletteConduitLabel": "EOchat",
   "@themePaletteConduitLabel": {
-    "description": "Palette name for the default Conduit theme."
+    "description": "Palette name for the default EOchat theme."
   },
-  "themePaletteConduitDescription": "Clean neutral theme designed for Conduit.",
+  "themePaletteConduitDescription": "Clean neutral theme designed for EOchat.",
   "@themePaletteConduitDescription": {
-    "description": "Description of the Conduit palette."
+    "description": "Description of the EOchat palette."
   },
   "themePaletteClaudeLabel": "Claude",
   "@themePaletteClaudeLabel": {
@@ -1233,7 +1277,7 @@
   "@currentlyUsingLightTheme": {
     "description": "Status text indicating light theme is active."
   },
-  "aboutConduit": "About Conduit",
+  "aboutConduit": "About EOchat",
   "@aboutConduit": {
     "description": "Dialog title for app information."
   },
@@ -1341,7 +1385,7 @@
   "@androidAssistantOverlayOption": {
     "description": "Option label for keeping the current assistant overlay."
   },
-  "androidAssistantNewChatOption": "Open Conduit with a new chat",
+  "androidAssistantNewChatOption": "Open EOchat with a new chat",
   "@androidAssistantNewChatOption": {
     "description": "Option label for opening the app to a fresh chat from the assistant trigger."
   },
