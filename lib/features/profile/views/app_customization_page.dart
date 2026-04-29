@@ -592,9 +592,8 @@ class AppCustomizationPage extends ConsumerWidget {
                                 theme.headingSmall?.copyWith(
                                   color: theme.sidebarForeground,
                                 ) ??
-                                TextStyle(
+                                AppTypography.headlineSmallStyle.copyWith(
                                   color: theme.sidebarForeground,
-                                  fontSize: 18,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
@@ -607,7 +606,7 @@ class AppCustomizationPage extends ConsumerWidget {
                                     alpha: 0.7,
                                   ),
                                 ) ??
-                                TextStyle(
+                                AppTypography.bodySmallStyle.copyWith(
                                   color: theme.sidebarForeground.withValues(
                                     alpha: 0.7,
                                   ),
@@ -736,9 +735,8 @@ class AppCustomizationPage extends ConsumerWidget {
                             color: theme.sidebarForeground,
                             fontWeight: FontWeight.w600,
                           ) ??
-                          TextStyle(
+                          AppTypography.bodyMediumStyle.copyWith(
                             color: theme.sidebarForeground,
-                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -786,9 +784,8 @@ class AppCustomizationPage extends ConsumerWidget {
                       theme.bodyMedium?.copyWith(
                         color: theme.sidebarForeground.withValues(alpha: 0.9),
                       ) ??
-                      TextStyle(
+                      AppTypography.bodyMediumStyle.copyWith(
                         color: theme.sidebarForeground.withValues(alpha: 0.9),
-                        fontSize: 14,
                       ),
                 ),
               ),
@@ -804,9 +801,8 @@ class AppCustomizationPage extends ConsumerWidget {
                             color: theme.error,
                             fontWeight: FontWeight.w600,
                           ) ??
-                          TextStyle(
+                          AppTypography.bodySmallStyle.copyWith(
                             color: theme.error,
-                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -830,9 +826,8 @@ class AppCustomizationPage extends ConsumerWidget {
                                   color: theme.sidebarForeground,
                                   fontWeight: FontWeight.w600,
                                 ) ??
-                                TextStyle(
+                                AppTypography.bodyMediumStyle.copyWith(
                                   color: theme.sidebarForeground,
-                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
                           ),
@@ -845,11 +840,10 @@ class AppCustomizationPage extends ConsumerWidget {
                                     alpha: 0.7,
                                   ),
                                 ) ??
-                                TextStyle(
+                                AppTypography.bodySmallStyle.copyWith(
                                   color: theme.sidebarForeground.withValues(
                                     alpha: 0.7,
                                   ),
-                                  fontSize: 12,
                                 ),
                           ),
                         ],
@@ -862,9 +856,8 @@ class AppCustomizationPage extends ConsumerWidget {
                             color: theme.buttonPrimary,
                             fontWeight: FontWeight.w600,
                           ) ??
-                          TextStyle(
+                          AppTypography.bodyMediumStyle.copyWith(
                             color: theme.buttonPrimary,
-                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -873,9 +866,12 @@ class AppCustomizationPage extends ConsumerWidget {
                 const SizedBox(height: Spacing.sm),
                 AdaptiveSlider(
                   value: settings.voiceSilenceDuration.toDouble(),
-                  min: 300,
-                  max: 3000,
-                  divisions: 27,
+                  min: SettingsService.minVoiceSilenceDurationMs.toDouble(),
+                  max: SettingsService.maxVoiceSilenceDurationMs.toDouble(),
+                  divisions:
+                      (SettingsService.maxVoiceSilenceDurationMs -
+                          SettingsService.minVoiceSilenceDurationMs) ~/
+                      100,
                   activeColor: theme.buttonPrimary,
                   onChanged: (value) {
                     notifier.setVoiceSilenceDuration(value.round());
@@ -887,9 +883,8 @@ class AppCustomizationPage extends ConsumerWidget {
                       theme.bodySmall?.copyWith(
                         color: theme.sidebarForeground.withValues(alpha: 0.7),
                       ) ??
-                      TextStyle(
+                      AppTypography.bodySmallStyle.copyWith(
                         color: theme.sidebarForeground.withValues(alpha: 0.7),
-                        fontSize: 12,
                       ),
                 ),
               ],
@@ -955,7 +950,9 @@ class AppCustomizationPage extends ConsumerWidget {
                           color: theme.sidebarForeground,
                           fontWeight: FontWeight.w600,
                         ) ??
-                        TextStyle(color: theme.sidebarForeground, fontSize: 14),
+                        AppTypography.bodyMediumStyle.copyWith(
+                          color: theme.sidebarForeground,
+                        ),
                   ),
                 ],
               ),
@@ -996,9 +993,8 @@ class AppCustomizationPage extends ConsumerWidget {
                       theme.bodyMedium?.copyWith(
                         color: theme.sidebarForeground.withValues(alpha: 0.9),
                       ) ??
-                      TextStyle(
+                      AppTypography.bodyMediumStyle.copyWith(
                         color: theme.sidebarForeground.withValues(alpha: 0.9),
-                        fontSize: 14,
                       ),
                 ),
               ),
@@ -1014,9 +1010,8 @@ class AppCustomizationPage extends ConsumerWidget {
                             color: theme.error,
                             fontWeight: FontWeight.w600,
                           ) ??
-                          TextStyle(
+                          AppTypography.bodySmallStyle.copyWith(
                             color: theme.error,
-                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -1165,7 +1160,9 @@ class AppCustomizationPage extends ConsumerWidget {
                         color: theme.sidebarForeground,
                         fontWeight: FontWeight.w500,
                       ) ??
-                      TextStyle(color: theme.sidebarForeground, fontSize: 14),
+                      AppTypography.bodyMediumStyle.copyWith(
+                        color: theme.sidebarForeground,
+                      ),
                 ),
               ),
               Text(
@@ -1175,9 +1172,8 @@ class AppCustomizationPage extends ConsumerWidget {
                       color: theme.sidebarForeground.withValues(alpha: 0.75),
                       fontWeight: FontWeight.w500,
                     ) ??
-                    TextStyle(
+                    AppTypography.bodyMediumStyle.copyWith(
                       color: theme.sidebarForeground.withValues(alpha: 0.75),
-                      fontSize: 14,
                     ),
               ),
             ],
@@ -1304,7 +1300,9 @@ class AppCustomizationPage extends ConsumerWidget {
                               ? FontWeight.bold
                               : FontWeight.normal,
                         ) ??
-                        TextStyle(color: theme.sidebarForeground),
+                        AppTypography.bodyMediumStyle.copyWith(
+                          color: theme.sidebarForeground,
+                        ),
                   ),
                   trailing:
                       (settings.ttsEngine == TtsEngine.server
@@ -1349,20 +1347,12 @@ class AppCustomizationPage extends ConsumerWidget {
                             l10n.ttsVoicesForLanguage(
                               appLanguageCode.toUpperCase(),
                             ),
-                            style:
-                                theme.bodySmall?.copyWith(
-                                  color: theme.sidebarForeground.withValues(
-                                    alpha: 0.75,
-                                  ),
-                                  fontWeight: FontWeight.bold,
-                                ) ??
-                                TextStyle(
-                                  color: theme.sidebarForeground.withValues(
-                                    alpha: 0.75,
-                                  ),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: AppTypography.labelStyle.copyWith(
+                              color: theme.sidebarForeground.withValues(
+                                alpha: 0.75,
+                              ),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         );
                       }
@@ -1375,20 +1365,12 @@ class AppCustomizationPage extends ConsumerWidget {
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                           child: Text(
                             l10n.ttsOtherVoices,
-                            style:
-                                theme.bodySmall?.copyWith(
-                                  color: theme.sidebarForeground.withValues(
-                                    alpha: 0.75,
-                                  ),
-                                  fontWeight: FontWeight.bold,
-                                ) ??
-                                TextStyle(
-                                  color: theme.sidebarForeground.withValues(
-                                    alpha: 0.75,
-                                  ),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                            style: AppTypography.labelStyle.copyWith(
+                              color: theme.sidebarForeground.withValues(
+                                alpha: 0.75,
+                              ),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         );
                       }
@@ -1429,7 +1411,9 @@ class AppCustomizationPage extends ConsumerWidget {
                                     ? FontWeight.bold
                                     : FontWeight.normal,
                               ) ??
-                              TextStyle(color: theme.sidebarForeground),
+                              AppTypography.bodyMediumStyle.copyWith(
+                                color: theme.sidebarForeground,
+                              ),
                         ),
                         subtitle: subtitle.isNotEmpty
                             ? Text(
@@ -1440,11 +1424,10 @@ class AppCustomizationPage extends ConsumerWidget {
                                         alpha: 0.75,
                                       ),
                                     ) ??
-                                    TextStyle(
+                                    AppTypography.bodySmallStyle.copyWith(
                                       color: theme.sidebarForeground.withValues(
                                         alpha: 0.75,
                                       ),
-                                      fontSize: 12,
                                     ),
                               )
                             : null,
@@ -1824,16 +1807,10 @@ class AppCustomizationPage extends ConsumerWidget {
       ),
       child: Text(
         label,
-        style:
-            theme.bodySmall?.copyWith(
-              color: theme.buttonPrimary,
-              fontWeight: FontWeight.w600,
-            ) ??
-            TextStyle(
-              color: theme.buttonPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
-            ),
+        style: AppTypography.labelMediumStyle.copyWith(
+          color: theme.buttonPrimary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -2156,7 +2133,9 @@ class _SectionHeader extends StatelessWidget {
       title,
       style:
           theme.headingSmall?.copyWith(color: theme.sidebarForeground) ??
-          TextStyle(color: theme.sidebarForeground, fontSize: 18),
+          AppTypography.headlineSmallStyle.copyWith(
+            color: theme.sidebarForeground,
+          ),
     );
   }
 }
@@ -2184,9 +2163,8 @@ class _SheetHeader extends StatelessWidget {
                   theme.headingSmall?.copyWith(
                     color: theme.sidebarForeground,
                   ) ??
-                  TextStyle(
+                  AppTypography.headlineSmallStyle.copyWith(
                     color: theme.sidebarForeground,
-                    fontSize: 18,
                     fontWeight: FontWeight.w600,
                   ),
             ),

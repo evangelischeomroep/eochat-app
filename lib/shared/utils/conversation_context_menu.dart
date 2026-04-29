@@ -7,7 +7,6 @@ import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/widgets/themed_dialogs.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:conduit/core/services/haptic_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:super_context_menu/super_context_menu.dart';
@@ -58,6 +57,10 @@ class ConduitContextMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (actions.isEmpty) {
+      return child;
+    }
+
     // iOS: Use native context menu
     if (Platform.isIOS) {
       return ContextMenuWidget(
@@ -196,8 +199,7 @@ class _ConduitMobileMenuBuilder extends mobile.MobileMenuWidgetBuilder {
             Expanded(
               child: Text(
                 element.title ?? '',
-                style: TextStyle(
-                  fontSize: AppTypography.bodyMedium,
+                style: AppTypography.bodyMediumStyle.copyWith(
                   fontWeight: FontWeight.w500,
                   color: textColor,
                   decoration: TextDecoration.none,
@@ -249,8 +251,7 @@ class _ConduitMobileMenuBuilder extends mobile.MobileMenuWidgetBuilder {
             Expanded(
               child: Text(
                 element.title ?? '',
-                style: TextStyle(
-                  fontSize: AppTypography.bodyMedium,
+                style: AppTypography.bodyMediumStyle.copyWith(
                   fontWeight: FontWeight.w500,
                   color: theme.textPrimary,
                   decoration: TextDecoration.none,
@@ -538,7 +539,10 @@ Future<void> _showConversationError(
   await ThemedDialogs.show<void>(
     context,
     title: l10n.errorMessage,
-    content: Text(message, style: TextStyle(color: theme.textSecondary)),
+    content: Text(
+      message,
+      style: AppTypography.bodyMediumStyle.copyWith(color: theme.textSecondary),
+    ),
     actions: [
       AdaptiveButton(
         onPressed: () => Navigator.of(context).pop(),

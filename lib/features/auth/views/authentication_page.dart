@@ -491,8 +491,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
                   child: Text(
                     _authModeLabel(modes[i]),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: AppTypography.bodySmall,
+                    style: AppTypography.bodySmallStyle.copyWith(
                       fontWeight: i == selectedIndex
                           ? FontWeight.w600
                           : FontWeight.w500,

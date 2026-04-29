@@ -37,6 +37,7 @@ import '../widgets/file_attachment_widget.dart';
 import '../widgets/context_attachment_widget.dart';
 import '../widgets/server_file_picker_sheet.dart';
 import '../services/file_attachment_service.dart';
+import '../services/historical_message_regeneration.dart';
 import '../voice_call/presentation/voice_call_launcher.dart';
 import '../../../shared/services/tasks/task_queue.dart';
 import '../../tools/providers/tools_providers.dart';
@@ -87,6 +88,32 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   String _formatModelDisplayName(String name) {
     return name.trim();
+  }
+
+  ({String? displayName, Model? matchedModel}) _resolveModelPresentation({
+    required String? rawModel,
+    required List<Model>? models,
+  }) {
+    final trimmedModel = rawModel?.trim();
+    if (trimmedModel == null || trimmedModel.isEmpty) {
+      return (displayName: null, matchedModel: null);
+    }
+
+    if (models != null) {
+      for (final model in models) {
+        if (model.id == trimmedModel || model.name == trimmedModel) {
+          return (
+            displayName: _formatModelDisplayName(model.name),
+            matchedModel: model,
+          );
+        }
+      }
+    }
+
+    return (
+      displayName: _formatModelDisplayName(trimmedModel),
+      matchedModel: null,
+    );
   }
 
   bool validateFileSize(int fileSize, int maxSizeMB) {
@@ -340,6 +367,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _handleMessageSend(String text, dynamic selectedModel) async {
+    if (ref.read(isLoadingConversationProvider)) {
+      return;
+    }
+
     // Resolve model on-demand if none selected yet
     if (selectedModel == null) {
       try {
@@ -1503,36 +1534,41 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 final isSelected = _selectedMessageIds.contains(message.id);
 
                 // Resolve a friendly model display name for message headers
-                String? displayModelName;
-                Model? matchedModel;
-                final rawModel = message.model;
-                if (rawModel != null && rawModel.isNotEmpty) {
-                  if (models != null) {
-                    try {
-                      // Prefer exact ID match; fall back to exact name match
-                      final match = models.firstWhere(
-                        (m) => m.id == rawModel || m.name == rawModel,
-                      );
-                      matchedModel = match;
-                      displayModelName = _formatModelDisplayName(match.name);
-                    } catch (_) {
-                      // As a fallback, format the raw value to be readable
-                      displayModelName = _formatModelDisplayName(rawModel);
-                    }
-                  } else {
-                    // Models not loaded yet; format raw value for readability
-                    displayModelName = _formatModelDisplayName(rawModel);
-                  }
-                }
+                final modelPresentation = _resolveModelPresentation(
+                  rawModel: message.model,
+                  models: models,
+                );
+                final displayModelName = modelPresentation.displayName;
+                final matchedModel = modelPresentation.matchedModel;
 
                 final modelIconUrl = resolveModelIconUrlForModel(
                   apiService,
                   matchedModel,
                 );
+                final versionModelNames = <String?>[];
+                final versionModelIconUrls = <String?>[];
+                for (final version in message.versions) {
+                  final versionPresentation = _resolveModelPresentation(
+                    rawModel: version.model,
+                    models: models,
+                  );
+                  versionModelNames.add(versionPresentation.displayName);
+                  versionModelIconUrls.add(
+                    resolveModelIconUrlForModel(
+                      apiService,
+                      versionPresentation.matchedModel,
+                    ),
+                  );
+                }
 
                 final adjacency = bubbleAdjacency[index];
                 final hasUserBubbleBelow = adjacency.hasUserBelow;
                 final hasAssistantBubbleBelow = adjacency.hasAssistantBelow;
+                final replacesArchivedAssistant =
+                    !isUser &&
+                    index > 0 &&
+                    messages[index - 1].role == 'assistant' &&
+                    (messages[index - 1].metadata?['archivedVariant'] == true);
 
                 // Hide archived assistant variants in the linear view
                 final isArchivedVariant =
@@ -1564,7 +1600,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       isStreaming: isStreaming,
                       modelName: displayModelName,
                       onCopy: () => _copyMessage(message.content),
-                      onRegenerate: () => _regenerateMessage(message),
+                      onRegenerate: () => _regenerateMessage(message.id),
                     ),
                   );
                 } else {
@@ -1573,10 +1609,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     message: message,
                     isStreaming: isStreaming,
                     showFollowUps: showFollowUps,
+                    animateOnMount: !replacesArchivedAssistant,
                     modelName: displayModelName,
                     modelIconUrl: modelIconUrl,
+                    versionModelNames: versionModelNames,
+                    versionModelIconUrls: versionModelIconUrls,
                     onCopy: () => _copyMessage(message.content),
-                    onRegenerate: () => _regenerateMessage(message),
+                    onRegenerate: () => _regenerateMessage(message.id),
                   );
                 }
 
@@ -1622,47 +1661,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     Clipboard.setData(ClipboardData(text: cleanedContent));
   }
 
-  void _regenerateMessage(dynamic message) async {
-    final selectedModel = ref.read(selectedModelProvider);
-    if (selectedModel == null) {
-      return;
-    }
-
-    // Find the user message that prompted this assistant response
-    final messages = ref.read(chatMessagesProvider);
-    final messageIndex = messages.indexOf(message);
-
-    if (messageIndex <= 0 || messages[messageIndex - 1].role != 'user') {
-      return;
-    }
-
+  void _regenerateMessage(String assistantMessageId) async {
     try {
-      // If assistant message has generated images and it's the last message,
-      // use image-only regenerate flow instead of text streaming regeneration
-      if (message.role == 'assistant' &&
-          (message.files?.any((f) => f['type'] == 'image') == true) &&
-          messageIndex == messages.length - 1) {
-        final regenerateImages = ref.read(regenerateLastMessageProvider);
-        await regenerateImages();
-        return;
-      }
-
-      // Mark previous assistant as archived for UI; keep it for server history
-      ref.read(chatMessagesProvider.notifier).updateLastMessageWithFunction((
-        m,
-      ) {
-        final meta = Map<String, dynamic>.from(m.metadata ?? const {});
-        meta['archivedVariant'] = true;
-        return m.copyWith(metadata: meta, isStreaming: false);
-      });
-
-      // Regenerate response for the previous user message (without duplicating it)
-      final userMessage = messages[messageIndex - 1];
-      await regenerateMessage(
-        ref,
-        userMessage.content,
-        userMessage.attachmentIds,
-      );
+      await regenerateHistoricalMessageById(ref, assistantMessageId);
     } catch (e) {
       DebugLogger.log('Regenerate failed: $e', scope: 'chat/page');
     }
@@ -1698,12 +1699,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     } else if (!hasGreeting && _greetingReady) {
       _greetingReady = false;
     }
-    final greetingStyle = theme.textTheme.headlineSmall?.copyWith(
+    final baseGreetingStyle = AppTypography.usesAppleRamp
+        ? theme.textTheme.displaySmall ?? AppTypography.displaySmallStyle
+        : theme.textTheme.headlineSmall ?? AppTypography.headlineSmallStyle;
+    final greetingStyle = baseGreetingStyle.copyWith(
       fontWeight: FontWeight.w600,
       color: context.conduitTheme.textPrimary,
     );
     final greetingHeight =
-        (greetingStyle?.fontSize ?? 24) * (greetingStyle?.height ?? 1.1);
+        (greetingStyle.fontSize ?? 24) * (greetingStyle.height ?? 1.1);
     final String? resolvedGreetingName = hasGreeting ? greetingName : null;
     final greetingText = resolvedGreetingName != null
         ? l10n.greetingTitle(resolvedGreetingName)
@@ -2280,10 +2284,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 ),
                                 child: Text(
                                   'REVIEWER MODE',
-                                  style: AppTypography.captionStyle.copyWith(
+                                  style: AppTypography.labelSmallStyle.copyWith(
                                     color: context.conduitTheme.success,
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 9,
                                   ),
                                 ),
                               ),
@@ -2512,6 +2515,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               child: ModernChatInput(
                                 onSendMessage: (text) =>
                                     _handleMessageSend(text, selectedModel),
+                                enabled: !isLoadingConversation,
                                 onVoiceInput: null,
                                 onVoiceCall: _handleVoiceCall,
                                 onFileAttachment: _handleFileAttachment,

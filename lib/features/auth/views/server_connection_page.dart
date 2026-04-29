@@ -553,7 +553,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
 
   Future<void> _pickMutualTlsFile({required bool isPrivateKey}) async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         allowMultiple: false,
         type: FileType.custom,
         allowedExtensions: isPrivateKey
@@ -1075,8 +1075,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
                     const SizedBox(height: Spacing.xxs),
                     Text(
                       l10n.allowSelfSignedCertificatesDescription,
-                      style: TextStyle(
-                        fontSize: AppTypography.labelSmall,
+                      style: AppTypography.labelSmallStyle.copyWith(
                         color: theme.textSecondary,
                         height: 1.3,
                       ),
@@ -1112,7 +1111,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
               children: [
                 Text(
                   l10n.mutualTlsSectionTitle,
-                  style: theme.bodySmall?.copyWith(
+                  style: AppTypography.bodySmallStyle.copyWith(
                     fontWeight: FontWeight.w600,
                     color: theme.textPrimary,
                   ),
@@ -1120,8 +1119,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
                 const SizedBox(height: Spacing.xxs),
                 Text(
                   l10n.mutualTlsSectionDescription,
-                  style: TextStyle(
-                    fontSize: AppTypography.labelSmall,
+                  style: AppTypography.labelSmallStyle.copyWith(
                     color: theme.textSecondary,
                     height: 1.3,
                   ),
@@ -1220,7 +1218,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
                       children: [
                         Text(
                           l10n.customHeaders,
-                          style: theme.bodySmall?.copyWith(
+                          style: AppTypography.bodySmallStyle.copyWith(
                             fontWeight: FontWeight.w600,
                             color: theme.textPrimary,
                           ),
@@ -1228,8 +1226,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
                         const SizedBox(height: Spacing.xxs),
                         Text(
                           l10n.customHeadersDescription,
-                          style: TextStyle(
-                            fontSize: AppTypography.labelSmall,
+                          style: AppTypography.labelSmallStyle.copyWith(
                             color: theme.textSecondary,
                             height: 1.3,
                           ),
@@ -1243,8 +1240,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
                       padding: const EdgeInsets.only(right: Spacing.xs),
                       child: Text(
                         '${_customHeaders.length}/10',
-                        style: TextStyle(
-                          fontSize: AppTypography.labelSmall,
+                        style: AppTypography.labelSmallStyle.copyWith(
                           color: _customHeaders.length >= 10
                               ? theme.error
                               : theme.textTertiary,

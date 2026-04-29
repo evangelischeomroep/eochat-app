@@ -9,6 +9,7 @@ import 'package:yaml/yaml.dart' as yaml;
 
 import '../../../core/auth/auth_state_manager.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/model.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart';
 
@@ -911,21 +912,6 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     // Do not archive if it's already streaming (nothing final to archive)
     if (last.isStreaming) return;
 
-    final snapshot = ChatMessageVersion(
-      id: last.id,
-      content: last.content,
-      timestamp: last.timestamp,
-      model: last.model,
-      files: last.files == null
-          ? null
-          : List<Map<String, dynamic>>.from(last.files!),
-      sources: List<ChatSourceReference>.from(last.sources),
-      followUps: List<String>.from(last.followUps),
-      codeExecutions: List<ChatCodeExecution>.from(last.codeExecutions),
-      usage: last.usage == null ? null : Map<String, dynamic>.from(last.usage!),
-      error: last.error, // Preserve error in version snapshot
-    );
-
     final updated = last.copyWith(
       // Start a fresh stream for the new generation
       isStreaming: true,
@@ -936,7 +922,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
       sources: const [],
       usage: null,
       error: null, // Clear error for new generation
-      versions: [...last.versions, snapshot],
+      versions: _buildReplayVersions(last),
     );
 
     state = [...state.sublist(0, state.length - 1), updated];
@@ -1111,19 +1097,8 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
           prev.role == 'assistant' &&
           (prev.metadata?['archivedVariant'] == true);
       if (isArchivedAssistant) {
-        final snapshot = ChatMessageVersion(
-          id: prev.id,
-          content: prev.content,
-          timestamp: prev.timestamp,
-          model: prev.model,
-          files: prev.files,
-          sources: prev.sources,
-          followUps: prev.followUps,
-          codeExecutions: prev.codeExecutions,
-          usage: prev.usage,
-        );
         updatedLast = updatedLast.copyWith(
-          versions: [...updatedLast.versions, snapshot],
+          versions: _buildReplayVersions(prev),
         );
       }
     }
@@ -1227,6 +1202,40 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   void finishStreaming() {
     _completeStreamingMessage(releaseTransport: true);
   }
+}
+
+bool _isArchivedAssistantVariant(ChatMessage message) {
+  return message.role == 'assistant' &&
+      message.metadata?['archivedVariant'] == true;
+}
+
+ChatMessageVersion _buildAssistantVersionSnapshot(ChatMessage message) {
+  return ChatMessageVersion(
+    id: message.id,
+    content: message.content,
+    timestamp: message.timestamp,
+    model: message.model,
+    files: message.files == null
+        ? null
+        : List<Map<String, dynamic>>.from(message.files!),
+    output: message.output == null
+        ? null
+        : List<Map<String, dynamic>>.from(message.output!),
+    embeds: message.embeds == null
+        ? null
+        : List<Map<String, dynamic>>.from(message.embeds!),
+    sources: List<ChatSourceReference>.from(message.sources),
+    followUps: List<String>.from(message.followUps),
+    codeExecutions: List<ChatCodeExecution>.from(message.codeExecutions),
+    usage: message.usage == null
+        ? null
+        : Map<String, dynamic>.from(message.usage!),
+    error: message.error,
+  );
+}
+
+List<ChatMessageVersion> _buildReplayVersions(ChatMessage message) {
+  return [...message.versions, _buildAssistantVersionSnapshot(message)];
 }
 
 // Pre-seed an assistant skeleton message (with a given id or a new one) and
@@ -1784,6 +1793,132 @@ Future<void> restoreDefaultModel(dynamic ref) async {
   }
 }
 
+typedef _ChatFeatureDefaults = ({
+  bool webSearchEnabled,
+  bool imageGenerationEnabled,
+});
+
+Map<String, dynamic>? _asStringDynamicMap(dynamic value) {
+  if (value is Map<String, dynamic>) {
+    return value;
+  }
+  if (value is Map) {
+    return value.map((key, value) => MapEntry(key.toString(), value));
+  }
+  return null;
+}
+
+Iterable<String> _stringList(dynamic value) {
+  if (value is! List) {
+    return const <String>[];
+  }
+  return value.map((item) => item.toString());
+}
+
+bool _isAlwaysOnChatFeatureSetting(
+  Map<String, dynamic>? userSettings, {
+  required String uiKey,
+  required String legacyKey,
+}) {
+  final uiMap = _asStringDynamicMap(userSettings?['ui']);
+  final raw = uiMap?[uiKey] ?? userSettings?[legacyKey];
+
+  if (raw is bool) {
+    return raw;
+  }
+  if (raw is num) {
+    return raw != 0;
+  }
+  if (raw is String) {
+    switch (raw.toLowerCase()) {
+      case 'always':
+      case 'enabled':
+      case 'on':
+      case 'true':
+      case '1':
+        return true;
+      default:
+        return false;
+    }
+  }
+  return false;
+}
+
+Set<String> _extractModelDefaultFeatureIds(Model? model) {
+  final metadata = model?.metadata;
+  final rootMeta = _asStringDynamicMap(metadata?['meta']);
+  final infoMeta = _asStringDynamicMap(
+    _asStringDynamicMap(metadata?['info'])?['meta'],
+  );
+  final defaultFeatureIds = <String>{};
+
+  for (final candidate in <dynamic>[
+    metadata?['defaultFeatureIds'],
+    metadata?['default_feature_ids'],
+    rootMeta?['defaultFeatureIds'],
+    rootMeta?['default_feature_ids'],
+    infoMeta?['defaultFeatureIds'],
+    infoMeta?['default_feature_ids'],
+  ]) {
+    defaultFeatureIds.addAll(_stringList(candidate));
+  }
+
+  return defaultFeatureIds;
+}
+
+_ChatFeatureDefaults _resolveChatFeatureDefaults({
+  required AppSettings appSettings,
+  required Map<String, dynamic>? userSettings,
+  required Model? model,
+}) {
+  final defaultFeatureIds = _extractModelDefaultFeatureIds(model);
+  final webSearchDefault =
+      _isAlwaysOnChatFeatureSetting(
+        userSettings,
+        uiKey: 'webSearch',
+        legacyKey: 'webSearchEnabled',
+      ) ||
+      defaultFeatureIds.contains('web_search');
+  final imageGenerationDefault =
+      _isAlwaysOnChatFeatureSetting(
+        userSettings,
+        uiKey: 'imageGeneration',
+        legacyKey: 'imageGenerationEnabled',
+      ) ||
+      defaultFeatureIds.contains('image_generation');
+
+  return (
+    webSearchEnabled: appSettings.chatWebSearchEnabled ?? webSearchDefault,
+    imageGenerationEnabled:
+        appSettings.chatImageGenerationEnabled ?? imageGenerationDefault,
+  );
+}
+
+@visibleForTesting
+({bool webSearchEnabled, bool imageGenerationEnabled})
+resolveChatFeatureDefaultsForTest({
+  required AppSettings appSettings,
+  Map<String, dynamic>? userSettings,
+  Model? model,
+}) {
+  return _resolveChatFeatureDefaults(
+    appSettings: appSettings,
+    userSettings: userSettings,
+    model: model,
+  );
+}
+
+final _chatFeatureDefaultsProvider = Provider<_ChatFeatureDefaults>((ref) {
+  final appSettings = ref.watch(appSettingsProvider);
+  final userSettings = ref.watch(rawUserSettingsProvider).asData?.value;
+  final selectedModel = ref.watch(selectedModelProvider);
+  return _resolveChatFeatureDefaults(
+    appSettings: appSettings,
+    userSettings: userSettings,
+    model: selectedModel,
+  );
+});
+
 // Available tools provider
 final availableToolsProvider =
     NotifierProvider<AvailableToolsNotifier, List<String>>(
@@ -1823,16 +1958,29 @@ class AvailableToolsNotifier extends Notifier<List<String>> {
 
 class WebSearchEnabledNotifier extends Notifier<bool> {
   @override
-  bool build() => false;
+  bool build() => ref.watch(_chatFeatureDefaultsProvider).webSearchEnabled;
 
-  void set(bool value) => state = value;
+  void set(bool value) {
+    state = value;
+    unawaited(
+      ref.read(appSettingsProvider.notifier).setChatWebSearchEnabled(value),
+    );
+  }
 }
 
 class ImageGenerationEnabledNotifier extends Notifier<bool> {
   @override
-  bool build() => false;
+  bool build() =>
+      ref.watch(_chatFeatureDefaultsProvider).imageGenerationEnabled;
 
-  void set(bool value) => state = value;
+  void set(bool value) {
+    state = value;
+    unawaited(
+      ref
+          .read(appSettingsProvider.notifier)
+          .setChatImageGenerationEnabled(value),
+    );
+  }
 }
 
 class VisionCapableModelsNotifier extends Notifier<List<String>> {
@@ -2118,19 +2266,29 @@ Future<void> regenerateMessage(
     final selectedTerminalId = ref.read(selectedTerminalIdProvider);
     // Include selected filter ids (toggle filters enabled by user)
     final selectedFilterIds = ref.read(selectedFilterIdsProvider);
-    // Get conversation history for context (excluding the removed assistant message)
+    // Get conversation history for context, skipping archived variants that are
+    // kept locally only for the version switcher.
     final List<ChatMessage> messages = ref.read(chatMessagesProvider);
     final List<Map<String, dynamic>> conversationMessages =
         <Map<String, dynamic>>[];
+    var lastUserIndex = -1;
+    for (var index = messages.length - 1; index >= 0; index--) {
+      if (messages[index].role == 'user') {
+        lastUserIndex = index;
+        break;
+      }
+    }
 
     for (int i = 0; i < messages.length; i++) {
       final msg = messages[i];
+      if (_isArchivedAssistantVariant(msg)) {
+        continue;
+      }
       if (msg.role.isNotEmpty && msg.content.isNotEmpty && !msg.isStreaming) {
         final cleaned = ToolCallsParser.sanitizeForApi(msg.content);
 
         // Prefer provided attachments for the last user message; otherwise use message attachments
-        final bool isLastUser =
-            (i == messages.length - 1) && msg.role == 'user';
+        final bool isLastUser = i == lastUserIndex && msg.role == 'user';
         final List<String> messageAttachments =
             (isLastUser && (attachments != null && attachments.isNotEmpty))
             ? List<String>.from(attachments)
@@ -2208,22 +2366,10 @@ Future<void> regenerateMessage(
         final prev = msgs[msgs.length - 2];
         final last = msgs.last;
         if (prev.role == 'assistant' && last.id == assistantMessageId) {
-          final snapshot = ChatMessageVersion(
-            id: prev.id,
-            content: prev.content,
-            timestamp: prev.timestamp,
-            model: prev.model,
-            files: prev.files,
-            sources: prev.sources,
-            followUps: prev.followUps,
-            codeExecutions: prev.codeExecutions,
-            usage: prev.usage,
-            error: prev.error, // Preserve error in version snapshot
-          );
           (ref.read(chatMessagesProvider.notifier) as ChatMessagesNotifier)
               .updateLastMessageWithFunction(
                 (ChatMessage m) =>
-                    m.copyWith(versions: [...m.versions, snapshot]),
+                    m.copyWith(versions: _buildReplayVersions(prev)),
               );
         }
       }
@@ -2233,7 +2379,9 @@ Future<void> regenerateMessage(
     final webSearchEnabled =
         ref.read(webSearchEnabledProvider) &&
         ref.read(webSearchAvailableProvider);
-    final imageGenerationEnabled = ref.read(imageGenerationEnabledProvider);
+    final imageGenerationEnabled =
+        ref.read(imageGenerationEnabledProvider) &&
+        ref.read(imageGenerationAvailableProvider);
 
     final modelItem = _buildLocalModelItem(selectedModel);
 
@@ -2484,6 +2632,14 @@ Future<void> _sendMessageInternal(
 
   if ((!reviewerMode && api == null) || selectedModel == null) {
     throw Exception('No API service or model selected');
+  }
+
+  final isLoadingConversation = ref.read(isLoadingConversationProvider);
+  final currentConversation = ref.read(activeConversationProvider);
+  // Guard against a race where the user opens an existing chat and sends
+  // before its history loads, which would otherwise create a new chat.
+  if (isLoadingConversation && currentConversation == null) {
+    throw StateError('Conversation is still loading');
   }
 
   // Get context attachments synchronously (no API calls)
@@ -2848,7 +3004,9 @@ Future<void> _sendMessageInternal(
   final webSearchEnabled =
       ref.read(webSearchEnabledProvider) &&
       ref.read(webSearchAvailableProvider);
-  final imageGenerationEnabled = ref.read(imageGenerationEnabledProvider);
+  final imageGenerationEnabled =
+      ref.read(imageGenerationEnabledProvider) &&
+      ref.read(imageGenerationAvailableProvider);
 
   // Get selected toggle filter IDs
   final selectedFilterIds = ref.read(selectedFilterIdsProvider);

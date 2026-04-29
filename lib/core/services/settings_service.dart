@@ -36,6 +36,9 @@ extension AndroidAssistantTriggerStorage on AndroidAssistantTrigger {
 
 /// Service for managing app-wide settings including accessibility preferences
 class SettingsService {
+  static const int minVoiceSilenceDurationMs = 300;
+  static const int defaultVoiceSilenceDurationMs = 2000;
+  static const int maxVoiceSilenceDurationMs = 5000;
   static const String _reduceMotionKey = PreferenceKeys.reduceMotion;
   static const String _animationSpeedKey = PreferenceKeys.animationSpeed;
   static const String _hapticFeedbackKey = PreferenceKeys.hapticFeedback;
@@ -55,6 +58,10 @@ class SettingsService {
   // Quick pill visibility selections (max 2)
   static const String _quickPillsKey = PreferenceKeys
       .quickPills; // StringList of identifiers e.g. ['web','image','tools']
+  static const String _chatWebSearchEnabledKey =
+      PreferenceKeys.chatWebSearchEnabled;
+  static const String _chatImageGenerationEnabledKey =
+      PreferenceKeys.chatImageGenerationEnabled;
   // Chat input behavior
   static const String _sendOnEnterKey = PreferenceKeys.sendOnEnterKey;
   // Voice silence duration for auto-stop (milliseconds)
@@ -193,6 +200,21 @@ class SettingsService {
     };
 
     await box.putAll(updates);
+
+    if (settings.chatWebSearchEnabled != null) {
+      await box.put(_chatWebSearchEnabledKey, settings.chatWebSearchEnabled);
+    } else {
+      await box.delete(_chatWebSearchEnabledKey);
+    }
+
+    if (settings.chatImageGenerationEnabled != null) {
+      await box.put(
+        _chatImageGenerationEnabledKey,
+        settings.chatImageGenerationEnabled,
+      );
+    } else {
+      await box.delete(_chatImageGenerationEnabledKey);
+    }
 
     if (settings.defaultModel != null) {
       await box.put(_defaultModelKey, settings.defaultModel);
@@ -342,6 +364,32 @@ class SettingsService {
     return _preferencesBox().put(_quickPillsKey, pills.toList());
   }
 
+  static Future<bool?> getChatWebSearchEnabled() {
+    final value = _preferencesBox().get(_chatWebSearchEnabledKey);
+    return Future.value(value is bool ? value : null);
+  }
+
+  static Future<void> setChatWebSearchEnabled(bool? value) {
+    final box = _preferencesBox();
+    if (value == null) {
+      return box.delete(_chatWebSearchEnabledKey);
+    }
+    return box.put(_chatWebSearchEnabledKey, value);
+  }
+
+  static Future<bool?> getChatImageGenerationEnabled() {
+    final value = _preferencesBox().get(_chatImageGenerationEnabledKey);
+    return Future.value(value is bool ? value : null);
+  }
+
+  static Future<void> setChatImageGenerationEnabled(bool? value) {
+    final box = _preferencesBox();
+    if (value == null) {
+      return box.delete(_chatImageGenerationEnabledKey);
+    }
+    return box.put(_chatImageGenerationEnabledKey, value);
+  }
+
   // Chat input behavior
   static Future<bool> getSendOnEnter() {
     final value = _preferencesBox().get(_sendOnEnterKey) as bool?;
@@ -364,11 +412,19 @@ class SettingsService {
 
   static Future<int> getVoiceSilenceDuration() {
     final value = _preferencesBox().get(_voiceSilenceDurationKey) as int?;
-    return Future.value((value ?? 2000).clamp(300, 3000));
+    return Future.value(
+      (value ?? defaultVoiceSilenceDurationMs).clamp(
+        minVoiceSilenceDurationMs,
+        maxVoiceSilenceDurationMs,
+      ),
+    );
   }
 
   static Future<void> setVoiceSilenceDuration(int milliseconds) {
-    final sanitized = milliseconds.clamp(300, 3000);
+    final sanitized = milliseconds.clamp(
+      minVoiceSilenceDurationMs,
+      maxVoiceSilenceDurationMs,
+    );
     return _preferencesBox().put(_voiceSilenceDurationKey, sanitized);
   }
 
@@ -449,6 +505,9 @@ class SettingsService {
       quickPills: List<String>.from(
         (box.get(_quickPillsKey) as List<dynamic>?) ?? const <String>[],
       ),
+      chatWebSearchEnabled: box.get(_chatWebSearchEnabledKey) as bool?,
+      chatImageGenerationEnabled:
+          box.get(_chatImageGenerationEnabledKey) as bool?,
       sendOnEnter: (box.get(_sendOnEnterKey) as bool?) ?? false,
       ttsVoice: box.get(PreferenceKeys.ttsVoice) as String?,
       ttsSpeechRate:
@@ -464,8 +523,10 @@ class SettingsService {
       androidAssistantTrigger: _parseAndroidAssistantTrigger(
         box.get(_androidAssistantTriggerKey) as String?,
       ),
-      voiceSilenceDuration: (box.get(_voiceSilenceDurationKey) as int? ?? 2000)
-          .clamp(300, 3000),
+      voiceSilenceDuration:
+          (box.get(_voiceSilenceDurationKey) as int? ??
+                  defaultVoiceSilenceDurationMs)
+              .clamp(minVoiceSilenceDurationMs, maxVoiceSilenceDurationMs),
       temporaryChatByDefault:
           (box.get(PreferenceKeys.temporaryChatByDefault) as bool?) ?? false,
     );
@@ -492,6 +553,8 @@ class AppSettings {
   final bool voiceAutoSendFinal;
   final String socketTransportMode; // 'polling' or 'ws'
   final List<String> quickPills; // e.g., ['web','image']
+  final bool? chatWebSearchEnabled;
+  final bool? chatImageGenerationEnabled;
   final bool sendOnEnter;
   final SttPreference sttPreference;
   final String? ttsVoice;
@@ -518,6 +581,8 @@ class AppSettings {
     this.voiceAutoSendFinal = false,
     this.socketTransportMode = 'ws',
     this.quickPills = const [],
+    this.chatWebSearchEnabled,
+    this.chatImageGenerationEnabled,
     this.sendOnEnter = false,
     this.sttPreference = SttPreference.deviceOnly,
     this.ttsVoice,
@@ -528,7 +593,7 @@ class AppSettings {
     this.ttsServerVoiceId,
     this.ttsServerVoiceName,
     this.androidAssistantTrigger = AndroidAssistantTrigger.overlay,
-    this.voiceSilenceDuration = 2000,
+    this.voiceSilenceDuration = SettingsService.defaultVoiceSilenceDurationMs,
     this.temporaryChatByDefault = false,
   });
 
@@ -546,6 +611,8 @@ class AppSettings {
     bool? voiceAutoSendFinal,
     String? socketTransportMode,
     List<String>? quickPills,
+    bool? chatWebSearchEnabled,
+    bool? chatImageGenerationEnabled,
     bool? sendOnEnter,
     SttPreference? sttPreference,
     Object? ttsVoice = const _DefaultValue(),
@@ -578,6 +645,9 @@ class AppSettings {
       voiceAutoSendFinal: voiceAutoSendFinal ?? this.voiceAutoSendFinal,
       socketTransportMode: socketTransportMode ?? this.socketTransportMode,
       quickPills: quickPills ?? this.quickPills,
+      chatWebSearchEnabled: chatWebSearchEnabled ?? this.chatWebSearchEnabled,
+      chatImageGenerationEnabled:
+          chatImageGenerationEnabled ?? this.chatImageGenerationEnabled,
       sendOnEnter: sendOnEnter ?? this.sendOnEnter,
       sttPreference: sttPreference ?? this.sttPreference,
       ttsVoice: ttsVoice is _DefaultValue ? this.ttsVoice : ttsVoice as String?,
@@ -614,6 +684,8 @@ class AppSettings {
         other.voiceLocaleId == voiceLocaleId &&
         other.voiceHoldToTalk == voiceHoldToTalk &&
         other.voiceAutoSendFinal == voiceAutoSendFinal &&
+        other.chatWebSearchEnabled == chatWebSearchEnabled &&
+        other.chatImageGenerationEnabled == chatImageGenerationEnabled &&
         other.sttPreference == sttPreference &&
         other.sendOnEnter == sendOnEnter &&
         other.ttsVoice == ttsVoice &&
@@ -644,6 +716,8 @@ class AppSettings {
       voiceLocaleId,
       voiceHoldToTalk,
       voiceAutoSendFinal,
+      chatWebSearchEnabled,
+      chatImageGenerationEnabled,
       sttPreference,
       socketTransportMode,
       sendOnEnter,
@@ -780,6 +854,16 @@ class AppSettingsNotifier extends _$AppSettingsNotifier {
     // Platform-specific limits are enforced in the UI layer
     state = state.copyWith(quickPills: pills);
     await SettingsService.setQuickPills(pills);
+  }
+
+  Future<void> setChatWebSearchEnabled(bool value) async {
+    state = state.copyWith(chatWebSearchEnabled: value);
+    await SettingsService.setChatWebSearchEnabled(value);
+  }
+
+  Future<void> setChatImageGenerationEnabled(bool value) async {
+    state = state.copyWith(chatImageGenerationEnabled: value);
+    await SettingsService.setChatImageGenerationEnabled(value);
   }
 
   Future<void> setSendOnEnter(bool value) async {

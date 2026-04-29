@@ -887,6 +887,58 @@ class ApiService {
     return conversations;
   }
 
+  /// Fetches a single page of chat summaries for sidebar pagination.
+  ///
+  /// This mirrors OpenWebUI's sidebar behavior where the main chat list loads
+  /// incrementally, while pinned/archived sections are fetched separately.
+  Future<List<Conversation>> getConversationPage({
+    int page = 1,
+    bool includeFolders = true,
+    bool includePinned = false,
+  }) async {
+    final safePage = page < 1 ? 1 : page;
+    _traceApi('Fetching conversation page: $safePage');
+
+    final queryParams = <String, dynamic>{'page': safePage};
+    if (includeFolders) {
+      queryParams['include_folders'] = true;
+    }
+    if (includePinned) {
+      queryParams['include_pinned'] = true;
+    }
+
+    final response = await _dio.get(
+      '/api/v1/chats/',
+      queryParameters: queryParams,
+    );
+    final data = response.data;
+    if (data is! List) {
+      throw Exception(
+        'Expected array of chats, got ${data.runtimeType}',
+      );
+    }
+
+    return _parseConversationSummaryList(
+      data,
+      debugLabel: 'parse_conversation_page_$safePage',
+    );
+  }
+
+  /// Fetches pinned chat summaries for the sidebar.
+  Future<List<Conversation>> getPinnedConversationSummaries() async {
+    final pinnedChats = await _fetchChatCollection(
+      '/api/v1/chats/pinned',
+      debugLabel: 'pinned chats',
+    );
+    final conversations = await _parseConversationSummaryList(
+      pinnedChats,
+      debugLabel: 'parse_pinned_conversations',
+    );
+    return conversations
+        .map((conversation) => conversation.copyWith(pinned: true))
+        .toList(growable: false);
+  }
+
   Future<List<dynamic>> _fetchChatCollection(
     String path, {
     required String debugLabel,
@@ -4780,8 +4832,10 @@ class ApiService {
     if (data is List) {
       return data.whereType<Map>().map((chatData) {
         final map = Map<String, dynamic>.from(chatData);
-        return Conversation.fromJson(parseConversationSummary(map));
-      }).toList();
+        return Conversation.fromJson(
+          parseConversationSummary(map),
+        ).copyWith(pinned: true);
+      }).toList(growable: false);
     }
     return [];
   }
@@ -4801,8 +4855,10 @@ class ApiService {
     if (data is List) {
       return data.whereType<Map>().map((chatData) {
         final map = Map<String, dynamic>.from(chatData);
-        return Conversation.fromJson(parseConversationSummary(map));
-      }).toList();
+        return Conversation.fromJson(
+          parseConversationSummary(map),
+        ).copyWith(archived: true);
+      }).toList(growable: false);
     }
     return [];
   }

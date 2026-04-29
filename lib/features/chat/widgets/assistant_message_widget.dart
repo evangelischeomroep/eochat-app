@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -20,7 +21,10 @@ import '../../../shared/widgets/middle_ellipsis_text.dart';
 import '../../../shared/widgets/web_content_embed.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../providers/chat_providers.dart'
-    show sendMessageWithContainer, streamingContentProvider;
+    show
+        isChatStreamingProvider,
+        sendMessageWithContainer,
+        streamingContentProvider;
 import '../../../core/utils/debug_logger.dart';
 import '../../../core/services/platform_service.dart';
 import '../../../core/services/settings_service.dart';
@@ -50,8 +54,11 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
   final dynamic message;
   final bool isStreaming;
   final bool showFollowUps;
+  final bool animateOnMount;
   final String? modelName;
   final String? modelIconUrl;
+  final List<String?> versionModelNames;
+  final List<String?> versionModelIconUrls;
   final VoidCallback? onCopy;
   final VoidCallback? onRegenerate;
   final VoidCallback? onLike;
@@ -62,8 +69,11 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
     required this.message,
     this.isStreaming = false,
     this.showFollowUps = true,
+    this.animateOnMount = true,
     this.modelName,
     this.modelIconUrl,
+    this.versionModelNames = const <String?>[],
+    this.versionModelIconUrls = const <String?>[],
     this.onCopy,
     this.onRegenerate,
     this.onLike,
@@ -81,6 +91,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   late AnimationController _slideController;
   String _displayedContent = '';
   Widget? _cachedAvatar;
+  String? _cachedAvatarModelName;
+  String? _cachedAvatarIconUrl;
   bool _allowTypingIndicator = false;
   Timer? _typingGateTimer;
   String _ttsPlainText = '';
@@ -98,6 +110,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   /// Guards the triple-haptic so it fires only once per streaming session.
   bool _hasTriggeredContentHaptic = false;
   ProviderSubscription<String?>? _streamingContentSub;
+
+  bool get _shouldAnimateOnMount =>
+      widget.animateOnMount && !_disableAnimations;
 
   // Streaming fade-in animation state
   late AnimationController _chunkFadeController;
@@ -128,13 +143,16 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         .platformDispatcher
         .accessibilityFeatures
         .disableAnimations;
+    final shouldAnimateOnMount = _shouldAnimateOnMount;
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
+      value: shouldAnimateOnMount ? 0.0 : 1.0,
     );
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
+      value: shouldAnimateOnMount ? 0.0 : 1.0,
     );
     _chunkFadeController = AnimationController(
       duration: const Duration(milliseconds: 200),
@@ -142,6 +160,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       value: 1.0, // Start fully opaque for non-streaming messages
     );
 
+    _hasAnimated = !shouldAnimateOnMount;
     _displayedContent = _resolvedMessageContent();
     _scheduleTtsPlainTextBuild(_displayedContent);
     _updateTypingIndicatorGate();
@@ -153,6 +172,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     super.didChangeDependencies();
     _disableAnimations =
         MediaQuery.maybeDisableAnimationsOf(context) ?? _disableAnimations;
+    if (!_shouldAnimateOnMount && !_hasAnimated) {
+      _fadeController.value = 1.0;
+      _slideController.value = 1.0;
+      _hasAnimated = true;
+    }
     // Build cached avatar when theme context is available
     _buildCachedAvatar();
   }
@@ -166,16 +190,19 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     if (messageChanged) {
       _lastStreamingContent = null;
       _displayedContent = '';
+      _cachedAvatar = null;
+      _cachedAvatarModelName = null;
+      _cachedAvatarIconUrl = null;
       _ttsPlainText = '';
       _ttsPlainTextRequestId++;
       _ttsPlainTextDebounce?.cancel();
       _pendingTtsPlainTextPayload = null;
       _pendingTtsPlainTextSource = null;
       _lastAppliedTtsPlainTextSource = null;
-      _hasAnimated = false;
+      _hasAnimated = !_shouldAnimateOnMount;
       _hasTriggeredContentHaptic = false;
-      _fadeController.reset();
-      _slideController.reset();
+      _fadeController.value = _shouldAnimateOnMount ? 0.0 : 1.0;
+      _slideController.value = _shouldAnimateOnMount ? 0.0 : 1.0;
       _chunkFadeController.value = 1.0;
     }
 
@@ -210,8 +237,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     }
 
     // Rebuild cached avatar if model name or icon changes
-    if (oldWidget.modelName != widget.modelName ||
-        oldWidget.modelIconUrl != widget.modelIconUrl) {
+    if (messageChanged ||
+        oldWidget.modelName != widget.modelName ||
+        oldWidget.modelIconUrl != widget.modelIconUrl ||
+        oldWidget.versionModelNames != widget.versionModelNames ||
+        oldWidget.versionModelIconUrls != widget.versionModelIconUrls ||
+        oldWidget.message.model != widget.message.model ||
+        oldWidget.message.versions != widget.message.versions) {
       _buildCachedAvatar();
     }
   }
@@ -264,6 +296,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       _activeVersionIndex = nextIndex;
       _displayedContent = raw;
     });
+    _buildCachedAvatar();
     _scheduleTtsPlainTextBuild(raw);
     _updateTypingIndicatorGate();
   }
@@ -439,11 +472,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final ws = ttsState.wordStartInSentence;
     final we = ttsState.wordEndInSentence;
 
-    final baseStyle = TextStyle(
-      color: theme.textPrimary,
-      height: 1.2,
-      fontSize: 14,
-    );
+    final baseStyle =
+        Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: theme.textPrimary) ??
+        AppTypography.bodyMediumStyle.copyWith(color: theme.textPrimary);
     final highlightStyle = baseStyle.copyWith(
       backgroundColor: theme.buttonPrimary.withValues(alpha: 0.25),
       color: theme.textPrimary,
@@ -531,11 +564,17 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
   void _buildCachedAvatar() {
     final theme = context.conduitTheme;
-    final iconUrl = widget.modelIconUrl?.trim();
+    final modelName = _resolveActiveModelName();
+    final iconUrl = _resolveActiveModelIconUrl();
+    if (_cachedAvatar != null &&
+        _cachedAvatarModelName == modelName &&
+        _cachedAvatarIconUrl == iconUrl) {
+      return;
+    }
     final hasIcon = iconUrl != null && iconUrl.isNotEmpty;
 
     final Widget leading = hasIcon
-        ? ModelAvatar(size: 20, imageUrl: iconUrl, label: widget.modelName)
+        ? ModelAvatar(size: 20, imageUrl: iconUrl, label: modelName)
         : Container(
             width: 20,
             height: 20,
@@ -558,10 +597,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           const SizedBox(width: Spacing.xs),
           Flexible(
             child: MiddleEllipsisText(
-              widget.modelName ?? 'Assistant',
-              style: TextStyle(
+              modelName,
+              style: AppTypography.bodySmallStyle.copyWith(
                 color: theme.textSecondary,
-                fontSize: AppTypography.bodySmall,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.1,
               ),
@@ -570,6 +608,58 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         ],
       ),
     );
+    _cachedAvatarModelName = modelName;
+    _cachedAvatarIconUrl = iconUrl;
+  }
+
+  String _resolveActiveModelName() {
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.versionModelNames.length) {
+      final versionModelName = widget.versionModelNames[_activeVersionIndex]
+          ?.trim();
+      if (versionModelName != null && versionModelName.isNotEmpty) {
+        return versionModelName;
+      }
+    }
+
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.message.versions.length) {
+      final rawVersionModel = widget.message.versions[_activeVersionIndex].model
+          ?.trim();
+      if (rawVersionModel != null && rawVersionModel.isNotEmpty) {
+        return rawVersionModel;
+      }
+    }
+
+    final currentModelName = widget.modelName?.trim();
+    if (currentModelName != null && currentModelName.isNotEmpty) {
+      return currentModelName;
+    }
+
+    final rawCurrentModel = widget.message.model?.trim();
+    if (rawCurrentModel != null && rawCurrentModel.isNotEmpty) {
+      return rawCurrentModel;
+    }
+
+    return 'Assistant';
+  }
+
+  String? _resolveActiveModelIconUrl() {
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.versionModelIconUrls.length) {
+      final versionIconUrl = widget.versionModelIconUrls[_activeVersionIndex]
+          ?.trim();
+      if (versionIconUrl != null && versionIconUrl.isNotEmpty) {
+        return versionIconUrl;
+      }
+      return null;
+    }
+
+    final currentIconUrl = widget.modelIconUrl?.trim();
+    if (currentIconUrl != null && currentIconUrl.isNotEmpty) {
+      return currentIconUrl;
+    }
+    return null;
   }
 
   /// Called on each streaming chunk to drive the fade-in animation
@@ -661,17 +751,20 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         .where((status) => status.hidden != true)
         .toList(growable: false);
     final hasStatusTimeline = visibleStatusHistory.isNotEmpty;
-    final hasCodeExecutions = widget.message.codeExecutions.isNotEmpty;
+    final activeCodeExecutions = _resolveActiveCodeExecutions();
+    final hasCodeExecutions = activeCodeExecutions.isNotEmpty;
+    final activeFollowUps = _resolveActiveFollowUps();
     final hasFollowUps =
         widget.showFollowUps &&
-        widget.message.followUps.isNotEmpty &&
+        activeFollowUps.isNotEmpty &&
         !widget.isStreaming;
     final bool showingVersion = _activeVersionIndex >= 0;
     final activeFiles = showingVersion
         ? widget.message.versions[_activeVersionIndex].files
         : widget.message.files;
     final activeEmbeds = _resolveActiveEmbeds();
-    final hasSources = widget.message.sources.isNotEmpty;
+    final activeSources = _resolveActiveSources();
+    final footer = _buildFooterBar(activeSources: activeSources);
 
     final content = Container(
       width: double.infinity,
@@ -747,17 +840,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
                 if (hasCodeExecutions) ...[
                   const SizedBox(height: Spacing.md),
-                  CodeExecutionListView(
-                    executions: widget.message.codeExecutions,
-                  ),
-                ],
-
-                if (hasSources) ...[
-                  const SizedBox(height: Spacing.xs),
-                  OpenWebUISourcesWidget(
-                    sources: widget.message.sources,
-                    messageId: widget.message.id,
-                  ),
+                  CodeExecutionListView(executions: activeCodeExecutions),
                 ],
 
                 // Version switcher moved inline with action buttons below
@@ -767,15 +850,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
           // Action buttons below the message content (only after streaming completes)
           if (!widget.isStreaming) ...[
-            const SizedBox(height: Spacing.sm),
-            _buildActionButtons(),
+            ?footer,
             if (hasFollowUps) ...[
               const SizedBox(height: Spacing.md),
-              FollowUpSuggestionBar(
-                suggestions: widget.message.followUps,
-                onSelected: _handleFollowUpTap,
-                isBusy: widget.isStreaming,
-              ),
+              _buildFollowUpSuggestions(activeFollowUps),
             ],
           ],
         ],
@@ -861,13 +939,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     // Keep the raw markdown intact so the shared renderer can parse
     // Open WebUI-style <details> blocks directly.
     final processedContent = _processContentForImages(content);
+    final activeSources = _resolveActiveSources();
 
     Widget buildDefault(BuildContext context) => StreamingMarkdownWidget(
       content: processedContent,
       isStreaming: widget.isStreaming,
       stateScopeId: _markdownStateScopeId(),
       onTapLink: (url, _) => _launchUri(url),
-      sources: widget.message.sources,
+      sources: activeSources,
       imageBuilderOverride: (uri, title, alt) {
         // Route markdown images through the enhanced image widget so they
         // get caching, auth headers, fullscreen viewer, and sharing.
@@ -915,6 +994,38 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       return null;
     }
     return embeds;
+  }
+
+  List<ChatSourceReference> _resolveActiveSources() {
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.message.versions.length) {
+      return widget.message.versions[_activeVersionIndex].sources;
+    }
+    return widget.message.sources;
+  }
+
+  List<String> _resolveActiveFollowUps() {
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.message.versions.length) {
+      return widget.message.versions[_activeVersionIndex].followUps;
+    }
+    return widget.message.followUps;
+  }
+
+  List<ChatCodeExecution> _resolveActiveCodeExecutions() {
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.message.versions.length) {
+      return widget.message.versions[_activeVersionIndex].codeExecutions;
+    }
+    return widget.message.codeExecutions;
+  }
+
+  Map<String, dynamic>? _resolveActiveUsage() {
+    if (_activeVersionIndex >= 0 &&
+        _activeVersionIndex < widget.message.versions.length) {
+      return widget.message.versions[_activeVersionIndex].usage;
+    }
+    return widget.message.usage;
   }
 
   String _processContentForImages(String content) {
@@ -1215,21 +1326,83 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget? _buildFooterBar({required List<ChatSourceReference> activeSources}) {
+    const maxInlineActions = 3;
+    final actions = _buildFooterActions();
+    final visibleActions = actions
+        .take(maxInlineActions)
+        .toList(growable: false);
+    final overflowActions = actions
+        .skip(maxInlineActions)
+        .toList(growable: false);
+    final infoWidgets = <Widget>[
+      if (activeSources.isNotEmpty)
+        OpenWebUISourcesWidget(
+          sources: activeSources,
+          messageId: widget.message.id,
+        ),
+      if (widget.message.versions.isNotEmpty) _buildVersionChip(),
+    ];
+
+    if (infoWidgets.isEmpty &&
+        visibleActions.isEmpty &&
+        overflowActions.isEmpty) {
+      return null;
+    }
+
+    final leftAlignedWidgets = <Widget>[
+      for (final action in visibleActions)
+        _buildActionButton(
+          icon: action.icon,
+          label: action.label,
+          onTap: action.onTap,
+          sfSymbol: action.sfSymbol,
+        ),
+      ...infoWidgets,
+    ];
+    final overflowButton = overflowActions.isNotEmpty
+        ? _buildOverflowActionButton(overflowActions)
+        : null;
+
+    if (overflowButton == null) {
+      return Wrap(
+        spacing: Spacing.sm,
+        runSpacing: Spacing.sm,
+        children: leftAlignedWidgets,
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.sm,
+            children: leftAlignedWidgets,
+          ),
+        ),
+        const SizedBox(width: Spacing.sm),
+        overflowButton,
+      ],
+    );
+  }
+
+  List<_AssistantFooterAction> _buildFooterActions() {
     final l10n = AppLocalizations.of(context)!;
     final ttsState = ref.watch(textToSpeechControllerProvider);
+    final isChatStreaming = ref.watch(isChatStreamingProvider);
+    final activeUsage = _resolveActiveUsage();
     final messageId = _messageId;
     final hasSpeechText = _ttsPlainText.trim().isNotEmpty;
-    // Check for error using the error field (preferred) or legacy content detection
-    // Also check the active version's error if viewing a version
     final activeError = _getActiveError();
     final hasErrorField = activeError != null;
     final isErrorMessage =
         hasErrorField ||
-        widget.message.content.contains('⚠️') ||
-        widget.message.content.contains('Error') ||
-        widget.message.content.contains('timeout') ||
-        widget.message.content.contains('retry options');
+        _displayedContent.contains('⚠️') ||
+        _displayedContent.contains('Error') ||
+        _displayedContent.contains('timeout') ||
+        _displayedContent.contains('retry options');
 
     final isActiveMessage = ttsState.activeMessageId == messageId;
     final isSpeaking =
@@ -1247,6 +1420,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final bool shouldShowTtsButton = hasSpeechText && messageId.isNotEmpty;
     final bool canStartTts =
         shouldShowTtsButton && !disableDueToStreaming && ttsAvailable;
+    final bool canRegenerate = widget.onRegenerate != null && !isChatStreaming;
+    final bool hasVersions = widget.message.versions.isNotEmpty;
+    final bool canGoToPreviousVersion =
+        hasVersions && (_activeVersionIndex < 0 || _activeVersionIndex > 0);
+    final bool canGoToNextVersion = hasVersions && _activeVersionIndex >= 0;
 
     VoidCallback? ttsOnTap;
     if (showStopState || canStartTts) {
@@ -1266,102 +1444,78 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final IconData stopIcon = Platform.isIOS
         ? CupertinoIcons.stop_fill
         : Icons.stop;
-    final IconData ttsIcon = showStopState ? stopIcon : listenIcon;
-    final String ttsLabel = showStopState ? l10n.ttsStop : l10n.ttsListen;
-    final String ttsSfSymbol = showStopState
-        ? 'stop.fill'
-        : 'speaker.wave.2.fill';
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        if (shouldShowTtsButton)
-          _buildActionButton(
-            icon: ttsIcon,
-            label: ttsLabel,
-            onTap: ttsOnTap,
-            sfSymbol: ttsSfSymbol,
-          ),
-        _buildActionButton(
-          icon: Platform.isIOS
-              ? CupertinoIcons.doc_on_clipboard
-              : Icons.content_copy,
-          label: l10n.copy,
-          onTap: widget.onCopy,
-          sfSymbol: 'doc.on.clipboard',
+    final actions = <_AssistantFooterAction>[
+      _AssistantFooterAction(
+        id: 'copy',
+        icon: Platform.isIOS
+            ? CupertinoIcons.doc_on_clipboard
+            : Icons.content_copy,
+        label: l10n.copy,
+        onTap: widget.onCopy,
+        sfSymbol: 'doc.on.clipboard',
+      ),
+      if (shouldShowTtsButton)
+        _AssistantFooterAction(
+          id: 'tts',
+          icon: showStopState ? stopIcon : listenIcon,
+          label: showStopState ? l10n.ttsStop : l10n.ttsListen,
+          onTap: ttsOnTap,
+          sfSymbol: showStopState ? 'stop.fill' : 'speaker.wave.2.fill',
         ),
-        if (widget.message.versions.isNotEmpty && !widget.isStreaming) ...[
-          // Inline version toggle: Prev [1/n] Next
-          ChatActionButton(
-            icon: Platform.isIOS
-                ? CupertinoIcons.chevron_left
-                : Icons.chevron_left,
-            label: l10n.previousLabel,
-            sfSymbol: 'chevron.left',
-            onTap: () {
-              final nextIndex = _activeVersionIndex < 0
-                  ? widget.message.versions.length - 1
-                  : _activeVersionIndex > 0
-                  ? _activeVersionIndex - 1
-                  : _activeVersionIndex;
-              if (nextIndex != _activeVersionIndex) {
-                _setActiveVersionIndex(nextIndex);
-              }
-            },
-          ),
-          ConduitChip(
-            label:
-                '${_activeVersionIndex < 0 ? (widget.message.versions.length + 1) : (_activeVersionIndex + 1)}/${widget.message.versions.length + 1}',
-            isCompact: true,
-          ),
-          ChatActionButton(
-            icon: Platform.isIOS
-                ? CupertinoIcons.chevron_right
-                : Icons.chevron_right,
-            label: l10n.nextLabel,
-            sfSymbol: 'chevron.right',
-            onTap: () {
-              if (_activeVersionIndex < 0) {
-                return;
-              }
-              final nextIndex =
-                  _activeVersionIndex < widget.message.versions.length - 1
-                  ? _activeVersionIndex + 1
-                  : -1;
-              _setActiveVersionIndex(nextIndex);
-            },
-          ),
-        ],
-        // Usage info button (like Open WebUI)
-        if (widget.message.usage != null &&
-            widget.message.usage!.isNotEmpty) ...[
-          _buildActionButton(
-            icon: Platform.isIOS ? CupertinoIcons.info : Icons.info_outline,
-            label: l10n.usageInfo,
-            onTap: () => UsageStatsModal.show(context, widget.message.usage!),
-            sfSymbol: 'info.circle',
-          ),
-        ],
-        if (isErrorMessage) ...[
-          _buildActionButton(
-            icon: Platform.isIOS
-                ? CupertinoIcons.arrow_clockwise
-                : Icons.refresh,
-            label: l10n.retry,
-            onTap: widget.onRegenerate,
-            sfSymbol: 'arrow.clockwise',
-          ),
-        ] else ...[
-          _buildActionButton(
-            icon: Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
-            label: l10n.regenerate,
-            onTap: widget.onRegenerate,
-            sfSymbol: 'arrow.clockwise',
-          ),
-        ],
-      ],
-    );
+      _AssistantFooterAction(
+        id: isErrorMessage ? 'retry' : 'regenerate',
+        icon: Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
+        label: isErrorMessage ? l10n.retry : l10n.regenerate,
+        onTap: canRegenerate ? widget.onRegenerate : null,
+        sfSymbol: 'arrow.clockwise',
+      ),
+      if (activeUsage != null && activeUsage.isNotEmpty)
+        _AssistantFooterAction(
+          id: 'usage',
+          icon: Platform.isIOS ? CupertinoIcons.info : Icons.info_outline,
+          label: l10n.usageInfo,
+          onTap: () => UsageStatsModal.show(context, activeUsage),
+          sfSymbol: 'info.circle',
+        ),
+      if (hasVersions)
+        _AssistantFooterAction(
+          id: 'previous_version',
+          icon: Platform.isIOS
+              ? CupertinoIcons.chevron_left
+              : Icons.chevron_left,
+          label: l10n.previousLabel,
+          onTap: canGoToPreviousVersion
+              ? () {
+                  final nextIndex = _activeVersionIndex < 0
+                      ? widget.message.versions.length - 1
+                      : _activeVersionIndex - 1;
+                  _setActiveVersionIndex(nextIndex);
+                }
+              : null,
+          sfSymbol: 'chevron.left',
+        ),
+      if (hasVersions)
+        _AssistantFooterAction(
+          id: 'next_version',
+          icon: Platform.isIOS
+              ? CupertinoIcons.chevron_right
+              : Icons.chevron_right,
+          label: l10n.nextLabel,
+          onTap: canGoToNextVersion
+              ? () {
+                  final nextIndex =
+                      _activeVersionIndex < widget.message.versions.length - 1
+                      ? _activeVersionIndex + 1
+                      : -1;
+                  _setActiveVersionIndex(nextIndex);
+                }
+              : null,
+          sfSymbol: 'chevron.right',
+        ),
+    ];
+
+    return actions;
   }
 
   Widget _buildActionButton({
@@ -1377,6 +1531,126 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       sfSymbol: sfSymbol,
     );
   }
+
+  Widget _buildVersionChip() {
+    final totalVersions = widget.message.versions.length + 1;
+    final currentVersion = _activeVersionIndex < 0
+        ? totalVersions
+        : _activeVersionIndex + 1;
+
+    return ConduitChip(
+      label: '$currentVersion/$totalVersions',
+      isCompact: true,
+      isSelected: _activeVersionIndex >= 0,
+    );
+  }
+
+  Widget _buildOverflowActionButton(
+    List<_AssistantFooterAction> overflowActions,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final theme = context.conduitTheme;
+
+    return AdaptivePopupMenuButton.widget<String>(
+      items: overflowActions
+          .map(
+            (action) => AdaptivePopupMenuItem<String>(
+              value: action.id,
+              label: action.label,
+              icon: Platform.isIOS ? action.sfSymbol : action.icon,
+              enabled: action.onTap != null,
+            ),
+          )
+          .toList(growable: false),
+      onSelected: (_, entry) {
+        final selectedId = entry.value;
+        if (selectedId == null) {
+          return;
+        }
+        for (final action in overflowActions) {
+          if (action.id == selectedId) {
+            action.onTap?.call();
+            return;
+          }
+        }
+      },
+      buttonStyle: PopupButtonStyle.glass,
+      child: AdaptiveTooltip(
+        message: l10n.more,
+        waitDuration: const Duration(milliseconds: 600),
+        child: Semantics(
+          button: true,
+          label: l10n.more,
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: theme.textPrimary.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(AppBorderRadius.circular),
+              border: Border.all(
+                color: theme.textPrimary.withValues(alpha: 0.08),
+                width: BorderWidth.regular,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Platform.isIOS
+                  ? CupertinoIcons.ellipsis
+                  : Icons.more_horiz_rounded,
+              size: IconSize.sm,
+              color: theme.textPrimary.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFollowUpSuggestions(List<String> suggestions) {
+    final shouldShow = widget.showFollowUps && suggestions.isNotEmpty;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            axisAlignment: -1,
+            child: child,
+          ),
+        );
+      },
+      child: shouldShow
+          ? KeyedSubtree(
+              key: ValueKey('follow-ups-${suggestions.join('|')}'),
+              child: FollowUpSuggestionBar(
+                suggestions: suggestions,
+                onSelected: _handleFollowUpTap,
+                isBusy: widget.isStreaming,
+              ),
+            )
+          : const SizedBox.shrink(key: ValueKey('follow-ups-empty')),
+    );
+  }
+}
+
+class _AssistantFooterAction {
+  const _AssistantFooterAction({
+    required this.id,
+    required this.icon,
+    required this.label,
+    required this.sfSymbol,
+    this.onTap,
+  });
+
+  final String id;
+  final IconData icon;
+  final String label;
+  final String sfSymbol;
+  final VoidCallback? onTap;
 }
 
 String _buildTtsPlainTextWorker(Map<String, dynamic> payload) {

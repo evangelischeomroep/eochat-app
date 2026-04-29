@@ -136,7 +136,9 @@ class _NotesListTabState extends ConsumerState<NotesListTab>
                   return Center(
                     child: Text(
                       _query.isEmpty ? l10n.noNotesYet : l10n.noNotesFound,
-                      style: TextStyle(color: theme.textSecondary),
+                      style: AppTypography.sidebarSupportingStyle.copyWith(
+                        color: theme.textSecondary,
+                      ),
                     ),
                   );
                 }
@@ -275,7 +277,7 @@ class _NoteListTile extends StatelessWidget {
                           title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodyMediumStyle.copyWith(
+                          style: AppTypography.sidebarTitleStyle.copyWith(
                             color: theme.textPrimary,
                             fontWeight: selected
                                 ? FontWeight.w700
@@ -294,7 +296,7 @@ class _NoteListTile extends StatelessWidget {
                       const SizedBox(width: 8),
                       Text(
                         timeAgo,
-                        style: AppTypography.bodySmallStyle.copyWith(
+                        style: AppTypography.sidebarSupportingStyle.copyWith(
                           color: theme.textSecondary,
                         ),
                       ),
@@ -306,7 +308,7 @@ class _NoteListTile extends StatelessWidget {
                       preview,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.bodySmallStyle.copyWith(
+                      style: AppTypography.sidebarSupportingStyle.copyWith(
                         color: theme.textSecondary,
                         height: 1.4,
                       ),
