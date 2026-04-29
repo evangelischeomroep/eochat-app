@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../auth/auth_state_manager.dart';
 import '../config/fork_overrides.dart';
+import '../config/fork_startup_watchdog.dart';
 import '../providers/app_providers.dart';
 import '../services/connectivity_service.dart';
 import '../services/navigation_service.dart';
@@ -41,6 +42,7 @@ class RouterNotifier extends ChangeNotifier {
         authNavigationStateProvider,
         _onStateChanged,
       ),
+      ref.listen<bool>(startupAuthStuckProvider, _onStateChanged),
       ref.listen<ConnectivityStatus>(
         connectivityStatusProvider,
         _onStateChanged,
@@ -98,14 +100,6 @@ class RouterNotifier extends ChangeNotifier {
     final activeServer = activeServerAsync.asData?.value;
     final hasActiveServer = activeServer != null;
     if (!hasActiveServer) {
-      // Fork behavior: when a server is preconfigured, don't send users to the
-      // setup screen. Keep them on splash while startup bootstrap writes the
-      // default server configuration.
-      if (ForkOverrides.hasPreconfiguredServer &&
-          ForkOverrides.skipSetupScreenWhenPreconfigured) {
-        return location == Routes.splash ? null : Routes.splash;
-      }
-
       // No server configured - redirect to server connection
       // Exception: allow staying on server connection, authentication,
       // proxy auth, and SSO pages during the connection/auth flow.
@@ -121,6 +115,7 @@ class RouterNotifier extends ChangeNotifier {
     }
 
     final authState = ref.read(authNavigationStateProvider);
+    final startupAuthStuck = ref.read(startupAuthStuckProvider);
     final connectivityService = ref.read(connectivityServiceProvider);
 
     // Allow staying on server connection page
@@ -161,6 +156,11 @@ class RouterNotifier extends ChangeNotifier {
 
     switch (authState) {
       case AuthNavigationState.loading:
+        if (startupAuthStuck) {
+          return location == Routes.authentication
+              ? null
+              : Routes.authentication;
+        }
         // Keep user on auth routes while loading to prevent bounce
         if (_isAuthLocation(location)) return null;
         // Otherwise keep splash during session establishment

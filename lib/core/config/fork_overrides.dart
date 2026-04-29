@@ -24,6 +24,16 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  static const bool enableStartupLoadingWatchdog = bool.fromEnvironment(
+    'ENABLE_STARTUP_LOADING_WATCHDOG',
+    defaultValue: true,
+  );
+
+  static const int startupLoadingTimeoutMs = int.fromEnvironment(
+    'STARTUP_LOADING_TIMEOUT_MS',
+    defaultValue: 12000,
+  );
+
   static const String preferredSsoProvider = String.fromEnvironment(
     'PREFERRED_SSO_PROVIDER',
     defaultValue: 'microsoft',

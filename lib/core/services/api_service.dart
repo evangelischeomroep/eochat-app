@@ -333,8 +333,33 @@ class ApiService {
   Future<bool> checkHealth() async {
     try {
       final response = await _dio.get('/health');
-      return response.statusCode == 200;
+      final statusCode = response.statusCode ?? 0;
+      final contentType = response.headers.value('content-type') ?? 'unknown';
+      final ok = statusCode == 200;
+      DebugLogger.log(
+        'Health check result: url=$baseUrl/health status=$statusCode '
+        'contentType=$contentType ok=$ok',
+        scope: 'api/health',
+      );
+      return ok;
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      final contentType =
+          e.response?.headers.value('content-type') ?? 'unknown';
+      DebugLogger.error(
+        'health-check-dio-failed',
+        scope: 'api/health',
+        error:
+            'url=$baseUrl/health type=${e.type} status=$statusCode '
+            'contentType=$contentType message=${e.message}',
+      );
+      return false;
     } catch (e) {
+      DebugLogger.error(
+        'health-check-failed',
+        scope: 'api/health',
+        error: 'url=$baseUrl/health error=$e',
+      );
       return false;
     }
   }

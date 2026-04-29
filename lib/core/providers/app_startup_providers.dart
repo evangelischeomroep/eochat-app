@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../config/fork_overrides.dart';
+import '../config/fork_startup_watchdog.dart';
 import '../providers/app_providers.dart';
 import '../../features/auth/providers/unified_auth_providers.dart';
 import '../services/navigation_service.dart';
@@ -51,6 +52,13 @@ class _ConversationWarmupLastAttemptNotifier extends Notifier<DateTime?> {
 
 Future<void> _ensureForkDefaultServer(Ref ref) async {
   if (!ForkOverrides.hasPreconfiguredServer) {
+    return;
+  }
+
+  // When setup skipping is enabled, keep the server onboarding/auth flow
+  // routed through `ServerConnectionPage` so validation/proxy/SSO discovery
+  // stays intact.
+  if (ForkOverrides.skipSetupScreenWhenPreconfigured) {
     return;
   }
 
@@ -314,6 +322,7 @@ class AppStartupFlow extends _$AppStartupFlow {
     // Ensure token integration listeners are active
     keepAlive(authApiIntegrationProvider);
     keepAlive(apiTokenUpdaterProvider);
+    keepAlive(startupAuthStuckProvider);
     keepAlive(silentLoginCoordinatorProvider);
     keepAlive(appIntentCoordinatorProvider);
     keepAlive(homeWidgetCoordinatorProvider);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File, Platform;
 
@@ -54,6 +55,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
   bool _isConnecting = false;
   bool _showAdvancedSettings = false;
   bool _allowSelfSignedCertificates = false;
+  bool _didAutoConnectPreconfigured = false;
 
   @override
   void initState() {
@@ -69,6 +71,7 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
           _urlController.text.trim().isEmpty) {
         _urlController.text = ForkOverrides.normalizedPreconfiguredServerUrl;
       }
+      _maybeAutoConnectPreconfigured();
       return;
     }
     setState(() {
@@ -90,6 +93,29 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
       _mtlsPrivateKeyPasswordController.text = kIsWeb
           ? ''
           : (activeServer.mtlsPrivateKeyPassword ?? '');
+    });
+  }
+
+  void _maybeAutoConnectPreconfigured() {
+    if (!ForkOverrides.hasPreconfiguredServer ||
+        !ForkOverrides.skipSetupScreenWhenPreconfigured) {
+      return;
+    }
+    if (_didAutoConnectPreconfigured || _isConnecting) {
+      return;
+    }
+
+    final preconfiguredUrl = ForkOverrides.normalizedPreconfiguredServerUrl;
+    if (preconfiguredUrl.isEmpty) {
+      return;
+    }
+
+    _didAutoConnectPreconfigured = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _isConnecting) {
+        return;
+      }
+      unawaited(_connectToServer());
     });
   }
 

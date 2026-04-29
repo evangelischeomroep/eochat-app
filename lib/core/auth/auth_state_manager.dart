@@ -7,6 +7,7 @@ import '../providers/app_providers.dart';
 import '../../features/tools/providers/tools_providers.dart';
 import '../models/user.dart';
 import '../services/optimized_storage_service.dart';
+import '../services/api_service.dart';
 import 'token_validator.dart';
 import 'auth_cache_manager.dart';
 import 'webview_cookie_helper.dart';
@@ -747,13 +748,28 @@ class AuthStateManager extends _$AuthStateManager {
       }
 
       try {
-        // Use checkHealth which hits the /health endpoint
-        final healthy = await api.checkHealth();
-        if (healthy) {
-          DebugLogger.auth(
-            'API readiness confirmed in ${stopwatch.elapsedMilliseconds}ms',
-          );
-          return true;
+        // Use proxy-aware health detection to distinguish truly unreachable
+        // servers from proxy auth/login flows.
+        final healthResult = await api.checkHealthWithProxyDetection();
+        switch (healthResult) {
+          case HealthCheckResult.healthy:
+            DebugLogger.auth(
+              'API readiness confirmed in ${stopwatch.elapsedMilliseconds}ms',
+            );
+            return true;
+          case HealthCheckResult.proxyAuthRequired:
+            DebugLogger.auth(
+              'API readiness: proxy auth required at '
+              '${stopwatch.elapsedMilliseconds}ms - '
+              'treating as reachable for startup',
+            );
+            // The endpoint is reachable, but gated by proxy auth.
+            // Treat this as "reachable" for startup to avoid getting stuck
+            // in a cold-start timeout path.
+            return true;
+          case HealthCheckResult.unhealthy:
+          case HealthCheckResult.unreachable:
+            break;
         }
       } catch (e) {
         DebugLogger.auth(

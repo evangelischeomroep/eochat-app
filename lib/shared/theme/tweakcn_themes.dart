@@ -118,40 +118,48 @@ Color mix(Color a, Color b, double amount) {
 }
 
 class TweakcnThemes {
+  // EO brand palette (screen/RGB)
+  static const Color _eoPurple = Color(0xFF8820F9);
+  static const Color _eoRed = Color(0xFFFF5A5A);
+  static const Color _eoYellow = Color(0xFFEDDD68);
+  static const Color _eoPeach = Color(0xFFFCeded);
+  static const Color _eoPeachTint = Color(0xFFFEF8F8);
+  static const Color _eoPurpleTint = Color(0xFF6423BE);
+
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
-    background: const Color(0xFFFFFFFF), // background
-    foreground: const Color(0xFF000000), // onBackground
-    card: const Color(0xFFF4F4F4), // surface
-    cardForeground: const Color(0xFF000000), // onSurface
-    popover: const Color(0xFFFFFFFF), // background
-    popoverForeground: const Color(0xFF000000), // onSurface
-    primary: const Color(0xFF000000), // primary
+    background: _eoPeachTint, // peach tint background
+    foreground: const Color(0xFF1F1235), // onBackground
+    card: const Color(0xFFFFFFFF), // white cards for iOS visual hierarchy
+    cardForeground: const Color(0xFF1F1235), // onSurface
+    popover: const Color(0xFFFFFFFF), // popover
+    popoverForeground: const Color(0xFF1F1235), // onSurface
+    primary: _eoPurple, // brand purple
     primaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    secondary: const Color(0xFFF4F4F4), // secondary
-    secondaryForeground: const Color(0xFF000000), // onSecondary
-    muted: const Color(0xFFF4F4F4), // surface
-    mutedForeground: const Color(0xFF6E6E80), // onSurfaceVariant
-    accent: const Color(0xFFECECEC), // surfaceVariant
-    accentForeground: const Color(0xFF000000), // onSurface
-    destructive: const Color(0xFFEF4444), // error
+    secondary: const Color(0xFFF3EAFD), // light purple secondary
+    secondaryForeground: const Color(0xFF1F1235), // onSecondary
+    muted: const Color(0xFFF5EEFE), // light purple muted surface
+    mutedForeground: const Color(0xFF7B5AB5), // purple-toned muted text
+    accent: _eoYellow, // brand yellow
+    accentForeground: const Color(0xFF2B213D), // onAccent
+    destructive: _eoRed, // brand red / error
     destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFFE5E5E5), // outlineVariant
-    input: const Color(0xFFE5E5E5), // outlineVariant
-    ring: const Color(0xFF8E8EA0), // outline
-    sidebarBackground: const Color(0xFFF4F4F4), // surface
-    sidebarForeground: const Color(0xFF000000), // onSurface
-    sidebarPrimary: const Color(0xFF000000), // primary
+    border: const Color(0xFFE7D7F8), // outlineVariant
+    input: const Color(0xFFE7D7F8), // input border
+    ring: _eoPurple, // brand purple ring (iOS tint convention)
+    sidebarBackground: _eoPeach, // sidebar surface
+    sidebarForeground: const Color(0xFF1F1235), // onSurface
+    sidebarPrimary: _eoPurple, // primary
     sidebarPrimaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    sidebarAccent: const Color(0xFFECECEC), // surfaceVariant
-    sidebarAccentForeground: const Color(0xFF000000), // onSurface
-    sidebarBorder: const Color(0xFFE5E5E5), // outlineVariant
-    sidebarRing: const Color(0xFF8E8EA0), // outline
-    success: const Color(0xFF10A37F), // success / tertiary
-    successForeground: const Color(0xFFFFFFFF), // onTertiary
-    warning: const Color(0xFFF59E0B), // warning
-    warningForeground: const Color(0xFF000000), // onBackground
-    info: const Color(0xFF10A37F), // tertiary (reuse as info)
-    infoForeground: const Color(0xFFFFFFFF), // onTertiary
+    sidebarAccent: const Color(0xFFF3EAFD), // light purple sidebar accent
+    sidebarAccentForeground: const Color(0xFF2B213D), // onAccent
+    sidebarBorder: const Color(0xFFE7D7F8), // outlineVariant
+    sidebarRing: _eoPurple, // brand purple ring
+    success: const Color(0xFF34C759), // iOS-style success green
+    successForeground: const Color(0xFF003018), // dark text on green
+    warning: _eoYellow, // brand yellow warning
+    warningForeground: const Color(0xFF2B213D), // onWarning
+    info: _eoPurpleTint, // slightly darker purple distinguishes from primary
+    infoForeground: const Color(0xFFFFFFFF), // onInfo
     radius: 10,
     fontSans: const <String>[
       'ui-sans-serif',
@@ -191,39 +199,39 @@ class TweakcnThemes {
   );
 
   static final TweakcnThemeVariant _conduitDark = TweakcnThemeVariant(
-    background: const Color(0xFF000000), // background
-    foreground: const Color(0xFFECECEC), // onBackground
-    card: const Color(0xFF141414), // surface
-    cardForeground: const Color(0xFFECECEC), // onSurface
-    popover: const Color(0xFF1A1A1A), // surfaceVariant
-    popoverForeground: const Color(0xFFECECEC), // onSurface
-    primary: const Color(0xFFECECEC), // primary
-    primaryForeground: const Color(0xFF000000), // onPrimary
-    secondary: const Color(0xFF1A1A1A), // secondary
-    secondaryForeground: const Color(0xFFECECEC), // onSecondary
-    muted: const Color(0xFF1A1A1A), // surfaceVariant
-    mutedForeground: const Color(0xFF8E8EA0), // onSurfaceVariant
-    accent: const Color(0xFF232323), // secondaryContainer
-    accentForeground: const Color(0xFFECECEC), // onSecondaryContainer
-    destructive: const Color(0xFFEF4444), // error
+    background: const Color(0xFF140A24), // deep purple background
+    foreground: const Color(0xFFF5EEFF), // onBackground
+    card: const Color(0xFF1D1033), // surface
+    cardForeground: const Color(0xFFF5EEFF), // onSurface
+    popover: const Color(0xFF25113F), // surfaceVariant
+    popoverForeground: const Color(0xFFF5EEFF), // onSurface
+    primary: _eoPurple, // brand purple
+    primaryForeground: const Color(0xFFFFFFFF), // onPrimary
+    secondary: const Color(0xFF25113F), // secondary
+    secondaryForeground: const Color(0xFFF5EEFF), // onSecondary
+    muted: const Color(0xFF2B164A), // surfaceVariant
+    mutedForeground: const Color(0xFFC6AFEA), // onSurfaceVariant
+    accent: _eoYellow, // brand yellow
+    accentForeground: const Color(0xFF2B213D), // onAccent
+    destructive: _eoRed, // brand red / error
     destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFF1E1E1E), // outlineVariant
-    input: const Color(0xFF1E1E1E), // outlineVariant
-    ring: const Color(0xFF6E6E80), // outline
-    sidebarBackground: const Color(0xFF000000), // background
-    sidebarForeground: const Color(0xFFECECEC), // onSurface
-    sidebarPrimary: const Color(0xFFECECEC), // primary
-    sidebarPrimaryForeground: const Color(0xFF000000), // onPrimary
-    sidebarAccent: const Color(0xFF1A1A1A), // surfaceVariant
-    sidebarAccentForeground: const Color(0xFFECECEC), // onSurface
-    sidebarBorder: const Color(0xFF1E1E1E), // outlineVariant
-    sidebarRing: const Color(0xFF6E6E80), // outline
-    success: const Color(0xFF10A37F), // success / tertiary
-    successForeground: const Color(0xFFFFFFFF), // onTertiary
-    warning: const Color(0xFFF59E0B), // warning
-    warningForeground: const Color(0xFFECECEC), // onBackground
-    info: const Color(0xFF10A37F), // tertiary (reuse as info)
-    infoForeground: const Color(0xFFECECEC), // onBackground
+    border: const Color(0xFF3A1F63), // outlineVariant
+    input: const Color(0xFF3A1F63), // input border
+    ring: _eoPurple, // brand purple ring (iOS tint convention)
+    sidebarBackground: const Color(0xFF351973), // saturated purple sidebar
+    sidebarForeground: const Color(0xFFF5EEFF), // onSurface
+    sidebarPrimary: _eoPurple, // primary
+    sidebarPrimaryForeground: const Color(0xFFFFFFFF), // onPrimary
+    sidebarAccent: const Color(0xFF25113F), // surfaceVariant
+    sidebarAccentForeground: const Color(0xFFD4B8F5), // softer lavender
+    sidebarBorder: const Color(0xFF3A1F63), // outlineVariant
+    sidebarRing: _eoPurple, // brand purple ring
+    success: const Color(0xFF30D158), // iOS dark mode success green
+    successForeground: const Color(0xFF001A00), // dark text on green
+    warning: _eoYellow, // brand yellow warning
+    warningForeground: const Color(0xFF2B213D), // onWarning
+    info: const Color(0xFFB07EFF), // lighter purple, distinguishable in dark mode
+    infoForeground: const Color(0xFF1A0030), // dark text on light purple
     radius: 10,
     fontSans: const <String>[
       'ui-sans-serif',
@@ -807,9 +815,9 @@ class TweakcnThemes {
     light: _conduitLight,
     dark: _conduitDark,
     preview: const <Color>[
-      Color(0xFF000000), // primary
-      Color(0xFF10A37F), // tertiary / accent
-      Color(0xFFF4F4F4), // surface
+      _eoPurple, // brand purple
+      _eoRed, // brand red
+      _eoYellow, // brand yellow
     ],
   );
 
