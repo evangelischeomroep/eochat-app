@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git checkout *)"
+    ]
+  },
   "hooks": {
     "Notification": [
       {

@@ -122,37 +122,46 @@ class TweakcnThemes {
   static const Color _eoPurple = Color(0xFF8820F9);
   static const Color _eoRed = Color(0xFFFF5A5A);
   static const Color _eoYellow = Color(0xFFEDDD68);
-  static const Color _eoPeach = Color(0xFFFCeded);
-  static const Color _eoPeachTint = Color(0xFFFEF8F8);
+  static const Color _eoPeach = Color(
+    0xFFFEF8F8,
+  ); // using official Peach-tint from EO guidelines
   static const Color _eoPurpleTint = Color(0xFF6423BE);
 
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
-    background: _eoPeachTint, // peach tint background
+    background: const Color(0xFFFFFFFF), // white base — chat bg, scaffold
     foreground: const Color(0xFF1F1235), // onBackground
-    card: const Color(0xFFFFFFFF), // white cards for iOS visual hierarchy
+    card: _eoPeach, // peach cards and user message bubbles
     cardForeground: const Color(0xFF1F1235), // onSurface
-    popover: const Color(0xFFFFFFFF), // popover
+    popover: const Color(0xFFFFFFFF), // popover stays white (feels elevated)
     popoverForeground: const Color(0xFF1F1235), // onSurface
     primary: _eoPurple, // brand purple
     primaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    secondary: const Color(0xFFF3EAFD), // light purple secondary
+    secondary: const Color(
+      0xFFF5ECEC,
+    ), // lighter than card — distinct surface layer
     secondaryForeground: const Color(0xFF1F1235), // onSecondary
-    muted: const Color(0xFFF5EEFE), // light purple muted surface
+    muted: const Color(
+      0xFFF8F3F3,
+    ), // near-white warm tint — lowest-emphasis backgrounds
     mutedForeground: const Color(0xFF7B5AB5), // purple-toned muted text
     accent: _eoYellow, // brand yellow
     accentForeground: const Color(0xFF2B213D), // onAccent
     destructive: _eoRed, // brand red / error
     destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFFE7D7F8), // outlineVariant
-    input: const Color(0xFFE7D7F8), // input border
+    border: const Color(0xFFE4CFCF), // warm border — slightly more visible
+    input: const Color(
+      0xFFFFFFFF,
+    ), // desaturated warm border — subtle, not pink paint
     ring: _eoPurple, // brand purple ring (iOS tint convention)
     sidebarBackground: _eoPeach, // sidebar surface
     sidebarForeground: const Color(0xFF1F1235), // onSurface
     sidebarPrimary: _eoPurple, // primary
     sidebarPrimaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    sidebarAccent: const Color(0xFFF3EAFD), // light purple sidebar accent
-    sidebarAccentForeground: const Color(0xFF2B213D), // onAccent
-    sidebarBorder: const Color(0xFFE7D7F8), // outlineVariant
+    sidebarAccent: const Color(
+      0xFFF5DADA,
+    ), // warm rose-peach — renders as #F7E1E1 at 80% alpha on white
+    sidebarAccentForeground: const Color(0xFF1F1235), // onAccent
+    sidebarBorder: const Color(0xFFFCEDED), // matches border
     sidebarRing: _eoPurple, // brand purple ring
     success: const Color(0xFF34C759), // iOS-style success green
     successForeground: const Color(0xFF003018), // dark text on green
@@ -230,7 +239,9 @@ class TweakcnThemes {
     successForeground: const Color(0xFF001A00), // dark text on green
     warning: _eoYellow, // brand yellow warning
     warningForeground: const Color(0xFF2B213D), // onWarning
-    info: const Color(0xFFB07EFF), // lighter purple, distinguishable in dark mode
+    info: const Color(
+      0xFFB07EFF,
+    ), // lighter purple, distinguishable in dark mode
     infoForeground: const Color(0xFF1A0030), // dark text on light purple
     radius: 10,
     fontSans: const <String>[
