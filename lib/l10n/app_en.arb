@@ -36,11 +36,11 @@
   "@account": {
     "description": "Section header for account-related options."
   },
-  "supportConduit": "Support EOchat",
+  "supportConduit": "Support Conduit",
   "@supportConduit": {
     "description": "Section header inviting the user to financially support the project."
   },
-  "supportConduitSubtitle": "Keep EOchat independent by funding ongoing development.",
+  "supportConduitSubtitle": "Keep Conduit independent by funding ongoing development.",
   "@supportConduitSubtitle": {
     "description": "Subtitle explaining why donations are helpful."
   },

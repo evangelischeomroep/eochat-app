@@ -151,7 +151,7 @@ class _SidebarMaterialBottomNavigationBar extends StatelessWidget {
           height: _kSidebarNavigationBarHeight,
           backgroundColor: conduitTheme.surfaceBackground,
           elevation: 0,
-          indicatorColor: conduitTheme.buttonPrimary.withValues(alpha: 0.12),
+          indicatorColor: conduitTheme.sidebarPrimary.withValues(alpha: 0.12),
           indicatorShape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppBorderRadius.pill),
           ),
@@ -159,7 +159,7 @@ class _SidebarMaterialBottomNavigationBar extends StatelessWidget {
             final selected = states.contains(WidgetState.selected);
             return IconThemeData(
               color: selected
-                  ? conduitTheme.buttonPrimary
+                  ? conduitTheme.sidebarPrimary
                   : conduitTheme.textSecondary,
               size: _kSidebarNavigationBarIconSize,
             );
@@ -168,7 +168,7 @@ class _SidebarMaterialBottomNavigationBar extends StatelessWidget {
             final selected = states.contains(WidgetState.selected);
             return AppTypography.labelSmallStyle.copyWith(
               color: selected
-                  ? conduitTheme.buttonPrimary
+                  ? conduitTheme.sidebarPrimary
                   : conduitTheme.textSecondary,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
             );
@@ -180,7 +180,7 @@ class _SidebarMaterialBottomNavigationBar extends StatelessWidget {
           height: _kSidebarNavigationBarHeight,
           backgroundColor: conduitTheme.surfaceBackground,
           elevation: 0,
-          indicatorColor: conduitTheme.buttonPrimary.withValues(alpha: 0.12),
+          indicatorColor: conduitTheme.sidebarPrimary.withValues(alpha: 0.12),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
           destinations: [
             for (final item in navigationItems)
@@ -240,7 +240,7 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
       selectedIndex: selectedIndex,
       onTap: onTap,
       useNativeBottomBar: true,
-      selectedItemColor: conduitTheme.buttonPrimary,
+      selectedItemColor: conduitTheme.sidebarPrimary,
       unselectedItemColor: conduitTheme.textSecondary,
       bottomNavigationBar: _SidebarMaterialBottomNavigationBar(
         navigationItems: navigationItems,

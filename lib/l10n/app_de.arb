@@ -15,7 +15,7 @@
     "description": "Untertitel mit den verfügbaren Aktionen, wenn der Server nicht erreichbar ist"
   },
   "account": "Konto",
-  "supportConduit": "EOchat unterstützen",
+  "supportConduit": "Conduit unterstützen",
   "supportConduitSubtitle": "Hilf, die Weiterentwicklung und neue Funktionen zu finanzieren.",
   "githubSponsorsTitle": "GitHub Sponsors",
   "githubSponsorsSubtitle": "Werde monatliche*r Sponsor*in und unterstütze die Roadmap.",

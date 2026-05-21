@@ -15,8 +15,8 @@
     "description": "当无法访问服务器时解释可用操作的副标题"
   },
   "account": "账户",
-  "supportConduit": "支持 EOchat",
-  "supportConduitSubtitle": "通过资助持续开发来保持 EOchat 的独立性。",
+  "supportConduit": "支持 Conduit",
+  "supportConduitSubtitle": "通过资助持续开发来保持 Conduit 的独立性。",
   "githubSponsorsTitle": "GitHub 赞助",
   "githubSponsorsSubtitle": "成为定期赞助者以资助路线图项目。",
   "buyMeACoffeeTitle": "Buy Me a Coffee",

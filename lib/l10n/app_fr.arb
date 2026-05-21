@@ -15,7 +15,7 @@
     "description": "Sous-titre expliquant les actions possibles quand le serveur est injoignable"
   },
   "account": "Compte",
-  "supportConduit": "Soutenir EOchat",
+  "supportConduit": "Soutenir Conduit",
   "supportConduitSubtitle": "Financez le développement continu et les nouvelles fonctionnalités.",
   "githubSponsorsTitle": "GitHub Sponsors",
   "githubSponsorsSubtitle": "Devenez sponsor récurrent pour soutenir la feuille de route.",

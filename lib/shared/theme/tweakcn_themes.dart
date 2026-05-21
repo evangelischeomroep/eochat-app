@@ -229,8 +229,8 @@ class TweakcnThemes {
     ring: _eoPurple, // brand purple ring (iOS tint convention)
     sidebarBackground: const Color(0xFF351973), // saturated purple sidebar
     sidebarForeground: const Color(0xFFF5EEFF), // onSurface
-    sidebarPrimary: _eoPurple, // primary
-    sidebarPrimaryForeground: const Color(0xFFFFFFFF), // onPrimary
+    sidebarPrimary: _eoYellow, // brand yellow — high-contrast pop on dark purple
+    sidebarPrimaryForeground: const Color(0xFF2B213D), // onYellow
     sidebarAccent: const Color(0xFF25113F), // surfaceVariant
     sidebarAccentForeground: const Color(0xFFD4B8F5), // softer lavender
     sidebarBorder: const Color(0xFF3A1F63), // outlineVariant

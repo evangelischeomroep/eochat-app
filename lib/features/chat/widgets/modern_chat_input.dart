@@ -2316,7 +2316,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                 child: _buildActiveOverlay(),
               ),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: _isMultiline
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.center,
               children: [
                 _buildOverflowButton(
                   tooltip: l10n.more,
@@ -2686,9 +2688,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     } else if (toolsActive) {
       overflowIcon = Platform.isIOS ? CupertinoIcons.wrench : Icons.build;
     } else if (terminalActive) {
-      overflowIcon = Platform.isIOS
-          ? CupertinoIcons.chevron_left_slash_chevron_right
-          : Icons.terminal_rounded;
+      overflowIcon = Platform.isIOS ? CupertinoIcons.add : Icons.add;
     } else if (filtersActive) {
       overflowIcon = Platform.isIOS
           ? CupertinoIcons.sparkles
