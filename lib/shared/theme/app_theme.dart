@@ -121,6 +121,7 @@ class AppTheme {
       variant: variant,
       tokens: tokens,
     );
+    final textInputAccentColor = _platformTextInputAccentColor(variant);
 
     return ThemeData(
       useMaterial3: true,
@@ -285,12 +286,12 @@ class AppTheme {
       textSelectionTheme: TextSelectionThemeData(
         // Use the platform-native selection tint: iOS/macOS use system blue
         // at ~15% opacity; other platforms use the theme primary at 20%.
+        cursorColor: textInputAccentColor,
         selectionColor: switch (defaultTargetPlatform) {
           TargetPlatform.iOS || TargetPlatform.macOS => const Color(0x26007AFF),
           _ => variant.primary.withValues(alpha: 0.2),
         },
-        cursorColor: variant.primary,
-        selectionHandleColor: variant.primary,
+        selectionHandleColor: textInputAccentColor,
       ),
       extensions: <ThemeExtension<dynamic>>[
         tokens,
@@ -368,6 +369,13 @@ class AppTheme {
     );
   }
 
+  static Color _platformTextInputAccentColor(TweakcnThemeVariant variant) {
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.iOS || TargetPlatform.macOS => const Color(0xFF007AFF),
+      _ => variant.primary,
+    };
+  }
+
   static double _contrastRatio(Color a, Color b) {
     final luminanceA = a.computeLuminance();
     final luminanceB = b.computeLuminance();
@@ -380,9 +388,9 @@ class AppTheme {
       PageTransitionsTheme(
         builders: <TargetPlatform, PageTransitionsBuilder>{
           TargetPlatform.android: ZoomPageTransitionsBuilder(),
-          TargetPlatform.iOS: ZoomPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.linux: ZoomPageTransitionsBuilder(),
-          TargetPlatform.macOS: ZoomPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.windows: ZoomPageTransitionsBuilder(),
         },
       );

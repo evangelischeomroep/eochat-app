@@ -90,8 +90,10 @@ void main() {
     bool isStreaming = false,
     String? stateScopeId,
     List<ChatSourceReference> sources = const <ChatSourceReference>[],
+    Locale? locale,
   }) {
     return MaterialApp(
+      locale: locale,
       theme: AppTheme.light(TweakcnThemes.t3Chat),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -124,6 +126,7 @@ void main() {
             message: message,
             isStreaming: isStreaming,
             showFollowUps: false,
+            onDelete: () {},
           ),
         ),
       ),
@@ -170,6 +173,91 @@ void main() {
     },
   );
 
+  testWidgets('keeps paragraph spacing between blocks but trims the end', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildHarness('First\n\nSecond'));
+
+    final paragraphPaddings = tester
+        .widgetList<Padding>(
+          find.byWidgetPredicate((widget) {
+            if (widget is! Padding || widget.child is! Text) {
+              return false;
+            }
+            final text = widget.child as Text;
+            final plainText = text.textSpan?.toPlainText() ?? text.data;
+            return plainText == 'First' || plainText == 'Second';
+          }),
+        )
+        .toList(growable: false);
+
+    expect(paragraphPaddings, hasLength(2));
+    expect(
+      (paragraphPaddings.first.padding as EdgeInsets).bottom,
+      greaterThan(0),
+    );
+    expect((paragraphPaddings.last.padding as EdgeInsets).bottom, 0);
+  });
+
+  testWidgets('renders OpenWebUI mentions without placeholder leakage', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Scaffold(
+          body: StreamingMarkdownWidget(
+            content:
+                'Hi <@U:user-id|Tuna>, see [<@M:model-id|Model>](https://a.test).',
+            isStreaming: false,
+            onTapLink: (_, _) {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.textContaining('@Tuna', findRichText: true), findsOneWidget);
+    expect(find.textContaining('@Model', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('{{conduit_mention_', findRichText: true),
+      findsNothing,
+    );
+
+    final richTexts = tester.widgetList<RichText>(find.byType(RichText));
+    final modelSpan = richTexts
+        .map((richText) => _findTextSpan(richText.text, '@Model'))
+        .nonNulls
+        .single;
+    expect(modelSpan.recognizer, isNotNull);
+  });
+
+  testWidgets('does not alter mention-like content in inline code', (
+    tester,
+  ) async {
+    await tester.pumpWidget(buildHarness('Use `<@U:user-id|Tuna>` literally.'));
+
+    expect(find.text('<@U:user-id|Tuna>'), findsOneWidget);
+    expect(
+      find.textContaining('{{conduit_mention_', findRichText: true),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'preserves literal text that resembles old mention placeholders',
+    (tester) async {
+      await tester.pumpWidget(
+        buildHarness('{{conduit_mention_0}} <@U:user-id|Tuna>'),
+      );
+
+      expect(
+        find.textContaining('{{conduit_mention_0}}', findRichText: true),
+        findsOneWidget,
+      );
+      expect(find.textContaining('@Tuna', findRichText: true), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'renders tool call details through markdown and expands attributes',
     (tester) async {
@@ -198,6 +286,167 @@ After
       expect(find.text('done'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'uses tool call body content as structured output without leaking raw text',
+    (tester) async {
+      const content = '''
+Before
+
+<details type="tool_calls" done="true" name="search" arguments="{&quot;q&quot;:&quot;cats&quot;}">
+<summary>Tool Executed</summary>
+&quot;done&quot;
+</details>
+
+After
+''';
+
+      await tester.pumpWidget(buildHarness(content));
+
+      expect(find.text('View Result from search'), findsOneWidget);
+      expect(find.text('done'), findsNothing);
+      expect(find.text('After'), findsOneWidget);
+
+      await tester.tap(find.text('View Result from search'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Input'), findsOneWidget);
+      expect(find.text('Output'), findsOneWidget);
+      expect(find.text('cats'), findsOneWidget);
+      expect(find.text('done'), findsOneWidget);
+    },
+  );
+
+  testWidgets('collapses consecutive tool calls into a grouped summary', (
+    tester,
+  ) async {
+    const content = '''
+<details type="tool_calls" done="true" name="search" result="&quot;one&quot;">
+<summary>Tool Executed</summary>
+</details>
+<details type="tool_calls" done="true" name="browser" result="&quot;two&quot;">
+<summary>Tool Executed</summary>
+</details>
+''';
+
+    await tester.pumpWidget(buildHarness(content));
+
+    expect(find.text('Explored search, browser'), findsOneWidget);
+    expect(find.text('View Result from search'), findsNothing);
+    expect(find.text('View Result from browser'), findsNothing);
+
+    await tester.tap(find.text('Explored search, browser'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('View Result from search'), findsOneWidget);
+    expect(find.text('View Result from browser'), findsOneWidget);
+  });
+
+  testWidgets('localizes grouped tool call titles', (tester) async {
+    const content = '''
+<details type="tool_calls" done="true" name="search" result="&quot;one&quot;">
+<summary>Tool Executed</summary>
+</details>
+<details type="tool_calls" done="true" name="browser" result="&quot;two&quot;">
+<summary>Tool Executed</summary>
+</details>
+''';
+
+    await tester.pumpWidget(
+      buildHarness(content, locale: const Locale('es')),
+    );
+
+    expect(find.text('Explorado search, browser'), findsOneWidget);
+  });
+
+  testWidgets(
+    'keeps grouped tool calls expanded when new tool calls stream in after remount',
+    (tester) async {
+      final bucket = PageStorageBucket();
+      var content = '''
+<details type="tool_calls" done="true" name="search" result="&quot;one&quot;">
+<summary>Tool Executed</summary>
+</details>
+<details type="tool_calls" done="true" name="browser" result="&quot;two&quot;">
+<summary>Tool Executed</summary>
+</details>
+''';
+      var revision = 0;
+      late void Function(VoidCallback fn) rebuild;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = setState;
+                return PageStorage(
+                  bucket: bucket,
+                  child: KeyedSubtree(
+                    key: ValueKey(revision),
+                    child: SingleChildScrollView(
+                      child: StreamingMarkdownWidget(
+                        content: content,
+                        isStreaming: true,
+                        stateScopeId: 'message-1',
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Explored search, browser'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('View Result from search'), findsOneWidget);
+      expect(find.text('View Result from browser'), findsOneWidget);
+
+      rebuild(() {
+        revision += 1;
+        content = '''
+<details type="tool_calls" done="true" name="search" result="&quot;one&quot;">
+<summary>Tool Executed</summary>
+</details>
+<details type="tool_calls" done="true" name="browser" result="&quot;two&quot;">
+<summary>Tool Executed</summary>
+</details>
+<details type="tool_calls" done="true" name="files" result="&quot;three&quot;">
+<summary>Tool Executed</summary>
+</details>
+''';
+      });
+      await tester.pumpAndSettle();
+
+      expect(find.text('View Result from search'), findsOneWidget);
+      expect(find.text('View Result from browser'), findsOneWidget);
+      expect(find.text('View Result from files'), findsOneWidget);
+    },
+  );
+
+  testWidgets('does not leak incomplete tool call details while streaming', (
+    tester,
+  ) async {
+    final content = [
+      List<String>.filled(80, 'Stable sentence.').join(' '),
+      '<details type="tool_calls" done="true" name="run_command" arguments="&quot;{&quot;command&quot;:&quot;python&quot;}&quot;">',
+      '<summary>Tool Executed</summary>',
+      '&quot;{',
+      '&quot;status&quot;:&quot;running&quot;,',
+    ].join('\n\n');
+
+    await tester.pumpWidget(buildHarness(content, isStreaming: true));
+
+    expect(find.textContaining('<details'), findsNothing);
+    expect(find.textContaining('type="tool_calls"'), findsNothing);
+    expect(find.textContaining('Stable sentence.'), findsWidgets);
+  });
 
   testWidgets(
     'assistant streaming haptics fire for content arrival and completion',
@@ -668,6 +917,7 @@ Version reasoning
                 message: message,
                 isStreaming: false,
                 showFollowUps: false,
+                onDelete: () {},
               ),
             ),
           ),
@@ -782,4 +1032,17 @@ Expanded content
       expect(find.text('Expanded content'), findsOneWidget);
     },
   );
+}
+
+TextSpan? _findTextSpan(InlineSpan span, String text) {
+  if (span is! TextSpan) return null;
+  if (span.text == text) return span;
+
+  final children = span.children;
+  if (children == null) return null;
+  for (final child in children) {
+    final match = _findTextSpan(child, text);
+    if (match != null) return match;
+  }
+  return null;
 }

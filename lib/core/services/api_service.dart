@@ -6,22 +6,27 @@ import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
 import 'chat_completion_transport.dart';
+import '../models/account_metadata.dart';
 import '../models/backend_config.dart';
-import '../models/server_config.dart';
-import '../models/user.dart';
-import '../models/model.dart';
-import '../models/conversation.dart';
 import '../models/chat_message.dart';
+import '../models/conversation.dart';
 import '../models/file_info.dart';
 import '../models/knowledge_base.dart';
 import '../models/knowledge_base_file.dart';
+import '../models/model.dart';
 import '../models/prompt.dart';
+import '../models/server_about_info.dart';
+import '../models/server_config.dart';
+import '../models/server_memory.dart';
+import '../models/server_user_settings.dart';
+import '../models/user.dart';
 import '../auth/api_auth_interceptor.dart';
 import '../error/api_error_interceptor.dart';
 // Tool-call details are parsed in the UI layer to render collapsible blocks
 import 'connectivity_service.dart';
 import '../utils/debug_logger.dart';
 import '../utils/embed_utils.dart';
+import '../utils/message_tree_utils.dart' as message_tree;
 import 'conversation_parsing.dart';
 import 'worker_manager.dart';
 import 'server_tls_http_client_factory.dart';
@@ -373,7 +378,12 @@ class ApiService {
   ///
   /// When a proxy is detected, returns [HealthCheckResult.proxyAuthRequired]
   /// so the app can show a WebView for proxy authentication.
-  Future<HealthCheckResult> checkHealthWithProxyDetection() async {
+  ///
+  /// Set [throwOnConnectionError] when the caller needs to show the exact
+  /// transport failure instead of a collapsed [HealthCheckResult.unreachable].
+  Future<HealthCheckResult> checkHealthWithProxyDetection({
+    bool throwOnConnectionError = false,
+  }) async {
     try {
       // Create a temporary Dio instance that doesn't follow redirects
       // so we can detect proxy redirects
@@ -470,6 +480,9 @@ class ApiService {
       if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.unknown) {
+        if (throwOnConnectionError) {
+          rethrow;
+        }
         return HealthCheckResult.unreachable;
       }
 
@@ -488,6 +501,9 @@ class ApiService {
         }
       }
 
+      if (throwOnConnectionError) {
+        rethrow;
+      }
       return HealthCheckResult.unreachable;
     } catch (e) {
       if (e.toString().toLowerCase().contains(
@@ -500,6 +516,9 @@ class ApiService {
         scope: 'api/proxy-detect',
         error: e,
       );
+      if (throwOnConnectionError) {
+        rethrow;
+      }
       return HealthCheckResult.unreachable;
     }
   }
@@ -603,6 +622,45 @@ class ApiService {
     }
   }
 
+  Future<ServerAboutInfo> getServerAboutInfo() async {
+    final results = await Future.wait<dynamic>([
+      _dio.get('/api/config').then((response) => response.data),
+      (() async {
+        try {
+          return (await _dio.get('/api/version')).data;
+        } catch (_) {
+          return null;
+        }
+      })(),
+      (() async {
+        try {
+          return (await _dio.get('/api/version/updates')).data;
+        } catch (_) {
+          return null;
+        }
+      })(),
+      (() async {
+        try {
+          return (await _dio.get('/api/changelog')).data;
+        } catch (_) {
+          return null;
+        }
+      })(),
+    ]);
+
+    final config = _coerceResponseMap(results[0]);
+    if (config == null) {
+      throw StateError('Unexpected /api/config response type.');
+    }
+
+    return ServerAboutInfo.fromJson(
+      config,
+      versionData: _coerceResponseMap(results[1]),
+      updateData: _coerceResponseMap(results[2]),
+      changelog: _coerceResponseMap(results[3]),
+    );
+  }
+
   // Authentication
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
@@ -673,14 +731,88 @@ class ApiService {
   }
 
   // User info
-  Future<User> getCurrentUser() async {
-    final response = await _dio.get('/api/v1/auths/');
+  Future<User> getCurrentUser({
+    bool suppressAuthFailureNotification = false,
+  }) async {
+    final response = await _dio.get(
+      '/api/v1/auths/',
+      options: suppressAuthFailureNotification
+          ? Options(extra: const {'suppressAuthFailureNotification': true})
+          : null,
+    );
     DebugLogger.log('user-info', scope: 'api/user');
     return User.fromJson(response.data);
   }
 
+  Future<AccountMetadata> getAccountMetadata() async {
+    final results = await Future.wait<dynamic>([
+      _dio.get('/api/v1/auths/').then((response) => response.data),
+      (() async {
+        try {
+          return (await _dio.get('/api/v1/users/user/info')).data;
+        } catch (_) {
+          return null;
+        }
+      })(),
+    ]);
+
+    final accountData = _coerceResponseMap(results[0]);
+    if (accountData == null) {
+      throw StateError('Unexpected account response type.');
+    }
+
+    return AccountMetadata.fromJson(
+      accountData,
+      info: _coerceResponseMap(results[1]),
+    );
+  }
+
+  Future<AccountMetadata> updateAccountMetadata({
+    required String name,
+    required String profileImageUrl,
+    String? bio,
+    String? gender,
+    String? dateOfBirth,
+    String? timezone,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      throw ArgumentError('name cannot be empty');
+    }
+
+    await _dio.post(
+      '/api/v1/auths/update/profile',
+      data: {
+        'name': trimmedName,
+        'profile_image_url': profileImageUrl.trim(),
+        'bio': _normalizeNullableString(bio),
+        'gender': _normalizeNullableString(gender),
+        'date_of_birth': _normalizeNullableString(dateOfBirth),
+      },
+    );
+
+    if (timezone != null) {
+      await _dio.post(
+        '/api/v1/auths/update/timezone',
+        data: {'timezone': timezone.trim()},
+      );
+    }
+
+    return getAccountMetadata();
+  }
+
+  Future<void> updateAccountPassword({
+    required String password,
+    required String newPassword,
+  }) async {
+    await _dio.post(
+      '/api/v1/auths/update/password',
+      data: {'password': password, 'new_password': newPassword},
+    );
+  }
+
   // Models
-  Future<List<Model>> getModels() async {
+  Future<List<Model>> getModels({bool includeHidden = false}) async {
     final response = await _dio.get('/api/models');
 
     // Normalize common response formats:
@@ -714,6 +846,7 @@ class ApiService {
     }
 
     final models = <Model>[];
+    var hiddenModelCount = 0;
     for (final raw in rawModels) {
       try {
         if (raw is String) {
@@ -724,7 +857,14 @@ class ApiService {
           final normalized = raw.map(
             (key, value) => MapEntry(key.toString(), value),
           );
-          models.add(Model.fromJson(normalized));
+          final model = Model.fromJson(normalized);
+          if (model.isHidden) {
+            hiddenModelCount++;
+          }
+          if (model.isHidden && !includeHidden) {
+            continue;
+          }
+          models.add(model);
           continue;
         }
         DebugLogger.warning(
@@ -746,7 +886,7 @@ class ApiService {
     DebugLogger.log(
       'models-count',
       scope: 'api/models',
-      data: {'count': models.length},
+      data: {'count': models.length, 'hidden': hiddenModelCount},
     );
     return models;
   }
@@ -754,42 +894,47 @@ class ApiService {
   // Get default model configuration from OpenWebUI user settings
   Future<String?> getDefaultModel() async {
     try {
-      final response = await _dio.get('/api/v1/users/user/settings');
-
-      DebugLogger.log('settings-ok', scope: 'api/user-settings');
-
-      final data = response.data;
-      if (data is Map<String, dynamic>) {
-        // Extract default model from ui.models array
-        final ui = data['ui'];
-        if (ui is Map<String, dynamic>) {
-          final models = ui['models'];
-          if (models is List && models.isNotEmpty) {
-            // Return the first model in the user's preferred models list
-            final defaultModel = models.first.toString();
-            DebugLogger.log(
-              'default-model',
-              scope: 'api/user-settings',
-              data: {'id': defaultModel},
-            );
-            return defaultModel;
-          }
-        }
+      final settings = await getServerUserSettingsModel();
+      final defaultModel = settings.defaultModelId;
+      if (defaultModel != null) {
+        DebugLogger.log(
+          'default-model',
+          scope: 'api/user-settings',
+          data: {'id': defaultModel, 'source': 'user-settings'},
+        );
+        return defaultModel;
       }
-
-      // Fallback: user has no default model configured, pick first available
-      // This fixes issue #353 where secondary accounts couldn't send messages
-      DebugLogger.log('default-model-fallback', scope: 'api/user-settings');
-      return _getFirstAvailableModelId();
     } catch (e) {
       DebugLogger.error(
         'default-model-error',
         scope: 'api/user-settings',
         error: e,
       );
-      // Attempt fallback even on error
-      return _getFirstAvailableModelId();
     }
+
+    try {
+      final response = await _dio.get('/api/config');
+      final config = _coerceResponseMap(response.data);
+      final defaultModels = _coerceStringList(config?['default_models']);
+      if (defaultModels.isNotEmpty) {
+        final defaultModel = defaultModels.first;
+        DebugLogger.log(
+          'default-model',
+          scope: 'api/user-settings',
+          data: {'id': defaultModel, 'source': 'server-config'},
+        );
+        return defaultModel;
+      }
+    } catch (e) {
+      DebugLogger.error(
+        'default-model-config-error',
+        scope: 'api/user-settings',
+        error: e,
+      );
+    }
+
+    DebugLogger.log('default-model-fallback', scope: 'api/user-settings');
+    return _getFirstAvailableModelId();
   }
 
   /// Returns the ID of the first available model, or null if none available.
@@ -938,9 +1083,7 @@ class ApiService {
     );
     final data = response.data;
     if (data is! List) {
-      throw Exception(
-        'Expected array of chats, got ${data.runtimeType}',
-      );
+      throw Exception('Expected array of chats, got ${data.runtimeType}');
     }
 
     return _parseConversationSummaryList(
@@ -1508,6 +1651,26 @@ class ApiService {
     return null;
   }
 
+  Map<String, dynamic>? _coerceResponseMap(dynamic value) {
+    if (value is String && value.isNotEmpty) {
+      try {
+        final decoded = json.decode(value);
+        return _coerceJsonMap(decoded);
+      } catch (_) {
+        return null;
+      }
+    }
+    return _coerceJsonMap(value);
+  }
+
+  String? _normalizeNullableString(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
+  }
+
   List<String> _coerceStringList(dynamic value) {
     if (value is! List) {
       return <String>[];
@@ -1520,27 +1683,104 @@ class ApiService {
   }
 
   List<Map<String, dynamic>> _buildHistoryChainMessages(
-    Map<String, dynamic> messagesMap,
+    Map<String, Map<String, dynamic>> messagesMap,
     String currentId,
   ) {
-    final chain = <Map<String, dynamic>>[];
-    final visited = <String>{};
-    String? nextId = currentId;
+    return message_tree
+        .chainToRoot<Map<String, dynamic>>(
+          currentId,
+          messagesById: messagesMap,
+          parentIdOf: message_tree.rawMessageParentId,
+        )
+        .map(_deepCloneJsonMap)
+        .toList(growable: false);
+  }
 
-    while (nextId != null && nextId.isNotEmpty && !visited.contains(nextId)) {
-      final message = _coerceJsonMap(messagesMap[nextId]);
-      if (message == null) {
-        break;
-      }
+  Set<String> _collectMessageDescendantIds(
+    Map<String, Map<String, dynamic>> messagesMap,
+    String messageId,
+  ) {
+    return message_tree.collectDescendantIds(messageId, {
+      for (final entry in messagesMap.entries)
+        entry.key: message_tree.rawMessageChildrenIds(entry.value),
+    });
+  }
 
-      chain.add(_deepCloneJsonMap(message));
-      visited.add(nextId);
+  String? _latestRemainingMessageId(
+    Map<String, Map<String, dynamic>> messagesMap,
+  ) {
+    return message_tree.latestRemainingMessageId<Map<String, dynamic>>(
+      messagesMap,
+      timestampOf: (message) {
+        final timestamp = message['timestamp'];
+        return timestamp is num ? timestamp : null;
+      },
+    );
+  }
 
-      final parentId = message['parentId']?.toString().trim();
-      nextId = parentId != null && parentId.isNotEmpty ? parentId : null;
+  /// Deletes one message from the current server-side chat history.
+  ///
+  /// This edits the latest raw chat payload from the server instead of replaying
+  /// a local message list, preserving any server-only history fields and
+  /// messages that may have arrived since the local state last synced.
+  Future<void> deleteConversationMessage(
+    String conversationId,
+    String messageId,
+  ) async {
+    _traceApi('Deleting message $messageId from chat $conversationId');
+
+    final response = await _dio.get('/api/v1/chats/$conversationId');
+    final rawConversation = _coerceJsonMap(response.data);
+    final rawChat = _coerceJsonMap(rawConversation?['chat']);
+    if (rawConversation == null || rawChat == null) {
+      throw Exception(
+        'Delete message failed: invalid chat payload for $conversationId',
+      );
     }
 
-    return chain.reversed.toList(growable: false);
+    final chat = _deepCloneJsonMap(rawChat);
+    final history = _coerceJsonMap(chat['history']) ?? <String, dynamic>{};
+    final rawMessagesMap =
+        _coerceJsonMap(history['messages']) ?? <String, dynamic>{};
+    final messagesMap = <String, Map<String, dynamic>>{};
+
+    for (final entry in rawMessagesMap.entries) {
+      final message = _coerceJsonMap(entry.value);
+      if (message == null) continue;
+      messagesMap[entry.key] = _deepCloneJsonMap(message);
+    }
+
+    if (!messagesMap.containsKey(messageId)) {
+      return;
+    }
+
+    final removedIds = _collectMessageDescendantIds(messagesMap, messageId);
+    messagesMap.removeWhere((id, _) => removedIds.contains(id));
+
+    for (final entry in messagesMap.entries) {
+      final message = entry.value;
+      final children = _coerceStringList(
+        message['childrenIds'],
+      ).where((id) => !removedIds.contains(id)).toList(growable: false);
+      message['childrenIds'] = children;
+    }
+
+    final currentId = history['currentId']?.toString();
+    final nextCurrentId = currentId != null && !removedIds.contains(currentId)
+        ? currentId
+        : _latestRemainingMessageId(messagesMap);
+
+    history['messages'] = messagesMap;
+    if (nextCurrentId == null || nextCurrentId.isEmpty) {
+      history.remove('currentId');
+      chat['messages'] = <Map<String, dynamic>>[];
+    } else {
+      history['currentId'] = nextCurrentId;
+      chat['messages'] = _buildHistoryChainMessages(messagesMap, nextCurrentId);
+    }
+    chat['history'] = history;
+
+    await _dio.post('/api/v1/chats/$conversationId', data: {'chat': chat});
   }
 
   Future<void> _persistLegacyPendingTurn({
@@ -1569,7 +1809,7 @@ class ApiService {
     final history = _coerceJsonMap(chat['history']) ?? <String, dynamic>{};
     final rawMessagesMap =
         _coerceJsonMap(history['messages']) ?? <String, dynamic>{};
-    final messagesMap = <String, dynamic>{};
+    final messagesMap = <String, Map<String, dynamic>>{};
 
     for (final entry in rawMessagesMap.entries) {
       final message = _coerceJsonMap(entry.value);
@@ -1588,7 +1828,7 @@ class ApiService {
       );
     }
 
-    final existingUserMessage = _coerceJsonMap(messagesMap[userMessageId]);
+    final existingUserMessage = messagesMap[userMessageId];
     final mergedUserMessage = <String, dynamic>{
       if (existingUserMessage != null)
         ..._deepCloneJsonMap(existingUserMessage),
@@ -1606,7 +1846,7 @@ class ApiService {
 
     final parentId = mergedUserMessage['parentId']?.toString().trim();
     if (parentId != null && parentId.isNotEmpty) {
-      final existingParentMessage = _coerceJsonMap(messagesMap[parentId]);
+      final existingParentMessage = messagesMap[parentId];
       if (existingParentMessage != null) {
         final mergedParentMessage = _deepCloneJsonMap(existingParentMessage);
         final parentChildrenIds = _coerceStringList(
@@ -1620,9 +1860,7 @@ class ApiService {
       }
     }
 
-    final existingAssistantMessage = _coerceJsonMap(
-      messagesMap[assistantMessageId],
-    );
+    final existingAssistantMessage = messagesMap[assistantMessageId];
     final assistantModelName =
         modelItem?['name']?.toString().trim().isNotEmpty == true
         ? modelItem!['name'].toString().trim()
@@ -1701,6 +1939,11 @@ class ApiService {
     return data['share_id'] as String?;
   }
 
+  Future<void> deleteSharedConversation(String id) async {
+    _traceApi('Deleting shared conversation link: $id');
+    await _dio.delete('/api/v1/chats/$id/share');
+  }
+
   // Clone conversation
   Future<Conversation> cloneConversation(String id) async {
     _traceApi('Cloning conversation: $id');
@@ -1730,6 +1973,68 @@ class ApiService {
     _traceApi('Updating user settings');
     // Align with web client update route
     await _dio.post('/api/v1/users/user/settings/update', data: settings);
+  }
+
+  Future<ServerUserSettings> getServerUserSettingsModel() async {
+    return ServerUserSettings.fromJson(await getUserSettings());
+  }
+
+  Future<ServerUserSettings> updateUserSystemPrompt(
+    String? systemPrompt,
+  ) async {
+    final settings = _deepCloneJsonMap(await getUserSettings());
+    final ui = _coerceJsonMap(settings['ui']) ?? <String, dynamic>{};
+    final trimmed = _normalizeNullableString(systemPrompt);
+
+    if (trimmed == null || trimmed.isEmpty) {
+      ui.remove('system');
+    } else {
+      ui['system'] = trimmed;
+    }
+
+    settings.remove('system');
+    settings['ui'] = ui;
+    _traceApi('Updating user system prompt');
+    final response = await _dio.post(
+      '/api/v1/users/user/settings/update',
+      data: settings,
+    );
+    final data = _coerceResponseMap(response.data) ?? settings;
+    return ServerUserSettings.fromJson(data);
+  }
+
+  Future<ServerUserSettings> updateUserDefaultModel(String? modelId) async {
+    final settings = _deepCloneJsonMap(await getUserSettings());
+    final ui = _coerceJsonMap(settings['ui']) ?? <String, dynamic>{};
+    final trimmed = _normalizeNullableString(modelId);
+
+    if (trimmed == null) {
+      ui.remove('models');
+    } else {
+      ui['models'] = <String>[trimmed];
+    }
+
+    settings['ui'] = ui;
+    final response = await _dio.post(
+      '/api/v1/users/user/settings/update',
+      data: settings,
+    );
+    final data = _coerceResponseMap(response.data) ?? settings;
+    return ServerUserSettings.fromJson(data);
+  }
+
+  Future<ServerUserSettings> updateUserMemoryEnabled(bool enabled) async {
+    final settings = _deepCloneJsonMap(await getUserSettings());
+    final ui = _coerceJsonMap(settings['ui']) ?? <String, dynamic>{};
+    ui['memory'] = enabled;
+    settings['ui'] = ui;
+
+    final response = await _dio.post(
+      '/api/v1/users/user/settings/update',
+      data: settings,
+    );
+    final data = _coerceResponseMap(response.data) ?? settings;
+    return ServerUserSettings.fromJson(data);
   }
 
   // Suggestions
@@ -1845,11 +2150,51 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<void> updateFolder(String id, {String? name}) async {
+  Future<Map<String, dynamic>?> getFolderById(String id) async {
+    _traceApi('Fetching folder: $id');
+    final response = await _dio.get('/api/v1/folders/$id');
+    final data = response.data;
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  Future<Map<String, dynamic>?> updateFolder(
+    String id, {
+    String? name,
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? meta,
+  }) async {
     _traceApi('Updating folder: $id');
-    if (name != null) {
-      await _dio.post('/api/v1/folders/$id/update', data: {'name': name});
+    final payload = <String, dynamic>{
+      'name': ?name,
+      'data': ?data,
+      'meta': ?meta,
+    };
+    if (payload.isEmpty) {
+      return null;
     }
+    final response = await _dio.post(
+      '/api/v1/folders/$id/update',
+      data: payload,
+    );
+    final responseData = response.data;
+    return responseData is Map<String, dynamic> ? responseData : null;
+  }
+
+  Future<Map<String, dynamic>?> updateFolderSystemPrompt(
+    String id,
+    String? systemPrompt,
+  ) async {
+    final folder = await getFolderById(id);
+    final data = _coerceJsonMap(folder?['data']) ?? <String, dynamic>{};
+    final trimmed = systemPrompt?.trim();
+
+    if (trimmed == null || trimmed.isEmpty) {
+      data['system_prompt'] = '';
+    } else {
+      data['system_prompt'] = trimmed;
+    }
+
+    return updateFolder(id, data: data);
   }
 
   Future<void> updateFolderParent(String id, String? parentId) async {
@@ -2616,6 +2961,50 @@ class ApiService {
     return null;
   }
 
+  Future<Map<String, dynamic>?> updateModel(Map<String, dynamic> model) async {
+    final payload = <String, dynamic>{
+      'id': model['id'],
+      'base_model_id': model['base_model_id'],
+      'name': model['name'],
+      'meta': _coerceJsonMap(model['meta']) ?? <String, dynamic>{},
+      'params': _coerceJsonMap(model['params']) ?? <String, dynamic>{},
+      'access_grants': model['access_grants'],
+      'is_active': model['is_active'],
+    };
+    payload.removeWhere((_, value) => value == null);
+
+    final response = await _dio.post(
+      '/api/v1/models/model/update',
+      data: payload,
+    );
+    final data = response.data;
+    return data is Map<String, dynamic> ? data : null;
+  }
+
+  Future<Map<String, dynamic>?> updateModelSystemPrompt(
+    String modelId,
+    String? systemPrompt,
+  ) async {
+    final model = await getModelDetails(modelId);
+    if (model == null) {
+      throw StateError('Model "$modelId" has no editable server record.');
+    }
+
+    final params = _coerceJsonMap(model['params']) ?? <String, dynamic>{};
+    final trimmed = systemPrompt?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      params.remove('system');
+    } else {
+      params['system'] = trimmed;
+    }
+
+    final updated = await updateModel({...model, 'params': params});
+    if (updated == null) {
+      throw StateError('Model "$modelId" update returned no server record.');
+    }
+    return updated;
+  }
+
   // Send chat completed notification
   // This persists usage data and other message metadata to the server
   /// Notify backend that chat streaming is complete.
@@ -3334,26 +3723,56 @@ class ApiService {
   }
 
   // Memory & Notes
-  Future<List<Map<String, dynamic>>> getMemories() async {
+  Future<List<ServerMemory>> getMemories() async {
     _traceApi('Fetching memories');
     final response = await _dio.get('/api/v1/memories/');
     final data = response.data;
     if (data is List) {
-      return data.cast<Map<String, dynamic>>();
+      return data
+          .whereType<Map>()
+          .map((entry) => ServerMemory.fromJson(entry.cast<String, dynamic>()))
+          .toList(growable: false);
     }
-    return [];
+    return const <ServerMemory>[];
   }
 
-  Future<Map<String, dynamic>> createMemory({
-    required String content,
-    String? title,
-  }) async {
+  Future<ServerMemory> createMemory({required String content}) async {
     _traceApi('Creating memory');
     final response = await _dio.post(
-      '/api/v1/memories/',
-      data: {'content': content, 'title': ?title},
+      '/api/v1/memories/add',
+      data: {'content': content},
     );
-    return response.data as Map<String, dynamic>;
+    final data = _coerceResponseMap(response.data);
+    if (data == null) {
+      throw StateError('Unexpected memory create response type.');
+    }
+    return ServerMemory.fromJson(data);
+  }
+
+  Future<ServerMemory> updateMemory({
+    required String memoryId,
+    required String content,
+  }) async {
+    _traceApi('Updating memory');
+    final response = await _dio.post(
+      '/api/v1/memories/$memoryId/update',
+      data: {'content': content},
+    );
+    final data = _coerceResponseMap(response.data);
+    if (data == null) {
+      throw StateError('Unexpected memory update response type.');
+    }
+    return ServerMemory.fromJson(data);
+  }
+
+  Future<void> deleteMemory(String memoryId) async {
+    _traceApi('Deleting memory');
+    await _dio.delete('/api/v1/memories/$memoryId');
+  }
+
+  Future<void> clearAllMemories() async {
+    _traceApi('Clearing all memories');
+    await _dio.delete('/api/v1/memories/delete/user');
   }
 
   // Team Collaboration
@@ -4855,12 +5274,15 @@ class ApiService {
     final response = await _dio.get('/api/v1/chats/pinned');
     final data = response.data;
     if (data is List) {
-      return data.whereType<Map>().map((chatData) {
-        final map = Map<String, dynamic>.from(chatData);
-        return Conversation.fromJson(
-          parseConversationSummary(map),
-        ).copyWith(pinned: true);
-      }).toList(growable: false);
+      return data
+          .whereType<Map>()
+          .map((chatData) {
+            final map = Map<String, dynamic>.from(chatData);
+            return Conversation.fromJson(
+              parseConversationSummary(map),
+            ).copyWith(pinned: true);
+          })
+          .toList(growable: false);
     }
     return [];
   }
@@ -4878,12 +5300,15 @@ class ApiService {
     );
     final data = response.data;
     if (data is List) {
-      return data.whereType<Map>().map((chatData) {
-        final map = Map<String, dynamic>.from(chatData);
-        return Conversation.fromJson(
-          parseConversationSummary(map),
-        ).copyWith(archived: true);
-      }).toList(growable: false);
+      return data
+          .whereType<Map>()
+          .map((chatData) {
+            final map = Map<String, dynamic>.from(chatData);
+            return Conversation.fromJson(
+              parseConversationSummary(map),
+            ).copyWith(archived: true);
+          })
+          .toList(growable: false);
     }
     return [];
   }

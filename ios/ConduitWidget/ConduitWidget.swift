@@ -8,6 +8,22 @@
 import WidgetKit
 import SwiftUI
 
+private enum WidgetDeepLink {
+    static var scheme: String {
+        guard
+            let configuredScheme = Bundle.main.object(forInfoDictionaryKey: "AppUrlScheme") as? String,
+            !configuredScheme.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return "conduit"
+        }
+        return configuredScheme
+    }
+
+    static func url(for action: String) -> URL {
+        URL(string: "\(scheme)://\(action)?homeWidget=true")!
+    }
+}
+
 // MARK: - Timeline Entry
 
 struct ConduitEntry: TimelineEntry {
@@ -54,8 +70,8 @@ struct ConduitWidgetEntryView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            // Main "Ask EOchat" pill - ChatGPT style
-            Link(destination: URL(string: "eochat://new_chat?homeWidget=true")!) {
+            // Main "Ask Conduit" pill - ChatGPT style
+            Link(destination: WidgetDeepLink.url(for: "new_chat")) {
                 HStack(spacing: 12) {
                     Image("HubIcon")
                         .renderingMode(.template)
@@ -63,7 +79,7 @@ struct ConduitWidgetEntryView: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 28, height: 28)
                         .foregroundStyle(contentColor.opacity(0.85))
-                    Text("Vraag aan EOchat")
+                    Text("Ask Conduit")
                         .font(.system(size: 18, weight: .medium, design: .rounded))
                         .foregroundStyle(contentColor.opacity(0.85))
                     Spacer()
@@ -82,25 +98,25 @@ struct ConduitWidgetEntryView: View {
             HStack(spacing: 8) {
                 CircularIconButton(
                     symbol: "camera",
-                    url: "eochat://camera?homeWidget=true",
+                    destination: WidgetDeepLink.url(for: "camera"),
                     contentColor: contentColor,
                     buttonBackground: buttonBackground
                 )
                 CircularIconButton(
                     symbol: "photo.on.rectangle.angled",
-                    url: "eochat://photos?homeWidget=true",
+                    destination: WidgetDeepLink.url(for: "photos"),
                     contentColor: contentColor,
                     buttonBackground: buttonBackground
                 )
                 CircularIconButton(
                     symbol: "waveform",
-                    url: "eochat://mic?homeWidget=true",
+                    destination: WidgetDeepLink.url(for: "mic"),
                     contentColor: contentColor,
                     buttonBackground: buttonBackground
                 )
                 CircularIconButton(
                     symbol: "doc.on.clipboard",
-                    url: "eochat://clipboard?homeWidget=true",
+                    destination: WidgetDeepLink.url(for: "clipboard"),
                     contentColor: contentColor,
                     buttonBackground: buttonBackground
                 )
@@ -114,12 +130,12 @@ struct ConduitWidgetEntryView: View {
 
 struct CircularIconButton: View {
     let symbol: String
-    let url: String
+    let destination: URL
     let contentColor: Color
     let buttonBackground: Color
 
     var body: some View {
-        Link(destination: URL(string: url)!) {
+        Link(destination: destination) {
             Image(systemName: symbol)
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(contentColor.opacity(0.85))
@@ -148,7 +164,7 @@ struct ConduitWidget: Widget {
                     .background(Color("WidgetBackground"))
             }
         }
-        .configurationDisplayName("EOchat")
+        .configurationDisplayName("Conduit")
         .description("Quick access to chat, camera, photos, and voice.")
         .supportedFamilies([.systemMedium])
         .contentMarginsDisabled()
@@ -162,3 +178,4 @@ struct ConduitWidget: Widget {
 } timeline: {
     ConduitEntry(date: .now)
 }
+

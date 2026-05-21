@@ -16,8 +16,10 @@ import '../../../core/providers/app_providers.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/services/streaming_response_controller.dart';
+import '../../../core/services/performance_profiler.dart';
 import '../../../core/services/worker_manager.dart';
 import '../../../core/utils/debug_logger.dart';
+import '../../../core/utils/message_tree_utils.dart' as message_tree;
 import '../../../core/utils/tool_calls_parser.dart';
 import '../models/chat_context_attachment.dart';
 import '../providers/context_attachments_provider.dart';
@@ -47,6 +49,19 @@ final isChatStreamingProvider = Provider<bool>((ref) {
     }),
   );
 });
+
+String? _connectedSocketSessionId(SocketService? socketService) {
+  if (socketService?.isConnected != true) {
+    return null;
+  }
+
+  final sessionId = socketService!.sessionId;
+  if (sessionId == null || sessionId.isEmpty) {
+    return null;
+  }
+
+  return sessionId;
+}
 
 /// The content of the currently streaming assistant message.
 /// Only the actively streaming message widget should watch this.
@@ -119,6 +134,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   /// Interval for syncing the streaming buffer into the message list state.
   /// Per-chunk updates go through [streamingContentProvider] instead.
   static const _streamingSyncInterval = Duration(milliseconds: 500);
+  static const _streamingContentUpdateInterval = Duration(milliseconds: 50);
   static const _passiveRefreshDebounce = Duration(milliseconds: 350);
 
   StreamingResponseController? _messageStream;
@@ -130,6 +146,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   DateTime? _lastStreamingActivity;
   StringBuffer? _streamingBuffer;
   Timer? _streamingSyncTimer;
+  Timer? _streamingContentTimer;
   Timer? _taskStatusTimer;
   Timer? _passiveConversationRefreshTimer;
   bool _taskStatusCheckInFlight = false;
@@ -138,6 +155,11 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   bool _queuedPassiveConversationRefresh = false;
   String? _passiveConversationId;
   String? _activeStreamingTransportMessageId;
+  String? _streamingProfileTaskKey;
+  String? _streamingProfileMessageId;
+  DateTime? _streamingProfileStartedAt;
+  int _streamingProfileChunkCount = 0;
+  int _streamingProfileBytes = 0;
 
   bool _initialized = false;
 
@@ -174,6 +196,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
 
         if (next != null) {
           state = next.messages;
+          _syncStreamingProfileWithState();
 
           // Update selected model if conversation has a different model
           _updateModelForConversation(next);
@@ -183,6 +206,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
           }
         } else {
           state = [];
+          _finishStreamingProfile(reason: 'conversation_cleared');
           _stopRemoteTaskMonitor();
         }
       });
@@ -198,6 +222,8 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
         _stopRemoteTaskMonitor();
         _streamingSyncTimer?.cancel();
         _streamingSyncTimer = null;
+        _streamingContentTimer?.cancel();
+        _streamingContentTimer = null;
 
         _conversationListener?.close();
         _conversationListener = null;
@@ -238,11 +264,14 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     _streamingBuffer = null;
     _streamingSyncTimer?.cancel();
     _streamingSyncTimer = null;
+    _streamingContentTimer?.cancel();
+    _streamingContentTimer = null;
     _clearStreamingContent();
     if (_hasTrackedStreamingTransport) {
       _dropStreamingTransportState(source: 'server adoption from $source');
     }
     state = serverMessages;
+    _syncStreamingProfileWithState();
 
     if (needsCleanup) {
       _cancelMessageStream();
@@ -428,7 +457,12 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
         try {
           ref
               .read(conversationsProvider.notifier)
-              .upsertConversation(refreshed.copyWith(messages: const []));
+              .upsertConversation(
+                refreshed.copyWith(messages: const []),
+                trustFolderConversation:
+                    refreshed.folderId != null &&
+                    refreshed.folderId!.isNotEmpty,
+              );
         } catch (_) {}
       }
 
@@ -464,6 +498,106 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     }
   }
 
+  void _beginStreamingProfile(ChatMessage message) {
+    if (message.role != 'assistant' || !message.isStreaming) {
+      return;
+    }
+    if (_streamingProfileMessageId == message.id &&
+        _streamingProfileTaskKey != null) {
+      return;
+    }
+
+    _finishStreamingProfile(reason: 'replaced');
+    _streamingProfileMessageId = message.id;
+    _streamingProfileStartedAt = DateTime.now();
+    _streamingProfileChunkCount = 0;
+    _streamingProfileBytes = message.content.length;
+    _streamingProfileTaskKey = PerformanceProfiler.instance.startTask(
+      'chat_stream',
+      scope: 'chat',
+      key: 'chat-stream:${message.id}',
+      data: {
+        'messageId': message.id,
+        'conversationId': ref.read(activeConversationProvider)?.id ?? 'none',
+        'initialLength': message.content.length,
+      },
+    );
+  }
+
+  void _recordStreamingChunk(String content) {
+    if (content.isEmpty || state.isEmpty) {
+      return;
+    }
+    final lastMessage = state.last;
+    if (lastMessage.role != 'assistant' || !lastMessage.isStreaming) {
+      return;
+    }
+
+    _beginStreamingProfile(lastMessage);
+    _streamingProfileChunkCount += 1;
+    _streamingProfileBytes += content.length;
+    if (_streamingProfileChunkCount == 1 ||
+        _streamingProfileChunkCount % 25 == 0) {
+      PerformanceProfiler.instance.instant(
+        'chat_stream_chunk',
+        scope: 'chat',
+        data: {
+          'messageId': lastMessage.id,
+          'chunkCount': _streamingProfileChunkCount,
+          'chunkBytes': content.length,
+          'bufferBytes': _streamingProfileBytes,
+        },
+      );
+    }
+  }
+
+  void _syncStreamingProfileWithState() {
+    final lastMessage = state.lastOrNull;
+    if (lastMessage == null ||
+        lastMessage.role != 'assistant' ||
+        !lastMessage.isStreaming) {
+      _finishStreamingProfile(reason: 'state_sync');
+      return;
+    }
+
+    _beginStreamingProfile(lastMessage);
+    _streamingProfileBytes = lastMessage.content.length;
+  }
+
+  void _finishStreamingProfile({required String reason, ChatMessage? message}) {
+    final taskKey = _streamingProfileTaskKey;
+    final messageId = _streamingProfileMessageId;
+    if (taskKey == null || messageId == null) {
+      _streamingProfileTaskKey = null;
+      _streamingProfileMessageId = null;
+      _streamingProfileStartedAt = null;
+      _streamingProfileChunkCount = 0;
+      _streamingProfileBytes = 0;
+      return;
+    }
+
+    final elapsed = _streamingProfileStartedAt == null
+        ? null
+        : DateTime.now().difference(_streamingProfileStartedAt!);
+    final finalMessage = message ?? state.lastOrNull;
+    PerformanceProfiler.instance.finishTask(
+      taskKey,
+      data: {
+        'messageId': messageId,
+        'reason': reason,
+        'chunkCount': _streamingProfileChunkCount,
+        'bufferBytes': _streamingProfileBytes,
+        'elapsedMs': elapsed?.inMilliseconds ?? 0,
+        'finalLength': finalMessage?.content.length ?? 0,
+      },
+    );
+    _streamingProfileTaskKey = null;
+    _streamingProfileMessageId = null;
+    _streamingProfileStartedAt = null;
+    _streamingProfileChunkCount = 0;
+    _streamingProfileBytes = 0;
+  }
+
   void _cancelMessageStream({bool clearStreamingContent = true}) {
     final controller = _messageStream;
     _messageStream = null;
@@ -475,10 +609,13 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     _streamingBuffer = null;
     _streamingSyncTimer?.cancel();
     _streamingSyncTimer = null;
+    _streamingContentTimer?.cancel();
+    _streamingContentTimer = null;
     if (clearStreamingContent) {
       _clearStreamingContent();
     }
     _stopRemoteTaskMonitor();
+    _finishStreamingProfile(reason: 'cancelled');
   }
 
   /// Checks if streaming cleanup is needed when adopting server messages.
@@ -576,6 +713,8 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     _streamingBuffer = null;
     _streamingSyncTimer?.cancel();
     _streamingSyncTimer = null;
+    _streamingContentTimer?.cancel();
+    _streamingContentTimer = null;
     _clearStreamingContent();
     _stopRemoteTaskMonitor();
   }
@@ -778,9 +917,13 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
 
     // If the conversation's model is different from the currently selected one
     if (currentSelectedModel?.id != conversation.model) {
-      // Get available models to find the matching one
+      // Existing chats must keep using their saved model, even if an admin
+      // later hides it from selectors.
       try {
-        final models = await ref.read(modelsProvider.future);
+        final api = ref.read(apiServiceProvider);
+        final models = api != null
+            ? await api.getModels(includeHidden: true)
+            : await ref.read(modelsProvider.future);
 
         if (models.isEmpty) {
           return;
@@ -793,7 +936,9 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
 
         if (conversationModel != null) {
           // Update the selected model
-          ref.read(selectedModelProvider.notifier).set(conversationModel);
+          ref
+              .read(selectedModelProvider.notifier)
+              .set(conversationModel, allowHidden: true);
         } else {
           // Model not found in available models - silently continue
         }
@@ -842,6 +987,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   void addMessage(ChatMessage message) {
     state = [...state, message];
     if (message.role == 'assistant' && message.isStreaming) {
+      _beginStreamingProfile(message);
       _touchStreamingActivity();
     }
   }
@@ -849,15 +995,18 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   void removeLastMessage() {
     if (state.isNotEmpty) {
       state = state.sublist(0, state.length - 1);
+      _syncStreamingProfileWithState();
     }
   }
 
   void clearMessages() {
     state = [];
+    _finishStreamingProfile(reason: 'cleared');
   }
 
   void setMessages(List<ChatMessage> messages) {
     state = messages;
+    _syncStreamingProfileWithState();
   }
 
   void updateLastMessage(String content) {
@@ -870,6 +1019,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
       ...state.sublist(0, state.length - 1),
       lastMessage.copyWith(content: _stripStreamingPlaceholders(content)),
     ];
+    _syncStreamingProfileWithState();
     _touchStreamingActivity();
   }
 
@@ -883,7 +1033,13 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     final updated = updater(lastMessage);
     state = [...state.sublist(0, state.length - 1), updated];
     if (updated.isStreaming) {
+      _syncStreamingProfileWithState();
       _touchStreamingActivity();
+    } else {
+      _finishStreamingProfile(
+        reason: 'updated_non_streaming',
+        message: updated,
+      );
     }
   }
 
@@ -926,6 +1082,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     );
 
     state = [...state.sublist(0, state.length - 1), updated];
+    _beginStreamingProfile(updated);
     _touchStreamingActivity();
   }
 
@@ -1009,14 +1166,9 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     // Initialize buffer with existing content on first chunk
     _streamingBuffer ??= StringBuffer(lastMessage.content);
     _streamingBuffer!.write(content);
+    _recordStreamingChunk(content);
 
-    // Update streaming content provider per-chunk so only the streaming
-    // widget re-parses. Note: .toString() materializes the full string each
-    // time (O(n) per chunk), but the StringBuffer avoids creating intermediate
-    // concatenation objects that pressure GC. The alternative of exposing the
-    // StringBuffer directly would leak mutable state into the widget layer.
-    final accumulated = _streamingBuffer!.toString();
-    ref.read(streamingContentProvider.notifier).set(accumulated);
+    _scheduleStreamingContentUpdate();
 
     // Throttle message list state updates to every 500ms.
     // This prevents rebuilding ALL visible messages on
@@ -1027,6 +1179,20 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     );
 
     _touchStreamingActivity();
+  }
+
+  void _scheduleStreamingContentUpdate() {
+    if (_streamingContentTimer != null) return;
+    _streamingContentTimer = Timer(_streamingContentUpdateInterval, () {
+      _streamingContentTimer = null;
+      _flushStreamingContentUpdate();
+    });
+  }
+
+  void _flushStreamingContentUpdate() {
+    final buffer = _streamingBuffer;
+    if (buffer == null) return;
+    ref.read(streamingContentProvider.notifier).set(buffer.toString());
   }
 
   /// Syncs the accumulated streaming buffer content into
@@ -1052,6 +1218,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
       ...state.sublist(0, state.length - 1),
       lastMessage.copyWith(content: accumulated),
     ];
+    _syncStreamingProfileWithState();
   }
 
   /// Flushes any pending streaming buffer content into the
@@ -1062,10 +1229,35 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   /// Riverpod state.
   void syncStreamingBuffer() => _syncStreamingBufferToState();
 
+  /// Buffers a full replacement for the active streaming assistant message.
+  ///
+  /// This is used for generated content that must replace the visible
+  /// streaming text, such as an in-progress reasoning block. The live widget
+  /// still receives frequent updates through [streamingContentProvider], while
+  /// the full message list only syncs on [_streamingSyncInterval].
+  void bufferLastMessageContent(String content) {
+    if (state.isEmpty) return;
+
+    final lastMessage = state.last;
+    if (lastMessage.role != 'assistant' || !lastMessage.isStreaming) return;
+
+    final sanitized = _stripStreamingPlaceholders(content);
+    _streamingBuffer = StringBuffer(sanitized);
+    _scheduleStreamingContentUpdate();
+    _streamingSyncTimer ??= Timer.periodic(
+      _streamingSyncInterval,
+      (_) => _syncStreamingBufferToState(),
+    );
+    _touchStreamingActivity();
+    _syncStreamingProfileWithState();
+  }
+
   void replaceLastMessageContent(String content) {
     _streamingBuffer = null;
     _streamingSyncTimer?.cancel();
     _streamingSyncTimer = null;
+    _streamingContentTimer?.cancel();
+    _streamingContentTimer = null;
     _clearStreamingContent();
     if (state.isEmpty) return;
 
@@ -1077,6 +1269,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
       ...state.sublist(0, state.length - 1),
       lastMessage.copyWith(content: sanitized),
     ];
+    _syncStreamingProfileWithState();
     _touchStreamingActivity();
   }
 
@@ -1153,6 +1346,9 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
 
   void _completeStreamingMessage({required bool releaseTransport}) {
     // Sync final buffer content to state before clearing
+    _streamingContentTimer?.cancel();
+    _streamingContentTimer = null;
+    _flushStreamingContentUpdate();
     _syncStreamingBufferToState();
     _streamingBuffer = null;
     _streamingSyncTimer?.cancel();
@@ -1160,6 +1356,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     _clearStreamingContent();
 
     if (state.isEmpty) {
+      _finishStreamingProfile(reason: 'empty_state');
       if (releaseTransport) {
         _messageStream = null;
         _activeStreamingTransportMessageId = null;
@@ -1171,6 +1368,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
 
     final lastMessage = state.last;
     if (lastMessage.role != 'assistant' || !lastMessage.isStreaming) {
+      _finishStreamingProfile(reason: 'not_streaming', message: lastMessage);
       if (releaseTransport) {
         _messageStream = null;
         _activeStreamingTransportMessageId = null;
@@ -1184,6 +1382,10 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
       ...state.sublist(0, state.length - 1),
       _buildCompletedAssistantMessage(lastMessage),
     ];
+    _finishStreamingProfile(
+      reason: releaseTransport ? 'completed' : 'ui_completed',
+      message: state.lastOrNull,
+    );
 
     if (releaseTransport) {
       _messageStream = null;
@@ -1466,20 +1668,11 @@ Map<String, dynamic>? _buildOpenWebUiUserMessage({
   }
 
   final metadata = userMessage.metadata;
-  final parentId = (() {
-    final rawParentId = metadata?['parentId']?.toString().trim();
-    if (rawParentId != null && rawParentId.isNotEmpty) {
-      return rawParentId;
-    }
-    return previousMessage?.id;
-  })();
-  final rawChildren = metadata?['childrenIds'];
-  final childrenIds = rawChildren is List
-      ? rawChildren
-            .map((child) => child?.toString() ?? '')
-            .where((child) => child.isNotEmpty)
-            .toList(growable: true)
-      : <String>[];
+  final parentId =
+      message_tree.chatMessageParentId(userMessage) ?? previousMessage?.id;
+  final childrenIds = message_tree
+      .chatMessageChildrenIds(userMessage)
+      .toList(growable: true);
   if (assistantChildMessageId != null &&
       assistantChildMessageId.isNotEmpty &&
       !childrenIds.contains(assistantChildMessageId)) {
@@ -1766,6 +1959,11 @@ void startNewChat(dynamic ref) {
 
   // Reset to default model for new conversations (fixes #296)
   restoreDefaultModel(ref);
+
+  final settings = ref.read(appSettingsProvider);
+  ref
+      .read(temporaryChatEnabledProvider.notifier)
+      .set(settings.temporaryChatByDefault);
 }
 
 /// Restores the selected model to the user's configured default model.
@@ -2250,16 +2448,6 @@ Future<void> regenerateMessage(
       userSystemPrompt = _extractSystemPromptFromSettings(userSettingsData);
     } catch (_) {}
 
-    if ((activeConversation.systemPrompt == null ||
-            activeConversation.systemPrompt!.trim().isEmpty) &&
-        (userSystemPrompt?.isNotEmpty ?? false)) {
-      final updated = activeConversation.copyWith(
-        systemPrompt: userSystemPrompt,
-      );
-      ref.read(activeConversationProvider.notifier).set(updated);
-      activeConversation = updated;
-    }
-
     // Include selected tool ids so provider-native tool calling is triggered
     final selectedToolIds = ref.read(selectedToolIdsProvider);
     final toolIdsForApi = _extractToolIdsForApi(selectedToolIds);
@@ -2387,7 +2575,7 @@ Future<void> regenerateMessage(
 
     // Socket is optional — only needed for taskSocket transport.
     final socketService = ref.read(socketServiceProvider);
-    final socketSessionId = socketService?.sessionId;
+    final socketSessionId = _connectedSocketSessionId(socketService);
 
     List<Map<String, dynamic>>? toolServers;
     try {
@@ -2598,8 +2786,16 @@ Future<void> sendMessageFromService(
   List<String>? attachments, [
   List<String>? toolIds,
   bool isVoiceMode = false,
+  String? pendingFolderIdOverride,
 ]) async {
-  await _sendMessageInternal(ref, message, attachments, toolIds, isVoiceMode);
+  await _sendMessageInternal(
+    ref,
+    message,
+    attachments,
+    toolIds,
+    isVoiceMode,
+    pendingFolderIdOverride,
+  );
 }
 
 Future<void> sendMessageWithContainer(
@@ -2625,6 +2821,7 @@ Future<void> _sendMessageInternal(
   List<String>? attachments, [
   List<String>? toolIds,
   bool isVoiceMode = false,
+  String? pendingFolderIdOverride,
 ]) async {
   final reviewerMode = ref.read(reviewerModeProvider);
   final api = ref.read(apiServiceProvider);
@@ -2776,7 +2973,8 @@ Future<void> _sendMessageInternal(
   var activeConversation = ref.read(activeConversationProvider);
 
   if (activeConversation == null) {
-    final pendingFolderId = ref.read(pendingFolderIdProvider);
+    final pendingFolderId =
+        pendingFolderIdOverride ?? ref.read(pendingFolderIdProvider);
     final isTemporary = ref.read(temporaryChatEnabledProvider);
 
     if (isTemporary) {
@@ -2787,7 +2985,6 @@ Future<void> _sendMessageInternal(
         title: 'New Chat',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        systemPrompt: userSystemPrompt,
         messages: [userMessage, assistantPlaceholder],
       );
 
@@ -2802,7 +2999,6 @@ Future<void> _sendMessageInternal(
         title: 'New Chat',
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
-        systemPrompt: userSystemPrompt,
         messages: [userMessage, assistantPlaceholder],
         folderId: pendingFolderId,
       );
@@ -2823,7 +3019,6 @@ Future<void> _sendMessageInternal(
             title: 'New Chat',
             messages: [lightweightMessage],
             model: selectedModel.id,
-            systemPrompt: userSystemPrompt,
             folderId: pendingFolderId,
           );
 
@@ -2835,7 +3030,6 @@ Future<void> _sendMessageInternal(
           final currentMessages = ref.read(chatMessagesProvider);
           final updatedConversation = localConversation.copyWith(
             id: serverConversation.id,
-            systemPrompt: serverConversation.systemPrompt ?? userSystemPrompt,
             messages: currentMessages,
             folderId: serverConversation.folderId ?? pendingFolderId,
           );
@@ -2848,6 +3042,9 @@ Future<void> _sendMessageInternal(
               .read(conversationsProvider.notifier)
               .upsertConversation(
                 updatedConversation.copyWith(updatedAt: DateTime.now()),
+                trustFolderConversation:
+                    updatedConversation.folderId != null &&
+                    updatedConversation.folderId!.isNotEmpty,
               );
 
           // Invalidate conversations provider to refresh the list
@@ -2878,15 +3075,6 @@ Future<void> _sendMessageInternal(
         ref.read(pendingFolderIdProvider.notifier).clear();
       }
     }
-  }
-
-  if (activeConversation != null &&
-      (activeConversation.systemPrompt == null ||
-          activeConversation.systemPrompt!.trim().isEmpty) &&
-      (userSystemPrompt?.isNotEmpty ?? false)) {
-    final updated = activeConversation.copyWith(systemPrompt: userSystemPrompt);
-    ref.read(activeConversationProvider.notifier).set(updated);
-    activeConversation = updated;
   }
 
   // Reviewer mode: simulate a response locally and return
@@ -3022,7 +3210,7 @@ Future<void> _sendMessageInternal(
 
     // Socket is optional — only needed for taskSocket transport.
     final socketService = ref.read(socketServiceProvider);
-    final socketSessionId = socketService?.sessionId;
+    final socketSessionId = _connectedSocketSessionId(socketService);
 
     List<Map<String, dynamic>>? toolServers;
     try {
@@ -3376,7 +3564,7 @@ Future<void> pinConversation(
 
     ref
         .read(conversationsProvider.notifier)
-        .updateConversation(
+        .updateConversationFromRemote(
           conversationId,
           (conversation) =>
               conversation.copyWith(pinned: pinned, updatedAt: DateTime.now()),
@@ -3423,7 +3611,7 @@ Future<void> archiveConversation(
 
     ref
         .read(conversationsProvider.notifier)
-        .updateConversation(
+        .updateConversationFromRemote(
           conversationId,
           (conversation) => conversation.copyWith(
             archived: archived,
@@ -3459,7 +3647,7 @@ Future<String?> shareConversation(WidgetRef ref, String conversationId) async {
 
     ref
         .read(conversationsProvider.notifier)
-        .updateConversation(
+        .updateConversationFromRemote(
           conversationId,
           (conversation) => conversation.copyWith(
             shareId: shareId,
@@ -3470,9 +3658,51 @@ Future<String?> shareConversation(WidgetRef ref, String conversationId) async {
     // Refresh conversations list to reflect the change
     refreshConversationsCache(ref);
 
+    final activeConversation = ref.read(activeConversationProvider);
+    if (activeConversation?.id == conversationId) {
+      ref
+          .read(activeConversationProvider.notifier)
+          .set(activeConversation!.copyWith(shareId: shareId));
+    }
+
     return shareId;
   } catch (e) {
     DebugLogger.log('Error sharing conversation: $e', scope: 'chat/providers');
+    rethrow;
+  }
+}
+
+Future<void> deleteSharedConversation(
+  WidgetRef ref,
+  String conversationId,
+) async {
+  try {
+    final api = ref.read(apiServiceProvider);
+    if (api == null) throw Exception('No API service available');
+
+    await api.deleteSharedConversation(conversationId);
+
+    ref
+        .read(conversationsProvider.notifier)
+        .updateConversationFromRemote(
+          conversationId,
+          (conversation) =>
+              conversation.copyWith(shareId: null, updatedAt: DateTime.now()),
+        );
+
+    refreshConversationsCache(ref);
+
+    final activeConversation = ref.read(activeConversationProvider);
+    if (activeConversation?.id == conversationId) {
+      ref
+          .read(activeConversationProvider.notifier)
+          .set(activeConversation!.copyWith(shareId: null));
+    }
+  } catch (e) {
+    DebugLogger.log(
+      'Error deleting shared conversation link: $e',
+      scope: 'chat/providers',
+    );
     rethrow;
   }
 }
@@ -3495,6 +3725,9 @@ Future<void> cloneConversation(WidgetRef ref, String conversationId) async {
         .read(conversationsProvider.notifier)
         .upsertConversation(
           clonedConversation.copyWith(updatedAt: DateTime.now()),
+          trustFolderConversation:
+              clonedConversation.folderId != null &&
+              clonedConversation.folderId!.isNotEmpty,
         );
     refreshConversationsCache(ref);
   } catch (e) {

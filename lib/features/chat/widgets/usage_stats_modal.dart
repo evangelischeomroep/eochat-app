@@ -1,7 +1,12 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
+import '../../../core/services/native_sheet_bridge.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../../shared/widgets/themed_sheets.dart';
 
 /// Modal bottom sheet displaying usage/performance statistics for a
 /// chat response, matching Open WebUI's info button behavior.
@@ -9,51 +14,72 @@ class UsageStatsModal {
   UsageStatsModal._();
 
   /// Shows a bottom sheet with usage/performance statistics for the response.
-  static void show(BuildContext context, Map<String, dynamic> usage) {
+  static void show(BuildContext context, Map<String, dynamic> usage) async {
     final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context)!;
 
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: theme.surfaceBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppBorderRadius.dialog),
-        ),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.lg),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title
-                Row(
-                  children: [
-                    Icon(
-                      Icons.analytics_outlined,
-                      size: IconSize.md,
-                      color: theme.textPrimary,
-                    ),
-                    const SizedBox(width: Spacing.sm),
-                    Text(
-                      l10n.usageInfoTitle,
-                      style: AppTypography.bodyLargeStyle.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.textPrimary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: Spacing.lg),
+    if (Platform.isIOS) {
+      try {
+        await NativeSheetBridge.instance.presentSheet(
+          root: NativeSheetDetailConfig(
+            id: 'usage-stats',
+            title: l10n.usageInfoTitle,
+            items: [
+              NativeSheetItemConfig(
+                id: 'usage-stats-text',
+                title: l10n.usageInfoTitle,
+                sfSymbol: 'chart.bar',
+                kind: NativeSheetItemKind.readOnlyText,
+                value: _buildUsageSummaryText(usage),
+              ),
+            ],
+          ),
+          rethrowErrors: true,
+        );
+        return;
+      } catch (_) {
+        if (!context.mounted) {
+          return;
+        }
+      }
+    }
 
-                // Stats grid
-                ..._buildUsageStats(ctx, usage, l10n, theme),
+    if (!context.mounted) {
+      return;
+    }
+
+    ThemedSheets.showSurface<void>(
+      context: context,
+      showHandle: false,
+      padding: const EdgeInsets.all(Spacing.lg),
+      builder: (ctx) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title
+            Row(
+              children: [
+                Icon(
+                  Icons.analytics_outlined,
+                  size: IconSize.md,
+                  color: theme.textPrimary,
+                ),
+                const SizedBox(width: Spacing.sm),
+                Text(
+                  l10n.usageInfoTitle,
+                  style: AppTypography.bodyLargeStyle.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.textPrimary,
+                  ),
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: Spacing.lg),
+
+            // Stats grid
+            ..._buildUsageStats(ctx, usage, l10n, theme),
+          ],
         );
       },
     );
@@ -273,6 +299,31 @@ class UsageStatsModal {
     if (value is num) return value;
     if (value is String) return num.tryParse(value);
     return null;
+  }
+
+  static String _buildUsageSummaryText(Map<String, dynamic> usage) {
+    final sortedKeys = usage.keys.toList()..sort();
+    return sortedKeys
+        .map((key) {
+          final value = usage[key];
+          final rendered = value is Map || value is List
+              ? jsonEncode(value)
+              : '$value';
+          return '${_humanizeKey(key)}: $rendered';
+        })
+        .join('\n');
+  }
+
+  static String _humanizeKey(String key) {
+    return key
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) => part.length == 1
+              ? part.toUpperCase()
+              : '${part[0].toUpperCase()}${part.substring(1)}',
+        )
+        .join(' ');
   }
 }
 

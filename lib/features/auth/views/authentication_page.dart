@@ -15,6 +15,7 @@ import '../../../core/services/navigation_service.dart';
 import '../../../core/widgets/error_boundary.dart';
 import '../../../shared/services/brand_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../core/auth/auth_state_manager.dart';
 import '../../../core/utils/debug_logger.dart';
@@ -171,6 +172,8 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
   }
 
   Future<void> _signIn() async {
+    if (_isSigningIn) return;
+
     final l10n = AppLocalizations.of(context)!;
     if (!_formKey.currentState!.validate()) return;
 
@@ -241,6 +244,21 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
     await storage.setActiveServerId(config.id);
     ref.invalidate(serverConfigsProvider);
     ref.invalidate(activeServerProvider);
+    ref.invalidate(apiServiceProvider);
+
+    await ref.read(activeServerProvider.future);
+    await _waitForApiService(config.id);
+  }
+
+  Future<void> _waitForApiService(String serverId) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (DateTime.now().isBefore(deadline)) {
+      final api = ref.read(apiServiceProvider);
+      if (api?.serverConfig.id == serverId) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
   }
 
   String _formatLoginError(String error) {
@@ -265,7 +283,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen for auth state changes to navigate on successful login
+    // Listen for auth state changes to run post-login side effects.
     ref.listen<AsyncValue<AuthState>>(authStateManagerProvider, (
       previous,
       next,
@@ -282,16 +300,16 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
         // Model selection will be handled by the chat page
         // to avoid widget disposal issues
 
-        DebugLogger.auth('Navigating to chat page');
-        // Navigate directly to chat page on successful authentication
-        context.go(Routes.chat);
+        // Navigation is handled automatically by the router when auth state
+        // changes to authenticated. Calling context.go() here can race with
+        // the redirect and duplicate the shell navigator during auth recovery.
       }
     });
 
     final safePadding = MediaQuery.of(context).padding;
 
     return ErrorBoundary(
-      child: Scaffold(
+      child: AdaptiveRouteShell(
         backgroundColor: context.conduitTheme.surfaceBackground,
         body: Column(
           children: [

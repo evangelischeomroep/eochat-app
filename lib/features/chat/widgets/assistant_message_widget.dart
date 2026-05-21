@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/markdown/streaming_markdown_widget.dart';
+import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../shared/widgets/markdown/markdown_preprocessor.dart';
 import '../providers/text_to_speech_provider.dart';
@@ -61,6 +62,7 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
   final List<String?> versionModelIconUrls;
   final VoidCallback? onCopy;
   final VoidCallback? onRegenerate;
+  final VoidCallback onDelete;
   final VoidCallback? onLike;
   final VoidCallback? onDislike;
 
@@ -76,6 +78,7 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
     this.versionModelIconUrls = const <String?>[],
     this.onCopy,
     this.onRegenerate,
+    required this.onDelete,
     this.onLike,
     this.onDislike,
   });
@@ -87,6 +90,8 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
 
 class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     with TickerProviderStateMixin {
+  static const _streamingDisplayUpdateInterval = Duration(milliseconds: 100);
+
   late AnimationController _fadeController;
   late AnimationController _slideController;
   String _displayedContent = '';
@@ -110,6 +115,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   /// Guards the triple-haptic so it fires only once per streaming session.
   bool _hasTriggeredContentHaptic = false;
   ProviderSubscription<String?>? _streamingContentSub;
+  Timer? _streamingDisplayTimer;
+  String? _pendingStreamingDisplayContent;
 
   bool get _shouldAnimateOnMount =>
       widget.animateOnMount && !_disableAnimations;
@@ -215,10 +222,12 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     if (oldWidget.isStreaming &&
         !widget.isStreaming &&
         oldWidget.message.id == widget.message.id) {
+      _flushPendingStreamingDisplayContent();
       _chunkFadeController.value = 1.0;
       _hasTriggeredContentHaptic = false;
       // Haptic: streaming finished
       _streamingHaptic(HapticType.medium);
+      _scheduleTtsPlainTextBuild(_displayedContent);
     }
 
     // Refresh rendered content when the active message changes.
@@ -357,6 +366,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       return;
     }
 
+    if (widget.isStreaming) {
+      _ttsPlainTextDebounce?.cancel();
+      _ttsPlainTextDebounce = null;
+      _pendingTtsPlainTextPayload = null;
+      _pendingTtsPlainTextSource = null;
+      return;
+    }
+
     if (_pendingTtsPlainTextPayload == null &&
         raw == _lastAppliedTtsPlainTextSource) {
       return;
@@ -432,14 +449,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     if (trimmedContent.isNotEmpty) {
       final markdownWidget = _buildEnhancedMarkdownContent(_displayedContent);
       children.add(
-        widget.isStreaming
-            ? RepaintBoundary(
-                child: _StreamingFadeOverlay(
+        RepaintBoundary(
+          child: widget.isStreaming
+              ? _StreamingFadeOverlay(
                   animation: _chunkFadeController,
                   child: markdownWidget,
-                ),
-              )
-            : markdownWidget,
+                )
+              : markdownWidget,
+        ),
       );
     }
 
@@ -722,15 +739,46 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       ) {
         if (next != null && next != _lastStreamingContent) {
           _lastStreamingContent = next;
-          _refreshDisplayedContent(next);
+          _queueStreamingDisplayContent(next);
         }
       }, fireImmediately: true);
     }
   }
 
+  void _queueStreamingDisplayContent(String content) {
+    if (content == _displayedContent ||
+        content == _pendingStreamingDisplayContent) {
+      return;
+    }
+
+    if (_displayedContent.isEmpty) {
+      _refreshDisplayedContent(content);
+      return;
+    }
+
+    _pendingStreamingDisplayContent = content;
+    _streamingDisplayTimer ??= Timer(
+      _streamingDisplayUpdateInterval,
+      _flushPendingStreamingDisplayContent,
+    );
+  }
+
+  void _flushPendingStreamingDisplayContent() {
+    _streamingDisplayTimer?.cancel();
+    _streamingDisplayTimer = null;
+
+    final pending = _pendingStreamingDisplayContent;
+    _pendingStreamingDisplayContent = null;
+    if (pending == null || pending == _displayedContent) {
+      return;
+    }
+    _refreshDisplayedContent(pending);
+  }
+
   @override
   void dispose() {
     _streamingContentSub?.close();
+    _streamingDisplayTimer?.cancel();
     _typingGateTimer?.cancel();
     _ttsPlainTextDebounce?.cancel();
     _pendingTtsPlainTextPayload = null;
@@ -747,10 +795,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   }
 
   Widget _buildDocumentationMessage() {
-    final visibleStatusHistory = widget.message.statusHistory
-        .where((status) => status.hidden != true)
-        .toList(growable: false);
-    final hasStatusTimeline = visibleStatusHistory.isNotEmpty;
+    final displayStatusHistory = filterVisibleStatusUpdates(
+      widget.message.statusHistory,
+      isStreaming: widget.isStreaming,
+    );
+    final hasStatusTimeline = displayStatusHistory.isNotEmpty;
     final activeCodeExecutions = _resolveActiveCodeExecutions();
     final hasCodeExecutions = activeCodeExecutions.isNotEmpty;
     final activeFollowUps = _resolveActiveFollowUps();
@@ -800,7 +849,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
                 if (hasStatusTimeline) ...[
                   StreamingStatusWidget(
-                    updates: visibleStatusHistory,
+                    updates: displayStatusHistory,
                     isStreaming: widget.isStreaming,
                   ),
                   const SizedBox(height: Spacing.xs),
@@ -850,7 +899,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
           // Action buttons below the message content (only after streaming completes)
           if (!widget.isStreaming) ...[
-            ?footer,
+            if (footer != null)
+              Padding(
+                padding: EdgeInsets.only(
+                  top: ConduitMarkdownStyle.fromTheme(context).paragraphSpacing,
+                ),
+                child: footer,
+              ),
             if (hasFollowUps) ...[
               const SizedBox(height: Spacing.md),
               _buildFollowUpSuggestions(activeFollowUps),
@@ -950,11 +1005,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       imageBuilderOverride: (uri, title, alt) {
         // Route markdown images through the enhanced image widget so they
         // get caching, auth headers, fullscreen viewer, and sharing.
-        return EnhancedImageAttachment(
-          attachmentId: uri.toString(),
-          isMarkdownFormat: true,
-          constraints: const BoxConstraints(maxWidth: 500, maxHeight: 400),
-          disableAnimation: widget.isStreaming,
+        return RepaintBoundary(
+          child: EnhancedImageAttachment(
+            attachmentId: uri.toString(),
+            isMarkdownFormat: true,
+            constraints: const BoxConstraints(maxWidth: 500, maxHeight: 400),
+            disableAnimation: widget.isStreaming,
+          ),
         );
       },
     );
@@ -1102,7 +1159,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           }
           return KeyedSubtree(
             key: ValueKey('message-embed-$index-$source'),
-            child: WebContentEmbed(source: source),
+            child: RepaintBoundary(child: WebContentEmbed(source: source)),
           );
         })
         .whereType<Widget>()
@@ -1179,17 +1236,19 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                   final imageUrl = getFileUrl(imageFiles[0]);
                   if (imageUrl == null) return const SizedBox.shrink();
 
-                  return EnhancedImageAttachment(
-                    attachmentId:
-                        imageUrl, // Pass URL directly as it handles URLs
-                    isMarkdownFormat: true,
-                    constraints: const BoxConstraints(
-                      maxWidth: 500,
-                      maxHeight: 400,
+                  return RepaintBoundary(
+                    child: EnhancedImageAttachment(
+                      attachmentId:
+                          imageUrl, // Pass URL directly as it handles URLs
+                      isMarkdownFormat: true,
+                      constraints: const BoxConstraints(
+                        maxWidth: 500,
+                        maxHeight: 400,
+                      ),
+                      disableAnimation:
+                          false, // Keep animations enabled to prevent black display
+                      httpHeaders: _headersForFile(imageFiles[0]),
                     ),
-                    disableAnimation:
-                        false, // Keep animations enabled to prevent black display
-                    httpHeaders: _headersForFile(imageFiles[0]),
                   );
                 },
               ),
@@ -1204,17 +1263,19 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                 final imageUrl = getFileUrl(file);
                 if (imageUrl == null) return const SizedBox.shrink();
 
-                return EnhancedImageAttachment(
-                  key: ValueKey('gen_attachment_$imageUrl'),
-                  attachmentId: imageUrl, // Pass URL directly
-                  isMarkdownFormat: true,
-                  constraints: BoxConstraints(
-                    maxWidth: imageCount == 2 ? 245 : 160,
-                    maxHeight: imageCount == 2 ? 245 : 160,
+                return RepaintBoundary(
+                  child: EnhancedImageAttachment(
+                    key: ValueKey('gen_attachment_$imageUrl'),
+                    attachmentId: imageUrl, // Pass URL directly
+                    isMarkdownFormat: true,
+                    constraints: BoxConstraints(
+                      maxWidth: imageCount == 2 ? 245 : 160,
+                      maxHeight: imageCount == 2 ? 245 : 160,
+                    ),
+                    disableAnimation:
+                        false, // Keep animations enabled to prevent black display
+                    httpHeaders: _headersForFile(file),
                   ),
-                  disableAnimation:
-                      false, // Keep animations enabled to prevent black display
-                  httpHeaders: _headersForFile(file),
                 );
               }).toList(),
             ),
@@ -1329,12 +1390,20 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   Widget? _buildFooterBar({required List<ChatSourceReference> activeSources}) {
     const maxInlineActions = 3;
     final actions = _buildFooterActions();
+    final forcedOverflowActions = actions
+        .where((action) => action.id == 'delete')
+        .toList(growable: false);
+    final inlineCandidateActions = actions
+        .where((action) => action.id != 'delete')
+        .toList(growable: false);
     final visibleActions = actions
+        .where((action) => action.id != 'delete')
         .take(maxInlineActions)
         .toList(growable: false);
-    final overflowActions = actions
-        .skip(maxInlineActions)
-        .toList(growable: false);
+    final overflowActions = [
+      ...inlineCandidateActions.skip(maxInlineActions),
+      ...forcedOverflowActions,
+    ];
     final infoWidgets = <Widget>[
       if (activeSources.isNotEmpty)
         OpenWebUISourcesWidget(
@@ -1356,7 +1425,6 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           icon: action.icon,
           label: action.label,
           onTap: action.onTap,
-          sfSymbol: action.sfSymbol,
         ),
       ...infoWidgets,
     ];
@@ -1513,6 +1581,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               : null,
           sfSymbol: 'chevron.right',
         ),
+      _AssistantFooterAction(
+        id: 'delete',
+        icon: Platform.isIOS ? CupertinoIcons.delete : Icons.delete_outline,
+        label: l10n.delete,
+        onTap: widget.onDelete,
+        sfSymbol: 'trash',
+      ),
     ];
 
     return actions;
@@ -1522,14 +1597,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     required IconData icon,
     required String label,
     VoidCallback? onTap,
-    String? sfSymbol,
   }) {
-    return ChatActionButton(
-      icon: icon,
-      label: label,
-      onTap: onTap,
-      sfSymbol: sfSymbol,
-    );
+    return ChatActionButton(icon: icon, label: label, onTap: onTap);
   }
 
   Widget _buildVersionChip() {
@@ -1581,24 +1650,17 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         child: Semantics(
           button: true,
           label: l10n.more,
-          child: Container(
+          child: SizedBox(
             width: 32,
             height: 32,
-            decoration: BoxDecoration(
-              color: theme.textPrimary.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(AppBorderRadius.circular),
-              border: Border.all(
-                color: theme.textPrimary.withValues(alpha: 0.08),
-                width: BorderWidth.regular,
+            child: Center(
+              child: Icon(
+                Platform.isIOS
+                    ? CupertinoIcons.ellipsis
+                    : Icons.more_horiz_rounded,
+                size: IconSize.sm,
+                color: theme.textPrimary.withValues(alpha: 0.8),
               ),
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              Platform.isIOS
-                  ? CupertinoIcons.ellipsis
-                  : Icons.more_horiz_rounded,
-              size: IconSize.sm,
-              color: theme.textPrimary.withValues(alpha: 0.8),
             ),
           ),
         ),

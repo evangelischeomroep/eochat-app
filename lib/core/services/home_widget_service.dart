@@ -31,7 +31,10 @@ class WidgetActions {
 }
 
 /// App group identifier for iOS widget data sharing.
-const String _appGroupId = 'group.nl.eo.eochat';
+const String _releaseAppGroupId = 'group.nl.eo.eochat';
+const String _debugAppGroupId = 'group.nl.eo.eochat.debug';
+
+String get _appGroupId => kReleaseMode ? _releaseAppGroupId : _debugAppGroupId;
 
 /// Android widget provider class name.
 const String _androidWidgetName = 'ConduitWidgetProvider';

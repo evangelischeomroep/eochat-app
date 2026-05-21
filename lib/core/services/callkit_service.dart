@@ -2,25 +2,22 @@ import 'dart:developer' as developer;
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:conduit/l10n/app_localizations.dart';
 import 'package:flutter_callkit_incoming/entities/entities.dart';
 import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
-import '../providers/app_providers.dart';
+import '../utils/current_localizations.dart';
 
 part 'callkit_service.g.dart';
 
 /// Thin wrapper around `flutter_callkit_incoming` for voice calls.
 class CallKitService {
-  CallKitService({Uuid? uuid, ui.Locale? appLocale})
+  CallKitService({Uuid? uuid})
     : _uuid = uuid ?? const Uuid(),
-      _appLocale = appLocale,
       _callKitAllowed = _computeCallKitAllowed();
 
   final Uuid _uuid;
-  final ui.Locale? _appLocale;
   final bool _callKitAllowed;
   bool _loggedCallKitDisabled = false;
   static const int _defaultCallDurationMs = 2 * 60 * 60 * 1000; // 2 hours
@@ -31,18 +28,17 @@ class CallKitService {
   /// Requests the notification/full-screen intent permissions needed on Android.
   Future<void> requestPermissions() async {
     if (!_shouldUseCallKit('request permissions')) return;
-    final l10n = _resolveL10n();
+    final l10n = currentAppLocalizations();
 
     await _safe(
-      () => FlutterCallkitIncoming.requestNotificationPermission(
-        <String, dynamic>{
-          'title': l10n.callkitNotificationPermissionTitle,
-          'rationaleMessagePermission':
-              l10n.callkitNotificationPermissionRationale,
-          'postNotificationMessageRequired':
-              l10n.callkitNotificationPermissionPostMessage,
-        },
-      ),
+      () => FlutterCallkitIncoming.requestNotificationPermission(<
+        String,
+        dynamic
+      >{
+        'title': l10n.notificationPermissionTitle,
+        'rationaleMessagePermission': l10n.callNotificationPermissionRationale,
+        'postNotificationMessageRequired': l10n.callNotificationPermissionPost,
+      }),
     );
     // Full-screen intent permission not needed for outgoing-only calls.
   }
@@ -176,28 +172,28 @@ class CallKitService {
     String? avatar,
     int durationMs = _defaultCallDurationMs,
   }) {
-    final l10n = _resolveL10n();
+    final l10n = currentAppLocalizations();
     return CallKitParams(
       id: id,
       nameCaller: callerName,
-      appName: 'Conduit',
+      appName: 'EOchat',
       avatar: avatar,
       handle: handle,
       type: 0, // 0 = audio call
       duration: durationMs,
-      textAccept: l10n.callkitActionAccept,
-      textDecline: l10n.callkitActionDecline,
+      textAccept: l10n.acceptCall,
+      textDecline: l10n.declineCall,
       missedCallNotification: NotificationParams(
         showNotification: true,
         isShowCallback: true,
-        subtitle: l10n.callkitMissedCallSubtitle,
-        callbackText: l10n.callkitCallBackAction,
+        subtitle: l10n.missedCall,
+        callbackText: l10n.callBack,
       ),
       callingNotification: NotificationParams(
         showNotification: true,
         isShowCallback: true,
-        subtitle: l10n.callkitCallingSubtitle,
-        callbackText: l10n.callkitHangUpAction,
+        subtitle: l10n.calling,
+        callbackText: l10n.hangUp,
       ),
       extra: const <String, dynamic>{'transport': 'voice'},
       android: AndroidParams(
@@ -206,9 +202,8 @@ class CallKitService {
         ringtonePath: 'system_ringtone_default',
         backgroundColor: '#0D1726',
         actionColor: '#4CAF50',
-        incomingCallNotificationChannelName:
-            l10n.callkitIncomingCallChannelName,
-        missedCallNotificationChannelName: l10n.callkitMissedCallChannelName,
+        incomingCallNotificationChannelName: l10n.incomingCallChannelName,
+        missedCallNotificationChannelName: l10n.missedCallChannelName,
       ),
       ios: const IOSParams(
         iconName: '',
@@ -267,19 +262,7 @@ class CallKitService {
     final country = locale.countryCode?.toUpperCase();
     return country == 'CN';
   }
-
-  AppLocalizations _resolveL10n() {
-    final locale = _appLocale ?? ui.PlatformDispatcher.instance.locale;
-    try {
-      return lookupAppLocalizations(locale);
-    } catch (_) {
-      return lookupAppLocalizations(const ui.Locale('en'));
-    }
-  }
 }
 
 @Riverpod(keepAlive: true)
-CallKitService callKitService(Ref ref) {
-  final locale = ref.watch(appLocaleProvider);
-  return CallKitService(appLocale: locale);
-}
+CallKitService callKitService(Ref ref) => CallKitService();

@@ -3,6 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:conduit/l10n/app_localizations.dart';
+
 import '../../../core/models/channel_message.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
@@ -15,6 +17,7 @@ import '../../../shared/widgets/user_avatar.dart';
 import '../../chat/widgets/modern_chat_input.dart';
 import '../providers/channel_providers.dart';
 import '../utils/mention_utils.dart';
+import 'channel_message_content.dart';
 
 /// Side panel (tablet) or bottom sheet (mobile) for
 /// viewing and replying to a message thread.
@@ -87,6 +90,7 @@ class _ThreadPanelState extends ConsumerState<ThreadPanel> {
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
+    final l10n = AppLocalizations.of(context)!;
     final api = ref.read(apiServiceProvider);
     final threadAsync = ref.watch(
       threadMessagesProvider(widget.channelId, widget.parentMessage.id),
@@ -134,7 +138,7 @@ class _ThreadPanelState extends ConsumerState<ThreadPanel> {
               ),
               child: ModernChatInput(
                 onSendMessage: _sendReply,
-                placeholder: 'Reply...',
+                placeholder: l10n.replyInputPlaceholder,
                 overflowButtonBuilder: widget.overflowButtonBuilder,
               ),
             ),
@@ -159,7 +163,7 @@ class _ThreadHeader extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            'Thread',
+            AppLocalizations.of(context)!.thread,
             style: AppTypography.titleMediumStyle.copyWith(
               color: theme.textPrimary,
               fontWeight: FontWeight.w600,
@@ -211,14 +215,9 @@ class _ParentMessageTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: Spacing.xxs),
-                RichText(
-                  text: buildMentionSpan(
-                    content: message.content,
-                    baseStyle: AppTypography.chatMessageStyle.copyWith(
-                      color: theme.textPrimary,
-                    ),
-                    mentionColor: Theme.of(context).colorScheme.primary,
-                  ),
+                ChannelMessageContent(
+                  content: message.content,
+                  stateScopeId: 'channel-thread-parent:${message.id}',
                 ),
               ],
             ),
@@ -311,14 +310,9 @@ class _ThreadReplies extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    RichText(
-                      text: buildMentionSpan(
-                        content: message.content,
-                        baseStyle: AppTypography.chatMessageStyle.copyWith(
-                          color: theme.textPrimary,
-                        ),
-                        mentionColor: Theme.of(context).colorScheme.primary,
-                      ),
+                    ChannelMessageContent(
+                      content: message.content,
+                      stateScopeId: 'channel-thread:${message.id}',
                     ),
                   ],
                 ),

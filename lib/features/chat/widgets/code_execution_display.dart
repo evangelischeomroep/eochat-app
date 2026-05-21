@@ -1,10 +1,15 @@
+import 'dart:io' show Platform;
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:conduit/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../../core/models/chat_message.dart';
+import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../../shared/widgets/themed_sheets.dart';
 import 'assistant_detail_header.dart';
 
 /// Displays a list of code execution results as interactive chips.
@@ -18,6 +23,7 @@ class CodeExecutionListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     if (executions.isEmpty) {
       return const SizedBox.shrink();
     }
@@ -32,12 +38,12 @@ class CodeExecutionListView extends StatelessWidget {
             final hasOutput = execution.result?.output != null;
             final label = execution.name?.isNotEmpty == true
                 ? execution.name!
-                : 'Execution';
+                : l10n.execution;
             final title = hasError
-                ? '$label failed'
+                ? l10n.codeExecutionFailed(label)
                 : hasOutput
                 ? label
-                : '$label…';
+                : l10n.codeExecutionRunning(label);
 
             return Padding(
               padding: const EdgeInsets.only(bottom: Spacing.xs),
@@ -60,16 +66,81 @@ class CodeExecutionListView extends StatelessWidget {
     BuildContext context,
     ChatCodeExecution execution,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     final theme = context.conduitTheme;
-    await showModalBottomSheet<void>(
+    if (Platform.isIOS) {
+      try {
+        final result = execution.result;
+        await NativeSheetBridge.instance.presentSheet(
+          root: NativeSheetDetailConfig(
+            id: 'code-execution-details',
+            title: execution.name ?? l10n.codeExecutionTitle,
+            items: [
+              if (execution.language != null)
+                NativeSheetItemConfig(
+                  id: 'code-language',
+                  title: l10n.language,
+                  subtitle: execution.language,
+                  sfSymbol: 'chevron.left.forwardslash.chevron.right',
+                  kind: NativeSheetItemKind.info,
+                ),
+              if (execution.code != null && execution.code!.isNotEmpty)
+                NativeSheetItemConfig(
+                  id: 'code-source',
+                  title: l10n.code,
+                  sfSymbol: 'doc.plaintext',
+                  kind: NativeSheetItemKind.readOnlyText,
+                  value: execution.code!,
+                ),
+              if (result?.error != null)
+                NativeSheetItemConfig(
+                  id: 'code-error',
+                  title: l10n.error,
+                  sfSymbol: 'exclamationmark.triangle',
+                  kind: NativeSheetItemKind.readOnlyText,
+                  value: result!.error!,
+                  destructive: true,
+                ),
+              if (result?.output != null)
+                NativeSheetItemConfig(
+                  id: 'code-output',
+                  title: l10n.output,
+                  sfSymbol: 'terminal',
+                  kind: NativeSheetItemKind.readOnlyText,
+                  value: result!.output!,
+                ),
+              if (result?.files.isNotEmpty == true)
+                for (var index = 0; index < result!.files.length; index++)
+                  NativeSheetItemConfig(
+                    id: 'code-file-$index',
+                    title:
+                        result.files[index].name ??
+                        result.files[index].url ??
+                        l10n.download,
+                    sfSymbol: 'doc',
+                    url: result.files[index].url,
+                  ),
+            ],
+          ),
+          rethrowErrors: true,
+        );
+        return;
+      } catch (_) {
+        if (!context.mounted) {
+          return;
+        }
+      }
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    await ThemedSheets.showSurface<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.surfaceBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppBorderRadius.dialog),
-        ),
-      ),
+      showHandle: false,
+      padding: EdgeInsets.zero,
       builder: (ctx) {
         final result = execution.result;
         return DraggableScrollableSheet(
@@ -87,7 +158,7 @@ class CodeExecutionListView extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          execution.name ?? 'Code execution',
+                          execution.name ?? l10n.codeExecutionTitle,
                           style: AppTypography.bodyLargeStyle.copyWith(
                             fontWeight: FontWeight.w600,
                             color: theme.textPrimary,
@@ -103,7 +174,7 @@ class CodeExecutionListView extends StatelessWidget {
                   const SizedBox(height: Spacing.sm),
                   if (execution.language != null)
                     Text(
-                      'Language: ${execution.language}',
+                      l10n.languageWithValue(execution.language!),
                       style: AppTypography.bodyMediumStyle.copyWith(
                         color: theme.textSecondary,
                       ),
@@ -111,7 +182,7 @@ class CodeExecutionListView extends StatelessWidget {
                   const SizedBox(height: Spacing.sm),
                   if (execution.code != null && execution.code!.isNotEmpty) ...[
                     Text(
-                      'Code',
+                      l10n.code,
                       style: AppTypography.labelStyle.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.textPrimary,
@@ -133,7 +204,7 @@ class CodeExecutionListView extends StatelessWidget {
                   ],
                   if (result?.error != null) ...[
                     Text(
-                      'Error',
+                      l10n.error,
                       style: AppTypography.labelStyle.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.error,
@@ -145,7 +216,7 @@ class CodeExecutionListView extends StatelessWidget {
                   ],
                   if (result?.output != null) ...[
                     Text(
-                      'Output',
+                      l10n.output,
                       style: AppTypography.labelStyle.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.textPrimary,
@@ -157,7 +228,7 @@ class CodeExecutionListView extends StatelessWidget {
                   ],
                   if (result?.files.isNotEmpty == true) ...[
                     Text(
-                      'Files',
+                      l10n.files,
                       style: AppTypography.labelStyle.copyWith(
                         fontWeight: FontWeight.w600,
                         color: theme.textPrimary,
@@ -165,7 +236,7 @@ class CodeExecutionListView extends StatelessWidget {
                     ),
                     const SizedBox(height: Spacing.xs),
                     ...result!.files.map((file) {
-                      final name = file.name ?? file.url ?? 'Download';
+                      final name = file.name ?? file.url ?? l10n.download;
                       return AdaptiveListTile(
                         padding: EdgeInsets.zero,
                         leading: const Icon(Icons.insert_drive_file_outlined),

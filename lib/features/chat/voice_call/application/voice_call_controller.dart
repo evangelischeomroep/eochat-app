@@ -8,6 +8,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../../core/models/chat_message.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/services/settings_service.dart';
+import '../../../../core/utils/message_tree_utils.dart' as message_tree;
 import '../../../../shared/widgets/markdown/markdown_preprocessor.dart';
 import '../../../tools/providers/tools_providers.dart';
 import '../../providers/chat_providers.dart';
@@ -177,7 +178,7 @@ class VoiceCallController extends _$VoiceCallController {
               ref.read(selectedModelProvider)?.name ?? 'Assistant';
           _nativeCallId = await _callSurface.startOutgoingCall(
             callerName: modelName,
-            handle: 'Conduit AI',
+            handle: 'EOchat AI',
           );
           _listenForNativeCallEvents(token);
         }
@@ -240,6 +241,11 @@ class VoiceCallController extends _$VoiceCallController {
 
         _keepAliveTimer?.cancel();
         _keepAliveTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+          if (!state.isActive) {
+            _keepAliveTimer?.cancel();
+            _keepAliveTimer = null;
+            return;
+          }
           unawaited(_background.keepAlive());
         });
 
@@ -920,21 +926,10 @@ class VoiceCallController extends _$VoiceCallController {
   String? _resolveActiveUserMessageId({
     required List<ChatMessage> messages,
     required int assistantIndex,
-  }) {
-    final metadataParentId = messages[assistantIndex].metadata?['parentId']
-        ?.toString()
-        .trim();
-    if (metadataParentId != null && metadataParentId.isNotEmpty) {
-      return metadataParentId;
-    }
-    for (var i = assistantIndex - 1; i >= 0; i--) {
-      final message = messages[i];
-      if (message.role == 'user') {
-        return message.id;
-      }
-    }
-    return null;
-  }
+  }) => message_tree.assistantParentUserMessageId(
+    messages: messages,
+    assistantIndex: assistantIndex,
+  );
 
   void _ignoreAssistantMessageId(String? value) {
     final normalized = value?.trim();
@@ -1181,10 +1176,7 @@ class VoiceCallController extends _$VoiceCallController {
     _signalActiveSpeechCompletion(error: StateError('Teardown'));
     await _output.stop();
 
-    await _background.stopBackgroundExecution();
-    await _background.cancelCallNotification();
-    await _background.setScreenAwake(false);
-    await _audioSession.deactivate();
+    await _releaseBackgroundResources();
 
     final callId = _nativeCallId;
     _nativeCallId = null;
@@ -1299,10 +1291,7 @@ class VoiceCallController extends _$VoiceCallController {
     await _input.stopListening();
     _signalActiveSpeechCompletion(error: StateError('Disposed'));
     await _output.stop();
-    await _background.stopBackgroundExecution();
-    await _background.cancelCallNotification();
-    await _background.setScreenAwake(false);
-    await _audioSession.deactivate();
+    await _releaseBackgroundResources();
 
     final callId = _nativeCallId;
     _nativeCallId = null;
@@ -1314,6 +1303,27 @@ class VoiceCallController extends _$VoiceCallController {
 
     await _input.dispose();
     await _output.dispose();
+  }
+
+  Future<void> _releaseBackgroundResources() async {
+    Future<void> ignoreTeardownError(Future<void> Function() action) async {
+      try {
+        await action();
+      } catch (error, stackTrace) {
+        developer.log(
+          'Voice call background teardown failed: $error',
+          name: 'voice_call_controller',
+          error: error,
+          stackTrace: stackTrace,
+          level: 900,
+        );
+      }
+    }
+
+    await ignoreTeardownError(_background.stopBackgroundExecution);
+    await ignoreTeardownError(_background.cancelCallNotification);
+    await ignoreTeardownError(() => _background.setScreenAwake(false));
+    await ignoreTeardownError(_audioSession.deactivate);
   }
 
   Future<void> _enqueue(Future<void> Function() action) {

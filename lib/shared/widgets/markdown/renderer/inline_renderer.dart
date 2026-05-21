@@ -1,4 +1,5 @@
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:conduit/l10n/app_localizations.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -200,9 +201,22 @@ class InlineRenderer {
       'code' => [_buildInlineCode(element.textContent)],
       'a' => _renderLink(element, currentStyle),
       'img' => _renderImage(element, currentStyle),
+      'mention' => _renderMention(element, currentStyle),
       'br' => [const TextSpan(text: '\n')],
       _ => _renderChildren(element, currentStyle),
     };
+  }
+
+  List<InlineSpan> _renderMention(md.Element element, TextStyle currentStyle) {
+    return [
+      TextSpan(
+        text: element.textContent,
+        style: currentStyle.copyWith(
+          color: style.linkColor,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ];
   }
 
   List<InlineSpan> _renderStyled(md.Element element, TextStyle styledText) {
@@ -253,15 +267,40 @@ class InlineRenderer {
 
     final spans = <InlineSpan>[];
     for (final child in children) {
-      if (child is md.Text) {
-        spans.add(
-          TextSpan(text: child.text, style: linkStyle, recognizer: recognizer),
-        );
-      } else {
-        spans.addAll(_renderNode(child, linkStyle));
-      }
+      spans.addAll(_withRecognizer(_renderNode(child, linkStyle), recognizer));
     }
     return spans;
+  }
+
+  List<InlineSpan> _withRecognizer(
+    List<InlineSpan> spans,
+    GestureRecognizer? recognizer,
+  ) {
+    if (recognizer == null) return spans;
+
+    return spans
+        .map((span) => _attachRecognizer(span, recognizer))
+        .toList(growable: false);
+  }
+
+  InlineSpan _attachRecognizer(InlineSpan span, GestureRecognizer recognizer) {
+    if (span is TextSpan) {
+      return TextSpan(
+        text: span.text,
+        children: span.children
+            ?.map((child) => _attachRecognizer(child, recognizer))
+            .toList(growable: false),
+        style: span.style,
+        recognizer: span.recognizer ?? recognizer,
+        mouseCursor: span.mouseCursor,
+        onEnter: span.onEnter,
+        onExit: span.onExit,
+        semanticsLabel: span.semanticsLabel,
+        locale: span.locale,
+        spellOut: span.spellOut,
+      );
+    }
+    return span;
   }
 
   List<InlineSpan> _renderImage(md.Element element, TextStyle currentStyle) {
@@ -321,7 +360,7 @@ class _InlineCodeWidget extends StatelessWidget {
     if (!context.mounted) return;
     AdaptiveSnackBar.show(
       context,
-      message: 'Copied to clipboard',
+      message: AppLocalizations.of(context)!.copiedToClipboard,
       type: AdaptiveSnackBarType.success,
       duration: const Duration(seconds: 2),
     );

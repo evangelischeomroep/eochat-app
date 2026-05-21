@@ -1,12 +1,16 @@
+import 'dart:io' show Platform;
+
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/models/chat_message.dart';
+import '../../../../core/services/native_sheet_bridge.dart';
 import '../../../../shared/theme/theme_extensions.dart';
-import '../../../../shared/widgets/conduit_components.dart';
 import '../../../../shared/widgets/markdown/source_reference_helper.dart';
 import '../../../../shared/widgets/sheet_handle.dart';
+import '../../../../shared/widgets/themed_sheets.dart';
 
 /// OpenWebUI-style sources component with a compact chip and details sheet.
 class OpenWebUISourcesWidget extends StatelessWidget {
@@ -33,97 +37,46 @@ class OpenWebUISourcesWidget extends StatelessWidget {
         .toList(growable: false);
     final chipContent = _buildChipContent(context, urlSources);
 
-    if (PlatformInfo.isIOS26OrHigher()) {
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          final labelStyle = AppTypography.labelMediumStyle.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.textPrimary.withValues(alpha: 0.8),
-          );
-          final textPainter = TextPainter(
-            text: TextSpan(
-              text: _sourceCountLabel(sources.length),
-              style: labelStyle,
-            ),
-            maxLines: 1,
-            textScaler: MediaQuery.textScalerOf(context),
-            textDirection: Directionality.of(context),
-          )..layout();
-          final faviconWidth = urlSources.isNotEmpty
-              ? (urlSources.length > 3 ? 52.0 : urlSources.length * 18.0) + 8.0
-              : 0.0;
-          final desiredWidth = faviconWidth + textPainter.width + 20.0;
-          final targetWidth = constraints.maxWidth.isFinite
-              ? desiredWidth.clamp(0.0, constraints.maxWidth).toDouble()
-              : desiredWidth;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelStyle = AppTypography.labelMediumStyle.copyWith(
+          fontWeight: FontWeight.w600,
+          color: theme.textPrimary.withValues(alpha: 0.8),
+        );
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: _sourceCountLabel(sources.length),
+            style: labelStyle,
+          ),
+          maxLines: 1,
+          textScaler: MediaQuery.textScalerOf(context),
+          textDirection: Directionality.of(context),
+        )..layout();
+        final faviconWidth = urlSources.isNotEmpty
+            ? (urlSources.length > 3 ? 52.0 : urlSources.length * 18.0) + 8.0
+            : 0.0;
+        final desiredWidth = faviconWidth + textPainter.width + 20.0;
+        final targetWidth = constraints.maxWidth.isFinite
+            ? desiredWidth.clamp(0.0, constraints.maxWidth).toDouble()
+            : desiredWidth;
 
-          return Semantics(
-            button: true,
-            label: _sourceCountLabel(sources.length),
-            child: AdaptiveButton.child(
-              onPressed: () => _showSourcesBottomSheet(context),
-              style: AdaptiveButtonStyle.glass,
-              size: AdaptiveButtonSize.small,
-              padding: EdgeInsets.zero,
-              minSize: Size(targetWidth, 28),
-              useSmoothRectangleBorder: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                child: chipContent,
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    if (PlatformInfo.isIOS) {
-      return Semantics(
-        button: true,
-        label: _sourceCountLabel(sources.length),
-        child: GestureDetector(
-          onTap: () => _showSourcesBottomSheet(context),
-          behavior: HitTestBehavior.opaque,
-          child: FloatingAppBarPill(
+        return Semantics(
+          button: true,
+          label: _sourceCountLabel(sources.length),
+          child: AdaptiveButton.child(
+            onPressed: () => _showSourcesBottomSheet(context),
+            style: AdaptiveButtonStyle.glass,
+            size: AdaptiveButtonSize.small,
+            padding: EdgeInsets.zero,
+            minSize: Size(targetWidth, 28),
+            useSmoothRectangleBorder: false,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: chipContent,
             ),
           ),
-        ),
-      );
-    }
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _showSourcesBottomSheet(context),
-        borderRadius: BorderRadius.circular(20),
-        hoverColor: theme.surfaceContainer.withValues(alpha: 0.1),
-        splashColor: theme.surfaceContainer.withValues(alpha: 0.2),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: theme.dividerColor.withValues(alpha: 0.5),
-              width: 1,
-            ),
-            color: theme.surfaceContainer.withValues(alpha: 0.3),
-            boxShadow: [
-              BoxShadow(
-                color: theme.cardShadow.withValues(alpha: 0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: chipContent,
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -170,18 +123,48 @@ class OpenWebUISourcesWidget extends StatelessWidget {
     );
   }
 
-  void _showSourcesBottomSheet(BuildContext context) {
-    final theme = context.conduitTheme;
+  void _showSourcesBottomSheet(BuildContext context) async {
+    if (Platform.isIOS) {
+      try {
+        await NativeSheetBridge.instance.presentSheet(
+          root: NativeSheetDetailConfig(
+            id: 'chat-sources',
+            title: _sourceCountLabel(sources.length),
+            items: [
+              for (var index = 0; index < sources.length; index++)
+                NativeSheetItemConfig(
+                  id: 'source-$index',
+                  title: SourceReferenceHelper.getSourceLabel(
+                    sources[index],
+                    index,
+                  ),
+                  subtitle: _sourceSnippet(sources[index]),
+                  sfSymbol: 'link',
+                  url: SourceReferenceHelper.getSourceUrl(
+                    sources[index],
+                  )?.toString(),
+                ),
+            ],
+          ),
+          rethrowErrors: true,
+        );
+        return;
+      } catch (_) {
+        if (!context.mounted) {
+          return;
+        }
+      }
+    }
 
-    showModalBottomSheet<void>(
+    if (!context.mounted) {
+      return;
+    }
+
+    ThemedSheets.showSurface<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.surfaceBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppBorderRadius.dialog),
-        ),
-      ),
+      showHandle: false,
+      padding: EdgeInsets.zero,
       builder: (sheetContext) {
         final liveTheme = sheetContext.conduitTheme;
 
@@ -274,106 +257,103 @@ class OpenWebUISourcesWidget extends StatelessWidget {
     final type = source.type?.trim();
     final hasType = type != null && type.isNotEmpty;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: url == null ? null : () => _launchUrl(url),
-        borderRadius: BorderRadius.circular(AppBorderRadius.card),
-        child: Ink(
-          padding: const EdgeInsets.all(Spacing.md),
-          decoration: BoxDecoration(
-            color: theme.surfaceContainer.withValues(alpha: 0.36),
-            borderRadius: BorderRadius.circular(AppBorderRadius.card),
-            border: Border.all(
-              color: theme.dividerColor.withValues(alpha: 0.32),
-              width: 1,
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: url == null ? null : () => _launchUrl(url),
+      child: Container(
+        padding: const EdgeInsets.all(Spacing.md),
+        decoration: BoxDecoration(
+          color: theme.surfaceContainer.withValues(alpha: 0.36),
+          borderRadius: BorderRadius.circular(AppBorderRadius.card),
+          border: Border.all(
+            color: theme.dividerColor.withValues(alpha: 0.32),
+            width: 1,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SourceIndexBadge(index: index + 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SourceIndexBadge(index: index + 1),
+                const SizedBox(width: Spacing.sm),
+                if (url != null) ...[
+                  _SourceFavicon(url: url, size: 18),
                   const SizedBox(width: Spacing.sm),
-                  if (url != null) ...[
-                    _SourceFavicon(url: url, size: 18),
-                    const SizedBox(width: Spacing.sm),
-                  ] else ...[
-                    Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(9),
-                        color: theme.surfaceContainerHighest,
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.description_outlined,
-                        size: 11,
-                        color: theme.textSecondary,
-                      ),
+                ] else ...[
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9),
+                      color: theme.surfaceContainerHighest,
                     ),
-                    const SizedBox(width: Spacing.sm),
-                  ],
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayText,
-                          style: AppTypography.bodyMediumStyle.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: theme.textPrimary,
-                          ),
-                        ),
-                        if (url != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            url,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.bodySmallStyle.copyWith(
-                              color: theme.textSecondary,
-                            ),
-                          ),
-                        ] else if (hasType) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            type,
-                            style: AppTypography.bodySmallStyle.copyWith(
-                              color: theme.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (url != null) ...[
-                    const SizedBox(width: Spacing.sm),
-                    Icon(
-                      Icons.open_in_new_rounded,
-                      size: IconSize.sm,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.description_outlined,
+                      size: 11,
                       color: theme.textSecondary,
                     ),
-                  ],
+                  ),
+                  const SizedBox(width: Spacing.sm),
                 ],
-              ),
-              if (snippet != null) ...[
-                const SizedBox(height: Spacing.sm),
-                Text(
-                  snippet,
-                  maxLines: 6,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.bodySmallStyle.copyWith(
-                    height: 1.45,
-                    color: theme.textSecondary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayText,
+                        style: AppTypography.bodyMediumStyle.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: theme.textPrimary,
+                        ),
+                      ),
+                      if (url != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          url,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodySmallStyle.copyWith(
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ] else if (hasType) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          type,
+                          style: AppTypography.bodySmallStyle.copyWith(
+                            color: theme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
+                if (url != null) ...[
+                  const SizedBox(width: Spacing.sm),
+                  Icon(
+                    Icons.open_in_new_rounded,
+                    size: IconSize.sm,
+                    color: theme.textSecondary,
+                  ),
+                ],
               ],
+            ),
+            if (snippet != null) ...[
+              const SizedBox(height: Spacing.sm),
+              Text(
+                snippet,
+                maxLines: 6,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.bodySmallStyle.copyWith(
+                  height: 1.45,
+                  color: theme.textSecondary,
+                ),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -497,24 +477,26 @@ class _SourceFavicon extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular((size / 2) - 1),
-        child: Image.network(
-          'https://www.google.com/s2/favicons?sz=32&domain=$domain',
+        child: CachedNetworkImage(
+          imageUrl: 'https://www.google.com/s2/favicons?sz=32&domain=$domain',
           width: size - 2,
           height: size - 2,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              width: size - 2,
-              height: size - 2,
-              color: theme.textSecondary.withValues(alpha: 0.1),
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.language,
-                size: size * 0.55,
-                color: theme.textSecondary.withValues(alpha: 0.6),
-              ),
-            );
-          },
+          errorWidget: (context, url, error) => _fallback(theme),
         ),
+      ),
+    );
+  }
+
+  Widget _fallback(ConduitThemeExtension theme) {
+    return Container(
+      width: size - 2,
+      height: size - 2,
+      color: theme.textSecondary.withValues(alpha: 0.1),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.language,
+        size: size * 0.55,
+        color: theme.textSecondary.withValues(alpha: 0.6),
       ),
     );
   }

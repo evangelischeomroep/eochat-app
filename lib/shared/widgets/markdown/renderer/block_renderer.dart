@@ -1,12 +1,16 @@
+import 'package:conduit/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:markdown/markdown.dart' as md;
 
 import '../../../theme/theme_extensions.dart';
 import '../markdown_config.dart';
 import 'details_block_widget.dart';
+import 'details_group_widget.dart';
 import 'inline_renderer.dart';
 import 'latex_preprocessor.dart';
 import 'markdown_style.dart';
+
+const Set<String> _groupableDetailTypes = {'tool_calls'};
 
 /// Signature for a builder that creates image widgets.
 typedef ImageBuilder = Widget Function(String src, String? alt, String? title);
@@ -65,13 +69,62 @@ class BlockRenderer {
   /// Renders a list of block [nodes] as a [Column].
   Widget renderBlocks(List<md.Node> nodes) {
     final widgets = <Widget>[];
-    for (var index = 0; index < nodes.length; index++) {
+    var index = 0;
+    while (index < nodes.length) {
+      final descriptor = _groupableDetailsDescriptor(
+        nodes[index],
+        nodePath: _nodePathFor(index),
+      );
+      if (descriptor != null) {
+        final descriptors = <_DetailsRenderDescriptor>[descriptor];
+        var lookahead = index + 1;
+        while (lookahead < nodes.length) {
+          final nextDescriptor = _groupableDetailsDescriptor(
+            nodes[lookahead],
+            nodePath: _nodePathFor(lookahead),
+          );
+          if (nextDescriptor == null) {
+            break;
+          }
+          descriptors.add(nextDescriptor);
+          lookahead++;
+        }
+
+        if (descriptors.length > 1) {
+          widgets.add(_renderDetailsGroup(descriptors));
+          index = lookahead;
+          continue;
+        }
+
+        widgets.add(_renderDetailsDescriptor(descriptor));
+        index++;
+        continue;
+      }
+
       final widget = renderBlock(nodes[index], nodePath: _nodePathFor(index));
       if (widget != null) widgets.add(widget);
+      index++;
+    }
+    if (widgets.isNotEmpty) {
+      widgets[widgets.length - 1] = _withoutBottomPadding(widgets.last);
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: widgets,
+    );
+  }
+
+  Widget _withoutBottomPadding(Widget widget) {
+    if (widget is! Padding) return widget;
+
+    final padding = widget.padding;
+    if (padding is! EdgeInsets || padding.bottom == 0) {
+      return widget;
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(padding.left, padding.top, padding.right, 0),
+      child: widget.child,
     );
   }
 
@@ -691,31 +744,32 @@ class BlockRenderer {
   }
 
   _AlertConfig _alertConfig(String type) {
+    final l10n = AppLocalizations.of(context)!;
     return switch (type) {
-      'tip' => const _AlertConfig(
+      'tip' => _AlertConfig(
         color: Colors.green,
         icon: Icons.lightbulb_outline,
-        label: 'Tip',
+        label: l10n.alertTip,
       ),
-      'important' => const _AlertConfig(
+      'important' => _AlertConfig(
         color: Colors.purple,
         icon: Icons.priority_high,
-        label: 'Important',
+        label: l10n.alertImportant,
       ),
-      'warning' => const _AlertConfig(
+      'warning' => _AlertConfig(
         color: Colors.amber,
         icon: Icons.warning_amber,
-        label: 'Warning',
+        label: l10n.alertWarning,
       ),
-      'caution' => const _AlertConfig(
+      'caution' => _AlertConfig(
         color: Colors.red,
         icon: Icons.error_outline,
-        label: 'Caution',
+        label: l10n.alertCaution,
       ),
-      _ => const _AlertConfig(
+      _ => _AlertConfig(
         color: Colors.blue,
         icon: Icons.info_outline,
-        label: 'Note',
+        label: l10n.alertNote,
       ),
     };
   }
@@ -795,6 +849,81 @@ class BlockRenderer {
   // -- Details --
 
   Widget _renderDetails(md.Element element, {required String nodePath}) {
+    final descriptor = _buildDetailsDescriptor(element, nodePath: nodePath);
+    return _renderDetailsDescriptor(descriptor);
+  }
+
+  Widget _renderDetailsDescriptor(_DetailsRenderDescriptor descriptor) {
+    final bodyNodes = descriptor.bodyNodes;
+    final hasBody = descriptor.hasBody;
+
+    return MarkdownDetailsBlock(
+      key: _detailsKey(
+        descriptor.element,
+        descriptor.summaryText,
+        nodePath: descriptor.nodePath,
+      ),
+      summaryText: descriptor.summaryText,
+      attributes: descriptor.attributes,
+      hasBody: hasBody,
+      inlineExpansionStateId: _detailsStateId(
+        descriptor.element,
+        descriptor.summaryText,
+        nodePath: descriptor.nodePath,
+      ),
+      bodyBuilder: hasBody
+          ? (context) {
+              final inner = BlockRenderer(
+                context,
+                style,
+                inlineRenderer,
+                latexPreprocessor,
+                onLinkTap,
+                imageBuilder,
+                stateScopeId,
+                descriptor.nodePath,
+              );
+              return inner.renderBlocks(bodyNodes);
+            }
+          : null,
+    );
+  }
+
+  Widget _renderDetailsGroup(List<_DetailsRenderDescriptor> descriptors) {
+    return MarkdownDetailsGroup(
+      key: ValueKey<String>(_detailsGroupStateId(descriptors)),
+      stateId: _detailsGroupStateId(descriptors),
+      items: descriptors
+          .map(
+            (descriptor) => MarkdownDetailsGroupItem(
+              type: descriptor.type,
+              name: descriptor.name,
+              isDone: descriptor.isDone,
+              child: _renderDetailsDescriptor(descriptor),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  _DetailsRenderDescriptor? _groupableDetailsDescriptor(
+    md.Node node, {
+    required String nodePath,
+  }) {
+    if (node is! md.Element || node.tag != 'details') {
+      return null;
+    }
+    final descriptor = _buildDetailsDescriptor(node, nodePath: nodePath);
+    if (!_groupableDetailTypes.contains(descriptor.type)) {
+      return null;
+    }
+    return descriptor;
+  }
+
+  _DetailsRenderDescriptor _buildDetailsDescriptor(
+    md.Element element, {
+    required String nodePath,
+  }) {
     final children = element.children ?? const <md.Node>[];
     String summaryText = '';
     var bodyStartIndex = 0;
@@ -809,33 +938,27 @@ class BlockRenderer {
 
     final bodyNodes = children.skip(bodyStartIndex).toList(growable: false);
     final hasBody = bodyNodes.any(_hasVisualContent);
+    final attributes = Map<String, String>.from(element.attributes);
 
-    return MarkdownDetailsBlock(
-      key: _detailsKey(element, summaryText, nodePath: nodePath),
+    return _DetailsRenderDescriptor(
+      element: element,
+      nodePath: nodePath,
       summaryText: summaryText,
-      attributes: Map<String, String>.from(element.attributes),
+      attributes: attributes,
+      bodyNodes: bodyNodes,
       hasBody: hasBody,
-      inlineExpansionStateId: _detailsStateId(
-        element,
-        summaryText,
-        nodePath: nodePath,
-      ),
-      bodyBuilder: hasBody
-          ? (context) {
-              final inner = BlockRenderer(
-                context,
-                style,
-                inlineRenderer,
-                latexPreprocessor,
-                onLinkTap,
-                imageBuilder,
-                stateScopeId,
-                nodePath,
-              );
-              return inner.renderBlocks(bodyNodes);
-            }
-          : null,
+      type: attributes['type']?.trim() ?? '',
+      name: attributes['name']?.trim() ?? '',
     );
+  }
+
+  String _detailsGroupStateId(List<_DetailsRenderDescriptor> descriptors) {
+    return [
+      if (stateScopeId != null && stateScopeId!.isNotEmpty) stateScopeId!,
+      'detail-group',
+      descriptors.first.nodePath,
+      descriptors.first.type,
+    ].join('|');
   }
 
   Key? _detailsKey(
@@ -937,6 +1060,30 @@ class BlockRenderer {
     if (text.isEmpty) return null;
     return Text.rich(inlineRenderer.render([element]));
   }
+}
+
+class _DetailsRenderDescriptor {
+  const _DetailsRenderDescriptor({
+    required this.element,
+    required this.nodePath,
+    required this.summaryText,
+    required this.attributes,
+    required this.bodyNodes,
+    required this.hasBody,
+    required this.type,
+    required this.name,
+  });
+
+  final md.Element element;
+  final String nodePath;
+  final String summaryText;
+  final Map<String, String> attributes;
+  final List<md.Node> bodyNodes;
+  final bool hasBody;
+  final String type;
+  final String name;
+
+  bool get isDone => attributes['done'] == 'true';
 }
 
 /// Configuration for a GitHub-style alert.

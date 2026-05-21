@@ -66,7 +66,9 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
         return;
       }
 
-      final info = await api.getFileInfo(widget.attachmentId);
+      final info = Map<String, dynamic>.from(
+        await api.getFileInfo(widget.attachmentId),
+      );
       if (!mounted) return;
       setState(() {
         _fileInfo = info;
@@ -272,13 +274,16 @@ class _EnhancedAttachmentState extends ConsumerState<EnhancedAttachment> {
       ),
     );
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppBorderRadius.md),
-      onTap: () async {
-        await ConduitHaptics.mediumImpact();
-        await _shareFile();
-      },
-      child: card,
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () async {
+          await ConduitHaptics.mediumImpact();
+          await _shareFile();
+        },
+        child: card,
+      ),
     );
   }
 

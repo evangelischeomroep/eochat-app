@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
@@ -13,8 +15,10 @@ import 'package:webview_flutter_plus/webview_flutter_plus.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
 
+import '../../../core/services/native_sheet_bridge.dart';
 import '../web_content_embed.dart';
 import '../webview_content_height.dart';
+import '../themed_sheets.dart';
 import '../../theme/color_tokens.dart';
 import '../../theme/theme_extensions.dart';
 import 'renderer/markdown_style.dart';
@@ -26,6 +30,7 @@ typedef MarkdownLinkTapCallback = void Function(String url, String title);
 const _chartPreviewMinHeight = 320.0;
 const _mermaidPreviewMinHeight = 360.0;
 const _embeddedPreviewMaxHeight = 1200.0;
+const _inlineWebPreviewMaxSourceLength = 32000;
 
 class ConduitMarkdown {
   const ConduitMarkdown._();
@@ -157,7 +162,14 @@ class ConduitMarkdown {
             ),
           ),
           const SizedBox(height: Spacing.xs),
-          WebContentEmbed(source: code),
+          if (code.length <= _inlineWebPreviewMaxSourceLength)
+            WebContentEmbed(
+              source: code,
+              previewTitle: previewLabel,
+              previewDescription: 'Load the inline preview when needed.',
+            )
+          else
+            _DeferredInlinePreviewCard(code: code, language: language),
         ],
       ),
     );
@@ -167,19 +179,45 @@ class ConduitMarkdown {
     BuildContext context, {
     required String code,
     required String language,
-  }) {
+  }) async {
     final theme = context.conduitTheme;
     final title = _previewTitleForLanguage(language);
 
-    return showModalBottomSheet<void>(
+    if (Platform.isIOS) {
+      try {
+        await NativeSheetBridge.instance.presentSheet(
+          root: NativeSheetDetailConfig(
+            id: 'code-preview',
+            title: title,
+            items: [
+              NativeSheetItemConfig(
+                id: 'code-preview-source',
+                title: title,
+                sfSymbol: 'doc.richtext',
+                kind: NativeSheetItemKind.readOnlyText,
+                value: code,
+              ),
+            ],
+          ),
+          rethrowErrors: true,
+        );
+        return;
+      } catch (_) {
+        if (!context.mounted) {
+          return;
+        }
+      }
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+
+    return ThemedSheets.showSurface<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: theme.surfaceBackground,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppBorderRadius.dialog),
-        ),
-      ),
+      showHandle: false,
+      padding: EdgeInsets.zero,
       builder: (sheetContext) {
         final markdownStyle = ConduitMarkdownStyle.fromTheme(sheetContext);
         return SafeArea(
@@ -237,7 +275,14 @@ class ConduitMarkdown {
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.all(Spacing.lg),
-                    children: [WebContentEmbed(source: code)],
+                    children: [
+                      WebContentEmbed(
+                        source: code,
+                        deferUntilExpanded: false,
+                        initiallyExpanded: true,
+                        previewTitle: title,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -595,6 +640,52 @@ class ConduitMarkdown {
   }
 }
 
+class _DeferredInlinePreviewCard extends StatelessWidget {
+  const _DeferredInlinePreviewCard({
+    required this.code,
+    required this.language,
+  });
+
+  final String code;
+  final String language;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = context.conduitTheme;
+    final l10n = AppLocalizations.of(context)!;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.cardBackground,
+        border: Border.all(color: theme.cardBorder, width: BorderWidth.thin),
+        borderRadius: BorderRadius.circular(AppBorderRadius.md),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(Spacing.sm),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                l10n.previewDeferredLargeContent,
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: theme.textSecondary,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => ConduitMarkdown.showCodePreviewSheet(
+                context,
+                code: code,
+                language: language,
+              ),
+              child: Text(l10n.openPreview),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Collapsible code block body with syntax highlighting.
 ///
 /// When the code exceeds [collapseThreshold] lines, only the
@@ -833,7 +924,7 @@ class _CodeBlockHeaderState extends State<CodeBlockHeader> {
           if (widget.onPreview != null) ...[
             _CodeBlockActionButton(
               icon: Icons.visibility_outlined,
-              label: 'Preview',
+              label: AppLocalizations.of(context)!.preview,
               color: iconColor,
               onTap: widget.onPreview!,
             ),
@@ -1006,6 +1097,8 @@ class _ChartJsDiagramState extends State<ChartJsDiagram> {
   double _height = _chartPreviewMinHeight;
   bool _isLoading = true;
   int _loadRequestId = 0;
+  bool _loadScheduled = false;
+  bool _retryLoadScheduled = false;
   final Set<Factory<OneSequenceGestureRecognizer>> _gestureRecognizers =
       <Factory<OneSequenceGestureRecognizer>>{
         Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
@@ -1014,27 +1107,6 @@ class _ChartJsDiagramState extends State<ChartJsDiagram> {
   @override
   void initState() {
     super.initState();
-    if (!ChartJsDiagram.isSupported) {
-      return;
-    }
-    ChartJsDiagram._loadScript().then((value) {
-      if (!mounted) {
-        return;
-      }
-      _script = value;
-      _controller = WebViewControllerPlus()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.transparent)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onPageFinished: (_) {
-              _scheduleHeightUpdates(_loadRequestId);
-            },
-          ),
-        );
-      _loadHtml();
-      setState(() {});
-    });
   }
 
   @override
@@ -1049,14 +1121,23 @@ class _ChartJsDiagramState extends State<ChartJsDiagram> {
         oldWidget.colorScheme != widget.colorScheme ||
         oldWidget.tokens != widget.tokens;
     if (contentChanged || themeChanged) {
-      _loadHtml();
+      if (_controller != null && _script != null) {
+        _loadHtml();
+      } else {
+        _loadScheduled = false;
+        _retryLoadScheduled = false;
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_controller == null) {
-      return const Center(child: CircularProgressIndicator());
+      _scheduleInitialization(context);
+      return const SizedBox(
+        height: _chartPreviewMinHeight,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     return SizedBox(
       height: _height,
@@ -1079,6 +1160,67 @@ class _ChartJsDiagramState extends State<ChartJsDiagram> {
         ],
       ),
     );
+  }
+
+  void _scheduleInitialization(BuildContext context) {
+    if (_loadScheduled || _controller != null || !ChartJsDiagram.isSupported) {
+      return;
+    }
+
+    if (Scrollable.recommendDeferredLoadingForContext(context)) {
+      if (_retryLoadScheduled) {
+        return;
+      }
+      _retryLoadScheduled = true;
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) {
+          return;
+        }
+        _retryLoadScheduled = false;
+        if (_controller == null && !_loadScheduled) {
+          setState(() {});
+        }
+      });
+      return;
+    }
+
+    _retryLoadScheduled = false;
+    _loadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_initializeController());
+    });
+  }
+
+  Future<void> _initializeController() async {
+    if (!ChartJsDiagram.isSupported || _controller != null) {
+      _loadScheduled = false;
+      return;
+    }
+
+    try {
+      final value = await ChartJsDiagram._loadScript();
+      if (!mounted) {
+        return;
+      }
+      _script = value;
+      _controller = WebViewControllerPlus()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.transparent)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              _scheduleHeightUpdates(_loadRequestId);
+            },
+          ),
+        );
+      _loadHtml();
+      setState(() {});
+    } finally {
+      _loadScheduled = false;
+    }
   }
 
   void _loadHtml() {
@@ -1382,6 +1524,8 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   double _height = _mermaidPreviewMinHeight;
   bool _isLoading = true;
   int _loadRequestId = 0;
+  bool _loadScheduled = false;
+  bool _retryLoadScheduled = false;
   final Set<Factory<OneSequenceGestureRecognizer>> _gestureRecognizers =
       <Factory<OneSequenceGestureRecognizer>>{
         Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
@@ -1390,27 +1534,6 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
   @override
   void initState() {
     super.initState();
-    if (!MermaidDiagram.isSupported) {
-      return;
-    }
-    MermaidDiagram._loadScript().then((value) {
-      if (!mounted) {
-        return;
-      }
-      _script = value;
-      _controller = WebViewControllerPlus()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
-        ..setBackgroundColor(Colors.transparent)
-        ..setNavigationDelegate(
-          NavigationDelegate(
-            onPageFinished: (_) {
-              _scheduleHeightUpdates(_loadRequestId);
-            },
-          ),
-        );
-      _loadHtml();
-      setState(() {});
-    });
   }
 
   @override
@@ -1425,14 +1548,23 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
         oldWidget.colorScheme != widget.colorScheme ||
         oldWidget.tokens != widget.tokens;
     if (codeChanged || themeChanged) {
-      _loadHtml();
+      if (_controller != null && _script != null) {
+        _loadHtml();
+      } else {
+        _loadScheduled = false;
+        _retryLoadScheduled = false;
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_controller == null) {
-      return const Center(child: CircularProgressIndicator());
+      _scheduleInitialization(context);
+      return const SizedBox(
+        height: _mermaidPreviewMinHeight,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     return SizedBox(
       height: _height,
@@ -1455,6 +1587,67 @@ class _MermaidDiagramState extends State<MermaidDiagram> {
         ],
       ),
     );
+  }
+
+  void _scheduleInitialization(BuildContext context) {
+    if (_loadScheduled || _controller != null || !MermaidDiagram.isSupported) {
+      return;
+    }
+
+    if (Scrollable.recommendDeferredLoadingForContext(context)) {
+      if (_retryLoadScheduled) {
+        return;
+      }
+      _retryLoadScheduled = true;
+      Future<void>.delayed(const Duration(milliseconds: 250), () {
+        if (!mounted) {
+          return;
+        }
+        _retryLoadScheduled = false;
+        if (_controller == null && !_loadScheduled) {
+          setState(() {});
+        }
+      });
+      return;
+    }
+
+    _retryLoadScheduled = false;
+    _loadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_initializeController());
+    });
+  }
+
+  Future<void> _initializeController() async {
+    if (!MermaidDiagram.isSupported || _controller != null) {
+      _loadScheduled = false;
+      return;
+    }
+
+    try {
+      final value = await MermaidDiagram._loadScript();
+      if (!mounted) {
+        return;
+      }
+      _script = value;
+      _controller = WebViewControllerPlus()
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.transparent)
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onPageFinished: (_) {
+              _scheduleHeightUpdates(_loadRequestId);
+            },
+          ),
+        );
+      _loadHtml();
+      setState(() {});
+    } finally {
+      _loadScheduled = false;
+    }
   }
 
   void _loadHtml() {
