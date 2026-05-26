@@ -1193,11 +1193,19 @@
   "@themePalette": {
     "description": "Title for selecting the app color palette."
   },
-  "themePaletteConduitLabel": "EOchat",
+  "themePaletteEochatLabel": "EOchat",
+  "@themePaletteEochatLabel": {
+    "description": "Palette name for the default EOchat theme."
+  },
+  "themePaletteEochatDescription": "EO ブランドカラー — パープル、イエロー、ピーチ。",
+  "@themePaletteEochatDescription": {
+    "description": "Description of the EOchat palette."
+  },
+  "themePaletteConduitLabel": "Conduit",
   "@themePaletteConduitLabel": {
     "description": "Palette name for the default Conduit theme."
   },
-  "themePaletteConduitDescription": "EOchat 向けに設計されたクリーンなニュートラルテーマ。",
+  "themePaletteConduitDescription": "Conduit 向けに設計されたクリーンなニュートラルテーマ。",
   "@themePaletteConduitDescription": {
     "description": "Description of the Conduit palette."
   },

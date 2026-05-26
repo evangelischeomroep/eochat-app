@@ -139,8 +139,8 @@ const _fontMono = <String>[
 /// Public palette definition used by `TweakcnThemes`.
 final TweakcnThemeDefinition eochatPalette = TweakcnThemeDefinition(
   id: 'eochat',
-  labelBuilder: (_) => 'EOchat',
-  descriptionBuilder: (_) => 'EO brand palette',
+  labelBuilder: (l10n) => l10n.themePaletteEochatLabel,
+  descriptionBuilder: (l10n) => l10n.themePaletteEochatDescription,
   light: _eochatLight,
   dark: _eochatDark,
   preview: const <Color>[

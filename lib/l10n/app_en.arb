@@ -1237,13 +1237,21 @@
   "@themePalette": {
     "description": "Title for selecting the app color palette."
   },
-  "themePaletteConduitLabel": "EOchat",
-  "@themePaletteConduitLabel": {
+  "themePaletteEochatLabel": "EOchat",
+  "@themePaletteEochatLabel": {
     "description": "Palette name for the default EOchat theme."
   },
-  "themePaletteConduitDescription": "Clean neutral theme designed for EOchat.",
-  "@themePaletteConduitDescription": {
+  "themePaletteEochatDescription": "EO brand palette — purple, yellow and peach.",
+  "@themePaletteEochatDescription": {
     "description": "Description of the EOchat palette."
+  },
+  "themePaletteConduitLabel": "Conduit",
+  "@themePaletteConduitLabel": {
+    "description": "Palette name for the default Conduit theme."
+  },
+  "themePaletteConduitDescription": "Clean neutral theme designed for Conduit.",
+  "@themePaletteConduitDescription": {
+    "description": "Description of the Conduit palette."
   },
   "themePaletteClaudeLabel": "Claude",
   "@themePaletteClaudeLabel": {

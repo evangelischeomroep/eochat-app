@@ -653,11 +653,19 @@
   "@nextLabel": {
     "description": "Label for navigating to the next item."
   },
-  "themePaletteConduitLabel": "EOchat",
+  "themePaletteEochatLabel": "EOchat",
+  "@themePaletteEochatLabel": {
+    "description": "Palette name for the default EOchat theme."
+  },
+  "themePaletteEochatDescription": "Palette del marchio EO — viola, giallo e pesca.",
+  "@themePaletteEochatDescription": {
+    "description": "Description of the EOchat palette."
+  },
+  "themePaletteConduitLabel": "Conduit",
   "@themePaletteConduitLabel": {
     "description": "Palette name for the default Conduit theme."
   },
-  "themePaletteConduitDescription": "Tema neutro e pulito progettato per EOchat.",
+  "themePaletteConduitDescription": "Tema neutro e pulito progettato per Conduit.",
   "@themePaletteConduitDescription": {
     "description": "Description of the Conduit palette."
   },

@@ -653,11 +653,19 @@
   "@nextLabel": {
     "description": "Label for navigating to the next item."
   },
-  "themePaletteConduitLabel": "EOchat",
+  "themePaletteEochatLabel": "EOchat",
+  "@themePaletteEochatLabel": {
+    "description": "Palette name for the default EOchat theme."
+  },
+  "themePaletteEochatDescription": "EO 品牌色板 — 紫色、黄色与桃色。",
+  "@themePaletteEochatDescription": {
+    "description": "Description of the EOchat palette."
+  },
+  "themePaletteConduitLabel": "Conduit",
   "@themePaletteConduitLabel": {
     "description": "Palette name for the default Conduit theme."
   },
-  "themePaletteConduitDescription": "为 EOchat 设计的简洁中性色主题。",
+  "themePaletteConduitDescription": "为 Conduit 设计的简洁中性色主题。",
   "@themePaletteConduitDescription": {
     "description": "Description of the Conduit palette."
   },

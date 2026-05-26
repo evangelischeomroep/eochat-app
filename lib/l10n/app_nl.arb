@@ -697,11 +697,19 @@
   "@nextLabel": {
     "description": "Label for navigating to the next item."
   },
-  "themePaletteConduitLabel": "EOchat",
-  "@themePaletteConduitLabel": {
+  "themePaletteEochatLabel": "EOchat",
+  "@themePaletteEochatLabel": {
     "description": "Palette name for the default EOchat theme."
   },
-  "themePaletteConduitDescription": "Strak neutraal thema ontworpen voor EOchat.",
+  "themePaletteEochatDescription": "EO-huisstijl — paars, geel en perzik.",
+  "@themePaletteEochatDescription": {
+    "description": "Description of the EOchat palette."
+  },
+  "themePaletteConduitLabel": "Conduit",
+  "@themePaletteConduitLabel": {
+    "description": "Palette name for the default Conduit theme."
+  },
+  "themePaletteConduitDescription": "Strak neutraal thema ontworpen voor Conduit.",
   "@themePaletteConduitDescription": {
     "description": "Description of the EOchat palette."
   },
