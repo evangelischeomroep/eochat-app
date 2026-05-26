@@ -351,6 +351,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				24812099A551BA4570C59A8E /* [CP] Embed Pods Frameworks */,
 				C10E41C5BC1B71D016E9688D /* [CP] Copy Pods Resources */,
+				B4A7EF42C7EBC345A13C8063 /* [EOchat] Generate objective_c.framework dSYM */,
 			);
 			buildRules = (
 			);
@@ -566,6 +567,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		B4A7EF42C7EBC345A13C8063 /* [EOchat] Generate objective_c.framework dSYM */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "[EOchat] Generate objective_c.framework dSYM";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nif [ \"${CONFIGURATION}\" != \"Release\" ] && [ \"${CONFIGURATION}\" != \"Profile\" ]; then\n  exit 0\nfi\nFRAMEWORK_BIN=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/objective_c.framework/objective_c\"\nif [ ! -f \"${FRAMEWORK_BIN}\" ]; then\n  echo \"warning: objective_c.framework not found at ${FRAMEWORK_BIN}, skipping dSYM generation\"\n  exit 0\nfi\nmkdir -p \"${DWARF_DSYM_FOLDER_PATH}\"\n/usr/bin/xcrun dsymutil \"${FRAMEWORK_BIN}\" -o \"${DWARF_DSYM_FOLDER_PATH}/objective_c.framework.dSYM\"\n";
 		};
 		C10E41C5BC1B71D016E9688D /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;

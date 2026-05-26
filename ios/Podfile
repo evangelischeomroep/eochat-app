@@ -100,6 +100,31 @@ post_install do |installer|
             config.build_settings['STRIP_STYLE'] = 'non-global'
           end
         end
+
+        # Generate a dSYM for objective_c.framework. The Dart `objective_c`
+        # package ships a pre-built, pre-stripped dylib via native_assets, so
+        # Xcode never emits one — and App Store Connect rejects archives that
+        # omit a dSYM for any embedded framework. dsymutil produces a dSYM with
+        # the matching UUID even when no debug symbols are present.
+        if native_target.name == 'Runner'
+          phase_name = '[EOchat] Generate objective_c.framework dSYM'
+          existing = native_target.shell_script_build_phases.find { |p| p.name == phase_name }
+          existing.remove_from_project if existing
+          phase = native_target.new_shell_script_build_phase(phase_name)
+          phase.shell_script = <<~SHELL
+            set -e
+            if [ "${CONFIGURATION}" != "Release" ] && [ "${CONFIGURATION}" != "Profile" ]; then
+              exit 0
+            fi
+            FRAMEWORK_BIN="${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/objective_c.framework/objective_c"
+            if [ ! -f "${FRAMEWORK_BIN}" ]; then
+              echo "warning: objective_c.framework not found at ${FRAMEWORK_BIN}, skipping dSYM generation"
+              exit 0
+            fi
+            mkdir -p "${DWARF_DSYM_FOLDER_PATH}"
+            /usr/bin/xcrun dsymutil "${FRAMEWORK_BIN}" -o "${DWARF_DSYM_FOLDER_PATH}/objective_c.framework.dSYM"
+          SHELL
+        end
       end
     end
     user_project.save
