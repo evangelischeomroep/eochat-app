@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/theme_extensions.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:io' show Platform;
+import '../../core/config/fork_overrides.dart';
 import '../theme/color_tokens.dart';
 import '../theme/tweakcn_themes.dart';
 
@@ -256,8 +257,9 @@ class BrandService {
   }
 
   /// Brand-specific semantic labels for accessibility
-  static String get brandName => 'EOchat';
-  static String get brandDescription => 'Beveiligd en afgeschermde AI';
+  static String get brandName => ForkOverrides.brandNameOverride ?? 'Conduit';
+  static String get brandDescription =>
+      ForkOverrides.brandDescriptionOverride ?? 'Your AI Conversation Hub';
   static String get connectionLabel => 'Hub Connection';
   static String get networkLabel => 'Network Hub';
 

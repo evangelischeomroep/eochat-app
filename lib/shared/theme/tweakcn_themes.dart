@@ -1,6 +1,8 @@
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 
+import 'eochat_palette.dart';
+
 /// Represents a single tweakcn theme variant (light or dark) and exposes the
 /// standard set of color tokens defined by the registry.
 @immutable
@@ -118,57 +120,40 @@ Color mix(Color a, Color b, double amount) {
 }
 
 class TweakcnThemes {
-  // EO brand palette (screen/RGB)
-  static const Color _eoPurple = Color(0xFF8820F9);
-  static const Color _eoRed = Color(0xFFFF5A5A);
-  static const Color _eoYellow = Color(0xFFEDDD68);
-  static const Color _eoPeach = Color(
-    0xFFFEF8F8,
-  ); // using official Peach-tint from EO guidelines
-  static const Color _eoPurpleTint = Color(0xFF6423BE);
-
   static final TweakcnThemeVariant _conduitLight = TweakcnThemeVariant(
-    background: const Color(0xFFFFFFFF), // white base — chat bg, scaffold
-    foreground: const Color(0xFF1F1235), // onBackground
-    card: _eoPeach, // peach cards and user message bubbles
-    cardForeground: const Color(0xFF1F1235), // onSurface
-    popover: const Color(0xFFFFFFFF), // popover stays white (feels elevated)
-    popoverForeground: const Color(0xFF1F1235), // onSurface
-    primary: _eoPurple, // brand purple
+    background: const Color(0xFFFFFFFF), // background
+    foreground: const Color(0xFF000000), // onBackground
+    card: const Color(0xFFF4F4F4), // surface
+    cardForeground: const Color(0xFF000000), // onSurface
+    popover: const Color(0xFFFFFFFF), // background
+    popoverForeground: const Color(0xFF000000), // onSurface
+    primary: const Color(0xFF000000), // primary
     primaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    secondary: const Color(
-      0xFFF5ECEC,
-    ), // lighter than card — distinct surface layer
-    secondaryForeground: const Color(0xFF1F1235), // onSecondary
-    muted: const Color(
-      0xFFF8F3F3,
-    ), // near-white warm tint — lowest-emphasis backgrounds
-    mutedForeground: const Color(0xFF7B5AB5), // purple-toned muted text
-    accent: _eoYellow, // brand yellow
-    accentForeground: const Color(0xFF2B213D), // onAccent
-    destructive: _eoRed, // brand red / error
+    secondary: const Color(0xFFF4F4F4), // secondary
+    secondaryForeground: const Color(0xFF000000), // onSecondary
+    muted: const Color(0xFFF4F4F4), // surface
+    mutedForeground: const Color(0xFF6E6E80), // onSurfaceVariant
+    accent: const Color(0xFFECECEC), // surfaceVariant
+    accentForeground: const Color(0xFF000000), // onSurface
+    destructive: const Color(0xFFEF4444), // error
     destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFFE4CFCF), // warm border — slightly more visible
-    input: const Color(
-      0xFFFFFFFF,
-    ), // desaturated warm border — subtle, not pink paint
-    ring: _eoPurple, // brand purple ring (iOS tint convention)
-    sidebarBackground: _eoPeach, // sidebar surface
-    sidebarForeground: const Color(0xFF1F1235), // onSurface
-    sidebarPrimary: _eoPurple, // primary
+    border: const Color(0xFFE5E5E5), // outlineVariant
+    input: const Color(0xFFE5E5E5), // outlineVariant
+    ring: const Color(0xFF8E8EA0), // outline
+    sidebarBackground: const Color(0xFFF4F4F4), // surface
+    sidebarForeground: const Color(0xFF000000), // onSurface
+    sidebarPrimary: const Color(0xFF000000), // primary
     sidebarPrimaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    sidebarAccent: const Color(
-      0xFFF5DADA,
-    ), // warm rose-peach — renders as #F7E1E1 at 80% alpha on white
-    sidebarAccentForeground: const Color(0xFF1F1235), // onAccent
-    sidebarBorder: const Color(0xFFFCEDED), // matches border
-    sidebarRing: _eoPurple, // brand purple ring
-    success: const Color(0xFF34C759), // iOS-style success green
-    successForeground: const Color(0xFF003018), // dark text on green
-    warning: _eoYellow, // brand yellow warning
-    warningForeground: const Color(0xFF2B213D), // onWarning
-    info: _eoPurpleTint, // slightly darker purple distinguishes from primary
-    infoForeground: const Color(0xFFFFFFFF), // onInfo
+    sidebarAccent: const Color(0xFFECECEC), // surfaceVariant
+    sidebarAccentForeground: const Color(0xFF000000), // onSurface
+    sidebarBorder: const Color(0xFFE5E5E5), // outlineVariant
+    sidebarRing: const Color(0xFF8E8EA0), // outline
+    success: const Color(0xFF10A37F), // success / tertiary
+    successForeground: const Color(0xFFFFFFFF), // onTertiary
+    warning: const Color(0xFFF59E0B), // warning
+    warningForeground: const Color(0xFF000000), // onBackground
+    info: const Color(0xFF10A37F), // tertiary (reuse as info)
+    infoForeground: const Color(0xFFFFFFFF), // onTertiary
     radius: 10,
     fontSans: const <String>[
       'ui-sans-serif',
@@ -208,41 +193,39 @@ class TweakcnThemes {
   );
 
   static final TweakcnThemeVariant _conduitDark = TweakcnThemeVariant(
-    background: const Color(0xFF140A24), // deep purple background
-    foreground: const Color(0xFFF5EEFF), // onBackground
-    card: const Color(0xFF1D1033), // surface
-    cardForeground: const Color(0xFFF5EEFF), // onSurface
-    popover: const Color(0xFF25113F), // surfaceVariant
-    popoverForeground: const Color(0xFFF5EEFF), // onSurface
-    primary: _eoPurple, // brand purple
-    primaryForeground: const Color(0xFFFFFFFF), // onPrimary
-    secondary: const Color(0xFF25113F), // secondary
-    secondaryForeground: const Color(0xFFF5EEFF), // onSecondary
-    muted: const Color(0xFF2B164A), // surfaceVariant
-    mutedForeground: const Color(0xFFC6AFEA), // onSurfaceVariant
-    accent: _eoYellow, // brand yellow
-    accentForeground: const Color(0xFF2B213D), // onAccent
-    destructive: _eoRed, // brand red / error
+    background: const Color(0xFF000000), // background
+    foreground: const Color(0xFFECECEC), // onBackground
+    card: const Color(0xFF141414), // surface
+    cardForeground: const Color(0xFFECECEC), // onSurface
+    popover: const Color(0xFF1A1A1A), // surfaceVariant
+    popoverForeground: const Color(0xFFECECEC), // onSurface
+    primary: const Color(0xFFECECEC), // primary
+    primaryForeground: const Color(0xFF000000), // onPrimary
+    secondary: const Color(0xFF1A1A1A), // secondary
+    secondaryForeground: const Color(0xFFECECEC), // onSecondary
+    muted: const Color(0xFF1A1A1A), // surfaceVariant
+    mutedForeground: const Color(0xFF8E8EA0), // onSurfaceVariant
+    accent: const Color(0xFF232323), // secondaryContainer
+    accentForeground: const Color(0xFFECECEC), // onSecondaryContainer
+    destructive: const Color(0xFFEF4444), // error
     destructiveForeground: const Color(0xFFFFFFFF), // onError
-    border: const Color(0xFF3A1F63), // outlineVariant
-    input: const Color(0xFF3A1F63), // input border
-    ring: _eoPurple, // brand purple ring (iOS tint convention)
-    sidebarBackground: const Color(0xFF351973), // saturated purple sidebar
-    sidebarForeground: const Color(0xFFF5EEFF), // onSurface
-    sidebarPrimary: _eoYellow, // brand yellow — high-contrast pop on dark purple
-    sidebarPrimaryForeground: const Color(0xFF2B213D), // onYellow
-    sidebarAccent: const Color(0xFF25113F), // surfaceVariant
-    sidebarAccentForeground: const Color(0xFFD4B8F5), // softer lavender
-    sidebarBorder: const Color(0xFF3A1F63), // outlineVariant
-    sidebarRing: _eoPurple, // brand purple ring
-    success: const Color(0xFF30D158), // iOS dark mode success green
-    successForeground: const Color(0xFF001A00), // dark text on green
-    warning: _eoYellow, // brand yellow warning
-    warningForeground: const Color(0xFF2B213D), // onWarning
-    info: const Color(
-      0xFFB07EFF,
-    ), // lighter purple, distinguishable in dark mode
-    infoForeground: const Color(0xFF1A0030), // dark text on light purple
+    border: const Color(0xFF1E1E1E), // outlineVariant
+    input: const Color(0xFF1E1E1E), // outlineVariant
+    ring: const Color(0xFF6E6E80), // outline
+    sidebarBackground: const Color(0xFF000000), // background
+    sidebarForeground: const Color(0xFFECECEC), // onSurface
+    sidebarPrimary: const Color(0xFFECECEC), // primary
+    sidebarPrimaryForeground: const Color(0xFF000000), // onPrimary
+    sidebarAccent: const Color(0xFF1A1A1A), // surfaceVariant
+    sidebarAccentForeground: const Color(0xFFECECEC), // onSurface
+    sidebarBorder: const Color(0xFF1E1E1E), // outlineVariant
+    sidebarRing: const Color(0xFF6E6E80), // outline
+    success: const Color(0xFF10A37F), // success / tertiary
+    successForeground: const Color(0xFFFFFFFF), // onTertiary
+    warning: const Color(0xFFF59E0B), // warning
+    warningForeground: const Color(0xFFECECEC), // onBackground
+    info: const Color(0xFF10A37F), // tertiary (reuse as info)
+    infoForeground: const Color(0xFFECECEC), // onBackground
     radius: 10,
     fontSans: const <String>[
       'ui-sans-serif',
@@ -826,11 +809,14 @@ class TweakcnThemes {
     light: _conduitLight,
     dark: _conduitDark,
     preview: const <Color>[
-      _eoPurple, // brand purple
-      _eoRed, // brand red
-      _eoYellow, // brand yellow
+      Color(0xFF000000), // primary
+      Color(0xFF10A37F), // tertiary / accent
+      Color(0xFFF4F4F4), // surface
     ],
   );
+
+  /// EOchat brand palette — defined in `eochat_palette.dart`.
+  static final TweakcnThemeDefinition eochat = eochatPalette;
 
   static final TweakcnThemeDefinition catppuccin = TweakcnThemeDefinition(
     id: 'catppuccin',
@@ -859,6 +845,7 @@ class TweakcnThemes {
   );
 
   static List<TweakcnThemeDefinition> all = [
+    eochat,
     conduit,
     claude,
     t3Chat,
@@ -866,8 +853,17 @@ class TweakcnThemes {
     tangerine,
   ];
 
+  /// Legacy palette ids that should be remapped on load. Used to migrate
+  /// existing EOchat installs whose stored id was 'conduit' (when the fork
+  /// used to overwrite that palette's colours).
+  static const Map<String, String> _paletteAliases = {'conduit': 'eochat'};
+
   static TweakcnThemeDefinition byId(String? id) {
-    return all.firstWhere((theme) => theme.id == id, orElse: () => conduit);
+    final resolved = _paletteAliases[id] ?? id;
+    return all.firstWhere(
+      (theme) => theme.id == resolved,
+      orElse: () => eochat,
+    );
   }
 }
 

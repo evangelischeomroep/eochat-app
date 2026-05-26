@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/models/user.dart';
 import '../../../core/network/image_header_utils.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/config/fork_overrides.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/navigation_service.dart';
@@ -243,26 +244,27 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
             ),
           ],
         ),
-        NativeSheetSectionConfig(
-          title: l10n.supportConduit,
-          footer: l10n.supportConduitSubtitle,
-          items: [
-            NativeSheetItemConfig(
-              id: 'buy-me-a-coffee',
-              title: l10n.buyMeACoffeeTitle,
-              subtitle: 'buymeacoffee.com/cogwheel0',
-              sfSymbol: 'gift',
-              url: 'https://www.buymeacoffee.com/cogwheel0',
-            ),
-            NativeSheetItemConfig(
-              id: 'github-sponsors',
-              title: l10n.githubSponsorsTitle,
-              subtitle: 'github.com/sponsors/cogwheel0',
-              sfSymbol: 'heart',
-              url: 'https://github.com/sponsors/cogwheel0',
-            ),
-          ],
-        ),
+        if (ForkOverrides.showDonationLinks)
+          NativeSheetSectionConfig(
+            title: l10n.supportConduit,
+            footer: l10n.supportConduitSubtitle,
+            items: [
+              NativeSheetItemConfig(
+                id: 'buy-me-a-coffee',
+                title: l10n.buyMeACoffeeTitle,
+                subtitle: 'buymeacoffee.com/cogwheel0',
+                sfSymbol: 'gift',
+                url: 'https://www.buymeacoffee.com/cogwheel0',
+              ),
+              NativeSheetItemConfig(
+                id: 'github-sponsors',
+                title: l10n.githubSponsorsTitle,
+                subtitle: 'github.com/sponsors/cogwheel0',
+                sfSymbol: 'heart',
+                url: 'https://github.com/sponsors/cogwheel0',
+              ),
+            ],
+          ),
         NativeSheetSectionConfig(
           items: [
             NativeSheetItemConfig(

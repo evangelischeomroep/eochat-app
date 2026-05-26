@@ -98,14 +98,14 @@ class AppColorTokens extends ThemeExtension<AppColorTokens> {
 
   factory AppColorTokens.light({TweakcnThemeDefinition? theme}) {
     return AppColorTokens._fromTheme(
-      theme ?? TweakcnThemes.conduit,
+      theme ?? TweakcnThemes.eochat,
       Brightness.light,
     );
   }
 
   factory AppColorTokens.dark({TweakcnThemeDefinition? theme}) {
     return AppColorTokens._fromTheme(
-      theme ?? TweakcnThemes.conduit,
+      theme ?? TweakcnThemes.eochat,
       Brightness.dark,
     );
   }

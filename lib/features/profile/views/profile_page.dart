@@ -23,6 +23,7 @@ import '../../../core/utils/user_avatar_utils.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../widgets/profile_setting_tile.dart';
 import '../widgets/profile_text_styles.dart';
+import '../../../core/config/fork_overrides.dart';
 
 /// Profile page (You tab) showing user info and main actions
 /// Enhanced with production-grade design tokens for better cohesion
@@ -104,8 +105,10 @@ class ProfilePage extends ConsumerWidget {
         _buildProfileHeader(context, userData, api),
         const SizedBox(height: Spacing.xl),
         _buildAccountSection(context, ref),
-        const SizedBox(height: Spacing.xl),
-        _buildSupportSection(context),
+        if (ForkOverrides.showDonationLinks) ...[
+          const SizedBox(height: Spacing.xl),
+          _buildSupportSection(context),
+        ],
       ],
     );
   }

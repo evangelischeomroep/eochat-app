@@ -39,6 +39,31 @@ class ForkOverrides {
     defaultValue: 'microsoft',
   );
 
+  /// When false, the upstream "Support Conduit" donation tiles are hidden
+  /// (profile page + sidebar native sheet). Off by default for EOchat builds.
+  static const bool showDonationLinks = bool.fromEnvironment(
+    'SHOW_DONATION_LINKS',
+    defaultValue: false,
+  );
+
+  /// Brand name shown in accessibility labels and a handful of UI strings.
+  /// Empty means "use the upstream default".
+  static const String _brandName = String.fromEnvironment(
+    'BRAND_NAME',
+    defaultValue: 'EOchat',
+  );
+
+  static const String _brandDescription = String.fromEnvironment(
+    'BRAND_DESCRIPTION',
+    defaultValue: 'Beveiligd en afgeschermde AI',
+  );
+
+  static String? get brandNameOverride =>
+      _brandName.isEmpty ? null : _brandName;
+
+  static String? get brandDescriptionOverride =>
+      _brandDescription.isEmpty ? null : _brandDescription;
+
   static String get defaultServerId => 'nl.eo.eochat.default_server';
 
   static bool get hasPreconfiguredServer =>
