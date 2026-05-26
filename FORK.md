@@ -42,9 +42,33 @@ smell and ask whether the upstream design has an extension point we missed.
 | iOS post-install hooks | `ios/Podfile` `post_install` blocks | Tagged `[EOchat] …` in the build phase name |
 | App icons, screenshots | `ios/Runner/Assets.xcassets/AppIcon*`, `android/.../mipmap-*`, `assets/icons` | Asset replacement only — no upstream code edits |
 | Localised brand strings | Per-locale `lib/l10n/app_*.arb` | New `themePaletteEochat*` keys; upstream `*Conduit*` keys stay vanilla |
+| Android native side | `android/app/src/main/kotlin/app/cogwheel/conduit/*.kt` | Sources stay on upstream's directory path; only the `package` declaration changes (see below) |
 
-When in doubt, grep for `ForkOverrides` and `EOCHAT_` — those two prefixes
-should cover most fork-aware code in the project.
+When in doubt, grep for `ForkOverrides`, `EOCHAT_`, and `nl.eo.eochat` —
+those three prefixes should cover most fork-aware code in the project.
+
+### Files that intentionally touch upstream code
+
+These are the *only* upstream files we knowingly edit inline today. If you
+add a new fork behaviour, see whether it can avoid extending this list:
+
+- `lib/core/router/app_router.dart` — fork branch when a server is preconfigured.
+- `lib/core/providers/app_startup_providers.dart` — bootstraps the default
+  server config when the manual setup screen is not skipped.
+- `lib/features/auth/views/server_connection_page.dart` — pre-populates the
+  URL field with the preconfigured server.
+- `lib/features/auth/views/authentication_page.dart` — auto-opens the
+  preferred SSO provider when `forceSsoOnly` is set.
+- `lib/features/profile/views/profile_page.dart` and
+  `lib/features/navigation/widgets/sidebar_user_pill.dart` — donation gate.
+- `lib/shared/services/brand_service.dart` — brand name/description fallback.
+- `lib/shared/theme/color_tokens.dart` — default palette fallback.
+- `lib/shared/theme/tweakcn_themes.dart` — registers `eochat` palette, alias
+  map for legacy `'conduit'` ids.
+- `lib/core/auth/native_cookie_manager.dart` — method-channel name.
+
+Every other fork behaviour should live in a fork-owned file (anything under
+`lib/core/config/`, `lib/shared/theme/eochat_palette.dart`).
 
 ---
 
@@ -97,6 +121,34 @@ To add a *third* fork palette later, mirror that pattern: new file, one
 entry in the registry, done.
 
 ---
+
+## Android: package decoupled from directory
+
+The Kotlin sources still live at `android/app/src/main/kotlin/app/cogwheel/conduit/`
+— the upstream directory path — but each file declares `package nl.eo.eochat`.
+
+This is intentional. Renaming the directory to match the package would make
+every upstream commit that touches those Kotlin files conflict on a path
+that no longer exists. Decoupling the path from the package lets Kotlin
+resolve `nl.eo.eochat.R`, `nl.eo.eochat.MainActivity` etc. correctly while
+keeping the source tree byte-identical to upstream for diff purposes.
+
+Native identifiers must be kept in sync across the Kotlin/Dart boundary:
+
+- **Method channels** — `nl.eo.eochat/cookies`, `nl.eo.eochat/assistant`.
+  Referenced from both `lib/core/auth/native_cookie_manager.dart` and
+  `MainActivity.kt`. Rename one, rename both.
+- **Broadcast actions** — `nl.eo.eochat.TIME_LIMIT_APPROACHING`,
+  `nl.eo.eochat.FOREGROUND_SERVICE_FAILED`, etc. Declared in Kotlin and
+  matched by intent filters.
+- **Resource references** — `nl.eo.eochat.R.layout.assistant_overlay`
+  (lookup paths in Kotlin). The R class is generated under the package,
+  not the directory.
+
+If you ever do rename the directory (e.g., upstream stops touching those
+files for a few releases), update `MainActivity.kt` package, the directory,
+the `applicationId` in `android/app/build.gradle.kts`, and the
+`AndroidManifest.xml` `android:name` attributes together.
 
 ## iOS bundle config: xcconfig is the source of truth
 
@@ -175,7 +227,10 @@ git merge vX.Y.Z          # always merge a tagged release, not a branch
 flutter pub get
 flutter gen-l10n
 flutter analyze
-# verify iOS still builds — xcconfig changes don't show up in `flutter analyze`
+# Walk every `ForkOverrides.X` call site — verify the override still applies
+# after upstream's restructure (this is what the 09aed909 "update custom
+# fork overrides accordingly" commit was about).
+# Verify iOS still builds — xcconfig changes don't show up in `flutter analyze`.
 ```
 
 **Conflicts you should expect:**
@@ -194,11 +249,32 @@ drifted from the conventions in this file):
 - `lib/shared/theme/tweakcn_themes.dart` — should be near-vanilla.
 - `lib/shared/services/brand_service.dart` — only the two `?? 'Conduit'`
   fallbacks should differ.
-- Any `lib/features/**` file — feature code should be wrapped via
-  `ForkOverrides`, not edited inline.
+- `lib/features/**` files outside the short list above — feature code
+  should be wrapped via `ForkOverrides`, not edited inline.
 
 If you find yourself editing upstream code directly to add a fork
 behaviour, stop and add a `ForkOverrides` flag instead.
+
+### Lessons baked in from past merges
+
+These are non-obvious things that have bitten us before — worth a quick
+sanity check on every merge:
+
+- After every upstream merge, walk every `ForkOverrides.X` call site and
+  confirm the override still has the effect you expect. Upstream
+  refactors routinely move the code our `if (ForkOverrides...)` wraps,
+  and the `if` can silently become a no-op if the surrounding control
+  flow changes shape. (Commit `09aed909`'s entire job was this kind of
+  re-verification after the v3.1.0 merge.)
+- Profile-config builds on iOS use Debug-flavour `APP_GROUP_ID` and
+  `APP_URL_SCHEME` together with Release-flavour bundle IDs. This is
+  upstream's own convention, but the asymmetry is easy to mess up when
+  resolving pbxproj conflicts. The xcconfig variables encode this
+  asymmetry — keep using them rather than reverting to literals.
+- `ios/Podfile.lock` is generated; never hand-resolve it. Take upstream's
+  version and rerun `pod install` (CocoaPods regenerates the lock from
+  our Podfile, which still contains the EOchat dSYM-tagged `post_install`
+  block).
 
 ---
 
@@ -215,3 +291,9 @@ behaviour, stop and add a `ForkOverrides` flag instead.
   English and Dutch are owned by the EO team. Other locales are
   best-effort and should be reviewed by native speakers if EOchat ever
   ships in those markets.
+- A few `Info.plist` strings still inline the brand name
+  (`CFBundleDisplayName`, `CFBundleName`, `NS*UsageDescription`). The
+  display-name keys are overridden at build time by `INFOPLIST_KEY_*`
+  build settings, but the permission strings are read directly. Moving
+  permission descriptions into `InfoPlist.strings` per locale would
+  close the last fork delta in `Info.plist`.
