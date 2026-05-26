@@ -5,14 +5,15 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_page_route.dart';
+import '../../../shared/widgets/jovial_svg_image.dart';
+import '../../../shared/widgets/skeleton_loader.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../shared/widgets/adaptive_route_shell.dart';
@@ -821,6 +822,68 @@ class _EnhancedImageAttachmentState
     return imageWidget;
   }
 
+  Widget _buildSkeletonPlaceholder({
+    BoxConstraints? constraints,
+    bool showProgressIndicator = false,
+    bool includeMarkdownMargin = false,
+  }) {
+    final theme = context.conduitTheme;
+    final borderRadius = BorderRadius.circular(AppBorderRadius.md);
+
+    return Container(
+      constraints: constraints,
+      margin: includeMarkdownMargin && widget.isMarkdownFormat
+          ? const EdgeInsets.symmetric(vertical: Spacing.sm)
+          : EdgeInsets.zero,
+      decoration: BoxDecoration(
+        color: theme.surfaceBackground.withValues(alpha: 0.28),
+        borderRadius: borderRadius,
+        border: Border.all(
+          color: theme.dividerColor.withValues(alpha: 0.2),
+          width: BorderWidth.thin,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: Stack(
+          fit: StackFit.expand,
+          alignment: Alignment.center,
+          children: [
+            SkeletonLoader(
+              borderRadius: borderRadius,
+              baseColor: theme.shimmerBase.withValues(
+                alpha: widget.isUserMessage ? 0.92 : 0.8,
+              ),
+              highlightColor: theme.shimmerHighlight.withValues(
+                alpha: widget.isUserMessage ? 1.0 : 0.9,
+              ),
+            ),
+            if (showProgressIndicator)
+              Center(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.surfaceContainer.withValues(alpha: 0.75),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(Spacing.sm),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: theme.buttonPrimary,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLoadingState() {
     final constraints =
         widget.constraints ??
@@ -831,49 +894,12 @@ class _EnhancedImageAttachmentState
           minWidth: 200,
         );
 
-    return Container(
+    return KeyedSubtree(
       key: const ValueKey('loading'),
-      constraints: constraints,
-      margin: const EdgeInsets.only(bottom: Spacing.xs),
-      decoration: BoxDecoration(
-        color: context.conduitTheme.surfaceBackground.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(AppBorderRadius.md),
-        border: Border.all(
-          color: context.conduitTheme.dividerColor.withValues(alpha: 0.3),
-          width: BorderWidth.thin,
-        ),
-      ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Shimmer effect placeholder
-          Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppBorderRadius.md),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      context.conduitTheme.shimmerBase,
-                      context.conduitTheme.shimmerHighlight,
-                      context.conduitTheme.shimmerBase,
-                    ],
-                  ),
-                ),
-              )
-              .animate(onPlay: (controller) => controller.repeat())
-              .shimmer(
-                duration: const Duration(milliseconds: 1500),
-                color: context.conduitTheme.shimmerHighlight.withValues(
-                  alpha: 0.3,
-                ),
-              ),
-          // Progress indicator overlay
-          CircularProgressIndicator(
-            color: context.conduitTheme.buttonPrimary,
-            strokeWidth: 2,
-          ),
-        ],
+      child: _buildSkeletonPlaceholder(
+        constraints: constraints,
+        showProgressIndicator: true,
+        includeMarkdownMargin: true,
       ),
     );
   }
@@ -947,14 +973,8 @@ class _EnhancedImageAttachmentState
       fadeOutDuration: widget.disableAnimation
           ? Duration.zero
           : const Duration(milliseconds: 200),
-      placeholder: (context, url) => Container(
-        constraints: widget.constraints,
-        decoration: BoxDecoration(
-          color: context.conduitTheme.shimmerBase,
-          borderRadius: BorderRadius.circular(AppBorderRadius.md),
-        ),
-      ),
-      errorWidget: (context, url, error) {
+      placeholder: (context, url) => _buildSkeletonPlaceholder(),
+      errorBuilder: (context, error, stackTrace) {
         _errorMessage = error.toString();
         return _buildErrorState();
       },
@@ -968,24 +988,12 @@ class _EnhancedImageAttachmentState
     final defaultHeaders = buildImageHeadersFromWidgetRef(ref);
     final headers = _mergeHeaders(defaultHeaders, widget.httpHeaders);
 
-    final svgWidget = SvgPicture.network(
+    final svgWidget = JovialSvgImage.network(
       _cachedImageData!,
       key: ValueKey('svg_${widget.attachmentId}'),
       fit: BoxFit.contain,
       headers: headers,
-      placeholderBuilder: (context) => Container(
-        constraints: widget.constraints,
-        decoration: BoxDecoration(
-          color: context.conduitTheme.shimmerBase,
-          borderRadius: BorderRadius.circular(AppBorderRadius.md),
-        ),
-        child: Center(
-          child: CircularProgressIndicator(
-            color: context.conduitTheme.buttonPrimary,
-            strokeWidth: 2,
-          ),
-        ),
-      ),
+      placeholderBuilder: (context) => _buildSkeletonPlaceholder(),
       errorBuilder: (context, error, stackTrace) {
         _errorMessage = AppLocalizations.of(
           context,
@@ -1026,7 +1034,7 @@ class _EnhancedImageAttachmentState
       return _buildLoadingState();
     }
 
-    final svgWidget = SvgPicture.memory(
+    final svgWidget = JovialSvgImage.bytes(
       bytes,
       key: ValueKey('svg_${widget.attachmentId}'),
       fit: BoxFit.contain,
@@ -1147,7 +1155,7 @@ class FullScreenImageViewer extends ConsumerWidget {
     // If we have raw bytes, use them directly
     if (imageData == null && imageBytes != null) {
       if (isSvg || _isSvgBytes(imageBytes!)) {
-        imageWidget = SvgPicture.memory(
+        imageWidget = JovialSvgImage.bytes(
           imageBytes!,
           fit: BoxFit.contain,
           errorBuilder: (context, error, stackTrace) => Center(
@@ -1167,7 +1175,7 @@ class FullScreenImageViewer extends ConsumerWidget {
       final headers = _mergeHeaders(defaultHeaders, customHeaders);
 
       if (isSvg || _isSvgUrl(imageData!)) {
-        imageWidget = SvgPicture.network(
+        imageWidget = JovialSvgImage.network(
           imageData!,
           fit: BoxFit.contain,
           headers: headers,
@@ -1196,7 +1204,7 @@ class FullScreenImageViewer extends ConsumerWidget {
               color: context.conduitTheme.buttonPrimary,
             ),
           ),
-          errorWidget: (context, url, error) => Center(
+          errorBuilder: (context, error, stackTrace) => Center(
             child: Icon(
               Icons.error_outline,
               color: context.conduitTheme.error,
@@ -1221,7 +1229,7 @@ class FullScreenImageViewer extends ConsumerWidget {
 
         // Check if SVG content
         if (isSvg || _isSvgDataUrl(imageData!) || _isSvgBytes(decodedBytes)) {
-          imageWidget = SvgPicture.memory(
+          imageWidget = JovialSvgImage.bytes(
             decodedBytes,
             fit: BoxFit.contain,
             errorBuilder: (context, error, stackTrace) => Center(

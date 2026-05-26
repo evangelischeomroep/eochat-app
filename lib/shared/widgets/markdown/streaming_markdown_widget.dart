@@ -3,17 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/chat_message.dart';
-import '../../../core/services/worker_manager.dart';
+import 'compiled_markdown_document.dart';
 import 'markdown_config.dart';
-import 'markdown_preprocessor.dart';
+import 'markdown_compile_service.dart';
+import 'markdown_document_controller.dart';
+import 'markdown_loading_skeleton.dart';
 import 'renderer/block_renderer.dart';
 import 'renderer/conduit_markdown_widget.dart';
-
-const int _streamingSnapshotWorkerThreshold = 768;
-
-Map<String, Object> _computeStreamingMarkdownSnapshot(String content) {
-  return _buildMarkdownSnapshot(content, streaming: true).toMap();
-}
 
 @visibleForTesting
 Map<String, Object> buildStreamingMarkdownSnapshotForTesting(
@@ -27,33 +23,9 @@ _MarkdownRenderSnapshot _buildMarkdownSnapshot(
   String content, {
   required bool streaming,
 }) {
-  final normalized = ConduitMarkdownPreprocessor.normalize(content);
-  final prepared = streaming
-      ? _stripTrailingIncompleteToolCallDetails(normalized)
-      : normalized;
-  return _MarkdownRenderSnapshot.full(prepared);
-}
-
-String _stripTrailingIncompleteToolCallDetails(String input) {
-  if (input.isEmpty || !input.contains('<details')) {
-    return input;
-  }
-
-  final matches = RegExp(
-    r'<details\b[^>]*type="tool_calls"[^>]*>',
-    caseSensitive: false,
-  ).allMatches(input).toList(growable: false);
-  if (matches.isEmpty) {
-    return input;
-  }
-
-  final lastOpen = matches.last;
-  final trailing = input.substring(lastOpen.start).toLowerCase();
-  if (trailing.contains('</details>')) {
-    return input;
-  }
-
-  return input.substring(0, lastOpen.start).trimRight();
+  return _MarkdownRenderSnapshot.full(
+    prepareMarkdownContent(content, streaming: streaming),
+  );
 }
 
 class _MarkdownRenderSnapshot {
@@ -66,12 +38,6 @@ class _MarkdownRenderSnapshot {
   final String normalizedContent;
 
   Map<String, Object> toMap() => {'normalizedContent': normalizedContent};
-
-  factory _MarkdownRenderSnapshot.fromMap(Map<String, Object?> map) {
-    return _MarkdownRenderSnapshot(
-      normalizedContent: (map['normalizedContent'] ?? '') as String,
-    );
-  }
 
   @override
   bool operator ==(Object other) {
@@ -95,6 +61,9 @@ class StreamingMarkdownWidget extends ConsumerStatefulWidget {
     this.stateScopeId,
     this.debugTreatAsWidgetTest,
     this.debugRenderInterval,
+    this.debugOnCompiledViewMounted,
+    this.debugOnCompiledViewDisposed,
+    this.debugOnStreamingRefreshFrame,
   });
 
   final String content;
@@ -119,33 +88,75 @@ class StreamingMarkdownWidget extends ConsumerStatefulWidget {
   @visibleForTesting
   final Duration? debugRenderInterval;
 
+  @visibleForTesting
+  final VoidCallback? debugOnCompiledViewMounted;
+
+  @visibleForTesting
+  final VoidCallback? debugOnCompiledViewDisposed;
+
+  @visibleForTesting
+  final VoidCallback? debugOnStreamingRefreshFrame;
+
   @override
   ConsumerState<StreamingMarkdownWidget> createState() =>
       _StreamingMarkdownWidgetState();
 }
 
 class _StreamingMarkdownWidgetState
-    extends ConsumerState<StreamingMarkdownWidget> {
-  static const _streamingRenderInterval = Duration(milliseconds: 120);
-
+    extends ConsumerState<StreamingMarkdownWidget>
+    with WidgetsBindingObserver {
+  late final MarkdownDocumentController _documentController;
+  final GlobalKey _markdownContentKey = GlobalKey();
   _MarkdownRenderSnapshot _snapshot = const _MarkdownRenderSnapshot.empty();
-  Timer? _renderTimer;
+  bool _preserveStaleCompiledDocumentUntilFreshFinal = false;
+  Timer? _debugStreamingDelayTimer;
   bool _snapshotInFlight = false;
-  String? _queuedContent;
+  bool _streamingRefreshFrameScheduled = false;
+  String? _pendingStreamingContent;
   int _snapshotGeneration = 0;
+  bool _isAppForeground = true;
+  bool _isRouteVisible = true;
+
+  CompiledMarkdownDocument? get _compiledDocument =>
+      _documentController.compiledDocument;
+
+  String get _compiledPreparedContent =>
+      _documentController.compiledPreparedContent;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _isAppForeground = _isLifecycleForeground(
+      WidgetsBinding.instance.lifecycleState,
+    );
+    _documentController = MarkdownDocumentController(
+      readCompiler: () => ref.read(markdownCompileServiceProvider),
+      isWidgetTest: () => _isWidgetTest,
+      onStateChanged: _applyCompiledDocumentState,
+    );
     _snapshot = _buildMarkdownSnapshot(
       widget.content,
       streaming: widget.isStreaming,
     );
+    _resolveCompiledDocument(_snapshot);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateRouteVisibility();
   }
 
   @override
   void didUpdateWidget(covariant StreamingMarkdownWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.isStreaming && !widget.isStreaming) {
+      _preserveStaleCompiledDocumentUntilFreshFinal = true;
+    } else if (widget.isStreaming ||
+        widget.stateScopeId != oldWidget.stateScopeId) {
+      _preserveStaleCompiledDocumentUntilFreshFinal = false;
+    }
     if (!identical(widget.sources, oldWidget.sources) ||
         widget.onSourceTap != oldWidget.onSourceTap ||
         widget.onTapLink != oldWidget.onTapLink ||
@@ -160,22 +171,31 @@ class _StreamingMarkdownWidgetState
 
     if (!widget.isStreaming) {
       _invalidatePendingAsyncSnapshot();
-      _applySnapshot(_buildMarkdownSnapshot(widget.content, streaming: false));
+      _applyPreparedSnapshotIfNeeded(
+        prepareMarkdownContent(widget.content, streaming: false),
+      );
       return;
     }
 
-    if (_isWidgetTest ||
-        widget.content.length < _streamingSnapshotWorkerThreshold) {
+    final compiler = ref.read(markdownCompileServiceProvider);
+    if (_canActivelyRefreshStreamingMarkdown &&
+        compiler.shouldPrepareSynchronously(
+          widget.content,
+          widgetTest: _isWidgetTest,
+        )) {
+      final preparedContent = prepareMarkdownContent(
+        widget.content,
+        streaming: true,
+      );
+      if (_needsPreparedSnapshotUpdate(preparedContent)) {
+        widget.debugOnStreamingRefreshFrame?.call();
+      }
       _invalidatePendingAsyncSnapshot();
-      _applySnapshot(_buildMarkdownSnapshot(widget.content, streaming: true));
+      _applyPreparedSnapshotIfNeeded(preparedContent);
       return;
     }
 
-    if (_snapshotInFlight) {
-      _queueLatestStreamingContent(widget.content);
-      return;
-    }
-
+    _markPendingStreamingContent(widget.content);
     _scheduleStreamingRefresh();
   }
 
@@ -185,84 +205,152 @@ class _StreamingMarkdownWidgetState
 
   @override
   void dispose() {
-    _renderTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _debugStreamingDelayTimer?.cancel();
+    _documentController.dispose();
     super.dispose();
   }
 
-  void _scheduleStreamingRefresh({bool immediate = false}) {
-    if (_renderTimer != null) {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final nextIsForeground = _isLifecycleForeground(state);
+    if (_isAppForeground == nextIsForeground) {
       return;
     }
-    final interval = immediate || _isWidgetTest
-        ? Duration.zero
-        : widget.debugRenderInterval ?? _streamingRenderInterval;
-    _renderTimer = Timer(interval, () {
-      _renderTimer = null;
-      if (!mounted) {
-        return;
-      }
-      unawaited(_refreshStreamingSnapshot(widget.content));
-    });
+    _isAppForeground = nextIsForeground;
+    _handleStreamingRefreshVisibilityChanged();
+  }
+
+  void _scheduleStreamingRefresh() {
+    if (!widget.isStreaming || !_canActivelyRefreshStreamingMarkdown) {
+      _debugStreamingDelayTimer?.cancel();
+      _debugStreamingDelayTimer = null;
+      return;
+    }
+    if (_streamingRefreshFrameScheduled || _debugStreamingDelayTimer != null) {
+      return;
+    }
+    final interval = _isWidgetTest ? Duration.zero : widget.debugRenderInterval;
+    if (interval != null && interval > Duration.zero) {
+      _debugStreamingDelayTimer = Timer(
+        interval,
+        _scheduleStreamingRefreshFrame,
+      );
+      return;
+    }
+    _scheduleStreamingRefreshFrame();
   }
 
   void _invalidatePendingAsyncSnapshot() {
-    _renderTimer?.cancel();
-    _renderTimer = null;
-    _queuedContent = null;
+    _debugStreamingDelayTimer?.cancel();
+    _debugStreamingDelayTimer = null;
+    _pendingStreamingContent = null;
+    _snapshotGeneration += 1;
+    _documentController.invalidatePending();
+  }
+
+  void _markPendingStreamingContent(String content) {
+    if (_pendingStreamingContent == content) {
+      return;
+    }
+    _pendingStreamingContent = content;
     _snapshotGeneration += 1;
   }
 
-  void _queueLatestStreamingContent(String content) {
-    if (_queuedContent == content) {
+  void _scheduleStreamingRefreshFrame() {
+    _debugStreamingDelayTimer?.cancel();
+    _debugStreamingDelayTimer = null;
+    if (!widget.isStreaming ||
+        !_canActivelyRefreshStreamingMarkdown ||
+        _streamingRefreshFrameScheduled ||
+        _snapshotInFlight) {
       return;
     }
-    _queuedContent = content;
-    _snapshotGeneration += 1;
+    _streamingRefreshFrameScheduled = true;
+    WidgetsBinding.instance.scheduleFrame();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _streamingRefreshFrameScheduled = false;
+      if (!mounted ||
+          !widget.isStreaming ||
+          !_canActivelyRefreshStreamingMarkdown) {
+        return;
+      }
+      final pendingContent = _pendingStreamingContent;
+      if (pendingContent == null) {
+        return;
+      }
+      if (_snapshotInFlight) {
+        return;
+      }
+      widget.debugOnStreamingRefreshFrame?.call();
+      _pendingStreamingContent = null;
+      unawaited(_refreshStreamingSnapshot(pendingContent));
+    });
   }
 
   Future<void> _refreshStreamingSnapshot(String content) async {
     if (_snapshotInFlight) {
-      _queueLatestStreamingContent(content);
+      _markPendingStreamingContent(content);
       return;
     }
 
     _snapshotInFlight = true;
-    final generation = ++_snapshotGeneration;
+    final generation = _snapshotGeneration;
     try {
-      final worker = ref.read(workerManagerProvider);
-      final rawSnapshot = await worker.schedule<String, Map<String, Object>>(
-        _computeStreamingMarkdownSnapshot,
+      final compiler = ref.read(markdownCompileServiceProvider);
+      if (compiler.shouldPrepareSynchronously(
         content,
-        debugLabel: 'markdown_stream_snapshot',
+        widgetTest: _isWidgetTest,
+      )) {
+        final synchronousPrepared = prepareMarkdownContent(
+          content,
+          streaming: true,
+        );
+        _applyPreparedSnapshotIfNeeded(synchronousPrepared);
+        return;
+      }
+      final preparedContent = await compiler.prepareContent(
+        content,
+        streaming: true,
       );
       if (!mounted || generation != _snapshotGeneration) {
         return;
       }
-      _applySnapshot(_MarkdownRenderSnapshot.fromMap(rawSnapshot));
+      _applyPreparedSnapshotIfNeeded(preparedContent);
     } catch (_) {
       if (!mounted || generation != _snapshotGeneration) {
         return;
       }
-      _applySnapshot(_buildMarkdownSnapshot(content, streaming: true));
+      _applyPreparedSnapshotIfNeeded(
+        prepareMarkdownContent(content, streaming: true),
+      );
     } finally {
       _snapshotInFlight = false;
-      final queuedContent = _queuedContent;
-      _queuedContent = null;
-      if (queuedContent != null && queuedContent != content && mounted) {
-        _scheduleStreamingRefresh(immediate: true);
+      if (_pendingStreamingContent != null &&
+          (generation != _snapshotGeneration ||
+              _pendingStreamingContent != content) &&
+          mounted) {
+        _scheduleStreamingRefresh();
       }
     }
   }
 
   void _applySnapshot(_MarkdownRenderSnapshot nextSnapshot) {
-    if (_snapshot == nextSnapshot) {
+    final changed = _snapshot != nextSnapshot;
+    if (!changed) {
+      if (_compiledDocument == null ||
+          _compiledPreparedContent != nextSnapshot.normalizedContent) {
+        _resolveCompiledDocument(nextSnapshot);
+      }
       return;
     }
     if (!mounted) {
       _snapshot = nextSnapshot;
+      _resolveCompiledDocument(nextSnapshot);
       return;
     }
     setState(() => _snapshot = nextSnapshot);
+    _resolveCompiledDocument(nextSnapshot);
   }
 
   /// Adapts the legacy [imageBuilderOverride] callback
@@ -280,14 +368,37 @@ class _StreamingMarkdownWidgetState
 
   @override
   Widget build(BuildContext context) {
-    final snapshot = widget.isStreaming
-        ? _snapshot
-        : _buildMarkdownSnapshot(widget.content, streaming: false);
+    final snapshot = _snapshot;
     if (snapshot.normalizedContent.trim().isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final result = _buildMarkdownWithCitations(snapshot.normalizedContent);
+    final compiledDocument = _compiledDocument;
+    final hasFreshCompiledDocument =
+        compiledDocument != null &&
+        _compiledPreparedContent == snapshot.normalizedContent;
+    if (_shouldShowLoadingSkeleton(
+      snapshot: snapshot,
+      compiledDocument: compiledDocument,
+      hasFreshCompiledDocument: hasFreshCompiledDocument,
+    )) {
+      return MarkdownLoadingSkeleton(
+        contentLength: snapshot.normalizedContent.length,
+      );
+    }
+    if (compiledDocument == null) {
+      return const SizedBox.shrink();
+    }
+    if (!widget.isStreaming &&
+        !hasFreshCompiledDocument &&
+        !_preserveStaleCompiledDocumentUntilFreshFinal) {
+      return const SizedBox.shrink();
+    }
+
+    final result = KeyedSubtree(
+      key: _markdownContentKey,
+      child: _buildMarkdownWithCitations(compiledDocument),
+    );
 
     // Only wrap in SelectionArea when not streaming to
     // avoid concurrent modification errors in Flutter's
@@ -303,15 +414,116 @@ class _StreamingMarkdownWidgetState
   ///
   /// Citations like [1], [2] are rendered as clickable
   /// badges inline with the text.
-  Widget _buildMarkdownWithCitations(String data) {
+  Widget _buildMarkdownWithCitations(CompiledMarkdownDocument document) {
     return ConduitMarkdownWidget(
-      data: data,
+      compiledDocument: document,
       onLinkTap: widget.onTapLink,
       imageBuilder: _adaptImageBuilder(),
       sources: widget.sources,
       onSourceTap: widget.onSourceTap,
       stateScopeId: widget.stateScopeId,
+      heavyBlockPolicy: widget.isStreaming
+          ? MarkdownHeavyBlockPolicy.defer
+          : MarkdownHeavyBlockPolicy.eager,
+      debugOnCompiledViewMounted: widget.debugOnCompiledViewMounted,
+      debugOnCompiledViewDisposed: widget.debugOnCompiledViewDisposed,
     );
+  }
+
+  void _resolveCompiledDocument(_MarkdownRenderSnapshot snapshot) {
+    if (widget.isStreaming) {
+      _documentController.resolveStreamingPrepared(snapshot.normalizedContent);
+      return;
+    }
+    _documentController.resolvePrepared(snapshot.normalizedContent);
+  }
+
+  bool _needsPreparedSnapshotUpdate(String preparedContent) {
+    if (preparedContent != _snapshot.normalizedContent) {
+      return true;
+    }
+    return _compiledDocument == null ||
+        _compiledPreparedContent != preparedContent;
+  }
+
+  void _applyPreparedSnapshotIfNeeded(String preparedContent) {
+    if (!_needsPreparedSnapshotUpdate(preparedContent)) {
+      return;
+    }
+    _applySnapshot(_MarkdownRenderSnapshot.full(preparedContent));
+  }
+
+  bool get _canActivelyRefreshStreamingMarkdown =>
+      _isAppForeground && _isRouteVisible;
+
+  bool _isLifecycleForeground(AppLifecycleState? state) =>
+      state == null ||
+      state == AppLifecycleState.resumed ||
+      state == AppLifecycleState.inactive;
+
+  bool _computeRouteVisibility() {
+    return TickerMode.valuesOf(context).enabled &&
+        (ModalRoute.isCurrentOf(context) ?? true);
+  }
+
+  void _updateRouteVisibility() {
+    final nextIsRouteVisible = _computeRouteVisibility();
+    if (_isRouteVisible == nextIsRouteVisible) {
+      return;
+    }
+    _isRouteVisible = nextIsRouteVisible;
+    _handleStreamingRefreshVisibilityChanged();
+  }
+
+  void _handleStreamingRefreshVisibilityChanged() {
+    if (!widget.isStreaming) {
+      return;
+    }
+    if (!_canActivelyRefreshStreamingMarkdown) {
+      _debugStreamingDelayTimer?.cancel();
+      _debugStreamingDelayTimer = null;
+      return;
+    }
+    if (_pendingStreamingContent != null) {
+      _scheduleStreamingRefresh();
+    }
+  }
+
+  bool _shouldShowLoadingSkeleton({
+    required _MarkdownRenderSnapshot snapshot,
+    required CompiledMarkdownDocument? compiledDocument,
+    required bool hasFreshCompiledDocument,
+  }) {
+    if (widget.isStreaming || snapshot.normalizedContent.trim().isEmpty) {
+      return false;
+    }
+    if (hasFreshCompiledDocument) {
+      return false;
+    }
+    if (_preserveStaleCompiledDocumentUntilFreshFinal &&
+        compiledDocument != null) {
+      return false;
+    }
+    return true;
+  }
+
+  void _applyCompiledDocumentState(
+    String compiledPreparedContent,
+    CompiledMarkdownDocument? document,
+  ) {
+    final hasFreshCompiledDocument =
+        compiledPreparedContent == _snapshot.normalizedContent;
+    if (!mounted) {
+      if (hasFreshCompiledDocument) {
+        _preserveStaleCompiledDocumentUntilFreshFinal = false;
+      }
+      return;
+    }
+    setState(() {
+      if (hasFreshCompiledDocument) {
+        _preserveStaleCompiledDocumentUntilFreshFinal = false;
+      }
+    });
   }
 }
 

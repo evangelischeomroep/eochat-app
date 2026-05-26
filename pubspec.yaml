@@ -1,7 +1,7 @@
 name: conduit
 description: Open-source mobile client for Open-WebUI
-version: 3.1.0+116
-publish_to: "none"
+version: 3.1.3+123
+publish_to: 'none'
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -32,7 +32,6 @@ dependencies:
   shared_preferences: ^2.3.2
 
   # UI Components - Markdown Rendering
-  cached_network_image: ^3.3.1
   markdown: ^7.3.0
   webview_flutter_plus: ^0.4.20
   socket_io_client: ^3.1.2
@@ -75,7 +74,6 @@ dependencies:
   http: ^1.5.0
   flutter_callkit_incoming: ^3.0.0
   quick_actions: 1.1.0
-  flutter_svg: ^2.2.3
   html_unescape: ^2.0.0
   home_widget: ^0.9.1
   flutter_highlight: ^0.7.0
@@ -85,7 +83,10 @@ dependencies:
   gaimon: ^1.4.2
   xterm: ^4.0.0
   web_socket_channel: ^3.0.3
-
+  cached_network_image_ce: ^4.6.4
+  jovial_svg: ^1.1.29
+  highlight: ^0.7.0
+  geolocator: ^14.0.2
 
 dev_dependencies:
   flutter_test:

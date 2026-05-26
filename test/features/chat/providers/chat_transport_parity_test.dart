@@ -267,13 +267,13 @@ ActiveChatStream _attach({
     replaceLastMessageContent: log.replaceLastMessageContent,
     updateLastMessageWith: log.updateLastMessageWith,
     appendStatusUpdate: (_, _) {},
-    setFollowUps: (_, _) {},
     upsertCodeExecution: (_, _) {},
     appendSourceReference: (_, _) {},
     updateMessageById: log.updateMessageById,
     completeStreamingUi: log.completeStreamingUi,
     finishStreaming: log.finishStreaming,
     getMessages: log.getMessages,
+    getVisibleStreamingContent: () => null,
     flushStreamingBuffer: log.flushStreamingBuffer,
   );
 }

@@ -31,6 +31,7 @@ import '../../../core/models/toggle_filter.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../core/services/native_sheet_bridge.dart';
+import '../../../core/services/location_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../chat/services/voice_input_service.dart';
 import '../../../core/models/knowledge_base.dart';
@@ -55,6 +56,7 @@ import 'prompt_suggestion_overlay.dart';
 class ModernChatInput extends ConsumerStatefulWidget {
   final Function(String) onSendMessage;
   final bool enabled;
+  final double? bottomPadding;
 
   /// Optional placeholder text shown when the input is empty.
   /// Falls back to the localised default ("Ask anything...").
@@ -80,6 +82,7 @@ class ModernChatInput extends ConsumerStatefulWidget {
     super.key,
     required this.onSendMessage,
     this.enabled = true,
+    this.bottomPadding,
     this.placeholder,
     this.overflowButtonBuilder,
     this.onVoiceInput,
@@ -1137,13 +1140,28 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       orElse: () => authUser,
     );
     final locale = Localizations.localeOf(context);
+    String? userLocation;
+    const parser = PromptVariableParser();
+    final needsUserLocation = parser.parse(prompt.content).any(
+      (variable) =>
+          variable.isSystemVariable &&
+          variable.name.toUpperCase() == 'USER_LOCATION',
+    );
+
+    if (needsUserLocation) {
+      final locationResult = await ref
+          .read(locationServiceProvider)
+          .resolveCurrentLocation();
+      userLocation = locationResult.hasLocation
+          ? locationResult.location
+          : 'LOCATION_UNKNOWN';
+    }
 
     // Create the processor with system variable context
-    const parser = PromptVariableParser();
     final systemResolver = SystemVariableResolver(
       userName: user?.name ?? user?.email,
       userLanguage: locale.languageCode,
-      // userLocation requires permission - left empty for now
+      userLocation: userLocation,
     );
     final processor = PromptProcessor(
       parser: parser,
@@ -3095,6 +3113,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   }
 
   double _composerBottomPadding(BuildContext context) {
+    if (widget.bottomPadding case final bottomPadding?) {
+      return bottomPadding;
+    }
+
     if (!kIsWeb && Platform.isIOS) {
       return Spacing.md * 2;
     }

@@ -1301,5 +1301,4 @@ class AuthStateManager extends _$AuthStateManager {
       'storageCache': 'Managed by OptimizedStorageService',
     };
   }
-
 }

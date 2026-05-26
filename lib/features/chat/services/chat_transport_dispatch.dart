@@ -253,9 +253,6 @@ Future<void> dispatchChatTransport({
     appendStatusUpdate: (messageId, update) => ref
         .read(chatMessagesProvider.notifier)
         .appendStatusUpdate(messageId, update),
-    setFollowUps: (messageId, followUps) => ref
-        .read(chatMessagesProvider.notifier)
-        .setFollowUps(messageId, followUps),
     upsertCodeExecution: (messageId, execution) => ref
         .read(chatMessagesProvider.notifier)
         .upsertCodeExecution(messageId, execution),
@@ -319,6 +316,7 @@ Future<void> dispatchChatTransport({
     finishStreaming: () =>
         ref.read(chatMessagesProvider.notifier).finishStreaming(),
     getMessages: () => ref.read(chatMessagesProvider),
+    getVisibleStreamingContent: () => ref.read(streamingContentProvider),
     flushStreamingBuffer: () =>
         ref.read(chatMessagesProvider.notifier).syncStreamingBuffer(),
     onObsoleteStreamRetired: () {

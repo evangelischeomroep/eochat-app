@@ -29,6 +29,8 @@ const double _kSidebarNavigationBarIconSize = 22;
 const double _kSidebarSearchCloseActionReserve = 64;
 const double _kSidebarSearchFieldReserve = 96;
 const double _kSidebarNativeLeadingVerticalOffset = 3;
+// Mirrors adaptive_platform_ui's iPadOS window-control reservation.
+const double _kSidebarWindowedLeadingInset = 62;
 const double _kSidebarNativeBottomBarContentHeight = 50;
 
 enum _SidebarTabId { chats, terminal, notes, channels }
@@ -286,13 +288,30 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
     required AppLocalizations localizations,
     required bool isSearchExpanded,
     required double toolbarWidth,
+    double leadingInset = 0,
   }) {
+    final availableLeadingWidth = (toolbarWidth - leadingInset)
+        .clamp(0.0, toolbarWidth)
+        .toDouble();
     return isSearchExpanded
         ? SidebarSearchAppBarLeading(
             hintText: sidebarSearchHintForActiveTab(ref, localizations),
-            maxWidth: toolbarWidth - _kSidebarSearchFieldReserve,
+            maxWidth: availableLeadingWidth - _kSidebarSearchFieldReserve,
           )
         : const SidebarProfileAppBarLeading();
+  }
+
+  bool _isWindowed(BuildContext context) {
+    final displaySize = View.of(context).display.size;
+    final logicalSize = MediaQuery.sizeOf(context);
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final viewportSize = Size(
+      logicalSize.width * devicePixelRatio,
+      logicalSize.height * devicePixelRatio,
+    );
+
+    return (displaySize.longestSide != viewportSize.longestSide) ||
+        (displaySize.shortestSide != viewportSize.shortestSide);
   }
 
   List<AdaptiveAppBarAction> _sidebarAppBarActions({
@@ -421,6 +440,19 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
       error: (_, _) => true,
       orElse: () => true,
     );
+    final visibleTabIds = <_SidebarTabId>[
+      _SidebarTabId.chats,
+      if (notesEnabled) _SidebarTabId.notes,
+      if (showTerminalTab) _SidebarTabId.terminal,
+      if (channelsEnabled) _SidebarTabId.channels,
+    ];
+    final persistedIndex = ref.watch(sidebarActiveTabProvider);
+    final activeIndex = _clampIndex(persistedIndex, visibleTabIds.length);
+    if (activeIndex != persistedIndex) {
+      _schedulePersistedIndexSync(activeIndex);
+    }
+    final isTerminalTabSelected =
+        visibleTabIds[activeIndex] == _SidebarTabId.terminal;
     final tabDefinitions = <_SidebarTabDefinition>[
       _SidebarTabDefinition(
         id: _SidebarTabId.chats,
@@ -437,7 +469,7 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
         _SidebarTabDefinition(
           id: _SidebarTabId.terminal,
           label: localizations.sidebarTerminalTab,
-          body: const TerminalTab(),
+          body: TerminalTab(isActive: isTerminalTabSelected),
         ),
       if (channelsEnabled)
         _SidebarTabDefinition(
@@ -446,11 +478,6 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
           body: const ChannelListTab(),
         ),
     ];
-    final persistedIndex = ref.watch(sidebarActiveTabProvider);
-    final activeIndex = _clampIndex(persistedIndex, tabDefinitions.length);
-    if (activeIndex != persistedIndex) {
-      _schedulePersistedIndexSync(activeIndex);
-    }
     final navigationItems = _sidebarNavigationItems(tabDefinitions);
 
     final conduitTheme = context.conduitTheme;
@@ -500,15 +527,26 @@ class _SidebarPageState extends ConsumerState<SidebarPage> {
           final toolbarWidth = constraints.hasBoundedWidth
               ? constraints.maxWidth
               : MediaQuery.sizeOf(context).width;
+          final windowedLeadingInset =
+              useNativeIos26Chrome && _isWindowed(context)
+              ? _kSidebarWindowedLeadingInset
+              : 0.0;
           final appBarLeading = _sidebarAppBarLeading(
             localizations: localizations,
             isSearchExpanded: isSearchExpanded,
             toolbarWidth: toolbarWidth,
+            leadingInset: windowedLeadingInset,
           );
           final adaptiveAppBarLeading = useNativeIos26Chrome
-              ? Transform.translate(
-                  offset: const Offset(0, _kSidebarNativeLeadingVerticalOffset),
-                  child: appBarLeading,
+              ? Padding(
+                  padding: EdgeInsets.only(left: windowedLeadingInset),
+                  child: Transform.translate(
+                    offset: const Offset(
+                      0,
+                      _kSidebarNativeLeadingVerticalOffset,
+                    ),
+                    child: appBarLeading,
+                  ),
                 )
               : appBarLeading;
 

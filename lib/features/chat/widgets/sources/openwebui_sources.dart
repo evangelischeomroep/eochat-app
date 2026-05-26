@@ -1,7 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image_ce/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -65,7 +65,12 @@ class OpenWebUISourcesWidget extends StatelessWidget {
           label: _sourceCountLabel(sources.length),
           child: AdaptiveButton.child(
             onPressed: () => _showSourcesBottomSheet(context),
-            style: AdaptiveButtonStyle.glass,
+            style: Platform.isAndroid
+                ? AdaptiveButtonStyle.filled
+                : AdaptiveButtonStyle.glass,
+            color: Platform.isAndroid
+                ? theme.surfaceContainerHighest.withValues(alpha: 0.95)
+                : null,
             size: AdaptiveButtonSize.small,
             padding: EdgeInsets.zero,
             minSize: Size(targetWidth, 28),
@@ -132,18 +137,7 @@ class OpenWebUISourcesWidget extends StatelessWidget {
             title: _sourceCountLabel(sources.length),
             items: [
               for (var index = 0; index < sources.length; index++)
-                NativeSheetItemConfig(
-                  id: 'source-$index',
-                  title: SourceReferenceHelper.getSourceLabel(
-                    sources[index],
-                    index,
-                  ),
-                  subtitle: _sourceSnippet(sources[index]),
-                  sfSymbol: 'link',
-                  url: SourceReferenceHelper.getSourceUrl(
-                    sources[index],
-                  )?.toString(),
-                ),
+                _buildNativeSourceItem(sources[index], index),
             ],
           ),
           rethrowErrors: true,
@@ -208,8 +202,7 @@ class OpenWebUISourcesWidget extends StatelessWidget {
                             ),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 20),
+                        SheetCloseButton(
                           onPressed: () => Navigator.of(sheetContext).pop(),
                           color: liveTheme.textSecondary,
                         ),
@@ -359,8 +352,36 @@ class OpenWebUISourcesWidget extends StatelessWidget {
     );
   }
 
+  NativeSheetItemConfig _buildNativeSourceItem(
+    ChatSourceReference source,
+    int index,
+  ) {
+    final url = SourceReferenceHelper.getSourceUrl(source);
+    final snippet = _sourceSnippet(source);
+    final type = _sourceType(source);
+
+    return NativeSheetItemConfig(
+      id: 'source-$index',
+      title: SourceReferenceHelper.getSourceLabel(source, index),
+      subtitle: snippet,
+      sfSymbol: url == null ? 'doc.text' : 'link',
+      url: url,
+      kind: NativeSheetItemKind.source,
+      sourceIndex: index + 1,
+      sourceUrl: url,
+      sourceType: type,
+      snippet: snippet,
+      faviconUrl: _sourceFaviconUrl(url),
+    );
+  }
+
   String _sourceCountLabel(int count) {
     return count == 1 ? '1 Source' : '$count Sources';
+  }
+
+  String? _sourceType(ChatSourceReference source) {
+    final type = source.type?.trim();
+    return type == null || type.isEmpty ? null : type;
   }
 
   String? _sourceSnippet(ChatSourceReference source) {
@@ -414,6 +435,19 @@ class OpenWebUISourcesWidget extends StatelessWidget {
 
     final text = value.toString().replaceAll(RegExp(r'\s+'), ' ').trim();
     return text.isEmpty ? null : text;
+  }
+
+  String? _sourceFaviconUrl(String? url) {
+    if (url == null) {
+      return null;
+    }
+
+    final domain = SourceReferenceHelper.extractDomain(url).trim();
+    if (domain.isEmpty) {
+      return null;
+    }
+
+    return 'https://www.google.com/s2/favicons?sz=32&domain=$domain';
   }
 
   Future<void> _launchUrl(String url) async {
@@ -481,7 +515,7 @@ class _SourceFavicon extends StatelessWidget {
           imageUrl: 'https://www.google.com/s2/favicons?sz=32&domain=$domain',
           width: size - 2,
           height: size - 2,
-          errorWidget: (context, url, error) => _fallback(theme),
+          errorBuilder: (context, error, stackTrace) => _fallback(theme),
         ),
       ),
     );

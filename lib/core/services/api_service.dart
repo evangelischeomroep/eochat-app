@@ -26,12 +26,15 @@ import '../error/api_error_interceptor.dart';
 import 'connectivity_service.dart';
 import '../utils/debug_logger.dart';
 import '../utils/embed_utils.dart';
+import '../utils/json_normalization.dart';
 import '../utils/message_tree_utils.dart' as message_tree;
 import 'conversation_parsing.dart';
 import 'worker_manager.dart';
 import 'server_tls_http_client_factory.dart';
 
 const bool _traceApiLogs = false;
+const int _conversationWorkerByteThreshold = 50 * 1024;
+const int _conversationSummaryWorkerItemThreshold = 24;
 
 void _traceApi(String message) {
   if (!_traceApiLogs) {
@@ -767,6 +770,14 @@ class ApiService {
     );
   }
 
+  Future<void> updateUserInfo(Map<String, Object?> info) async {
+    if (info.isEmpty) {
+      return;
+    }
+    _traceApi('Updating user info');
+    await _dio.post('/api/v1/users/user/info/update', data: info);
+  }
+
   Future<AccountMetadata> updateAccountMetadata({
     required String name,
     required String profileImageUrl,
@@ -964,21 +975,23 @@ class ApiService {
 
   // Conversations - Updated to use correct OpenWebUI API
   Future<List<Conversation>> getConversations({int? limit, int? skip}) async {
-    final pinnedFuture = _fetchChatCollection(
+    final pinnedFuture = _fetchConversationSummaries(
       '/api/v1/chats/pinned',
-      debugLabel: 'pinned chats',
+      debugLabel: 'parse_pinned_conversations',
+      pinned: true,
     );
-    final archivedFuture = _fetchChatCollection(
+    final archivedFuture = _fetchConversationSummaries(
       '/api/v1/chats/archived',
-      debugLabel: 'archived chats',
+      debugLabel: 'parse_archived_conversations',
+      archived: true,
     );
 
-    List<dynamic> allRegularChats = [];
+    List<Conversation> allRegularChats = [];
 
     if (limit == null) {
       // Fetch all conversations using parallel pagination for better performance
       // Main chats endpoint uses 50 items per page
-      allRegularChats = await _fetchAllPagedResults(
+      allRegularChats = await _fetchAllPagedConversationSummaries(
         endpoint: '/api/v1/chats/',
         baseParams: {'include_folders': true, 'include_pinned': true},
         expectedPageSize: 50,
@@ -1001,18 +1014,15 @@ class ApiService {
         // Convert skip/limit to 1-based page index expected by OpenWebUI.
         // Example: skip=0 => page=1, skip=limit => page=2, etc.
         queryParameters: pageQuery,
+        options: Options(responseType: ResponseType.bytes),
       );
-
-      if (regularResponse.data is! List) {
-        throw Exception(
-          'Expected array of chats, got ${regularResponse.data.runtimeType}',
-        );
-      }
-
-      allRegularChats = regularResponse.data as List;
+      allRegularChats = await _parseConversationSummaryPayload(
+        regular: regularResponse.data,
+        debugLabel: 'parse_conversation_page_single',
+      );
     }
 
-    final pinnedAndArchived = await Future.wait<List<dynamic>>([
+    final pinnedAndArchived = await Future.wait<List<Conversation>>([
       pinnedFuture,
       archivedFuture,
     ]);
@@ -1030,20 +1040,11 @@ class ApiService {
       },
     );
 
-    final parsedJson = await _workerManager
-        .schedule<Map<String, dynamic>, List<Map<String, dynamic>>>(
-          parseConversationSummariesWorker,
-          {
-            'pinned': pinnedChatList,
-            'archived': archivedChatList,
-            'regular': regularChatList,
-          },
-          debugLabel: 'parse_conversation_list',
-        );
-
-    final conversations = parsedJson
-        .map((json) => Conversation.fromJson(json))
-        .toList(growable: false);
+    final conversations = _mergeConversationSummaries(
+      pinned: pinnedChatList,
+      archived: archivedChatList,
+      regular: regularChatList,
+    );
 
     DebugLogger.log(
       'parse-complete',
@@ -1080,52 +1081,47 @@ class ApiService {
     final response = await _dio.get(
       '/api/v1/chats/',
       queryParameters: queryParams,
+      options: Options(responseType: ResponseType.bytes),
     );
-    final data = response.data;
-    if (data is! List) {
-      throw Exception('Expected array of chats, got ${data.runtimeType}');
-    }
-
-    return _parseConversationSummaryList(
-      data,
+    return _parseConversationSummaryPayload(
+      regular: response.data,
       debugLabel: 'parse_conversation_page_$safePage',
     );
   }
 
   /// Fetches pinned chat summaries for the sidebar.
   Future<List<Conversation>> getPinnedConversationSummaries() async {
-    final pinnedChats = await _fetchChatCollection(
+    return _fetchConversationSummaries(
       '/api/v1/chats/pinned',
-      debugLabel: 'pinned chats',
-    );
-    final conversations = await _parseConversationSummaryList(
-      pinnedChats,
       debugLabel: 'parse_pinned_conversations',
+      pinned: true,
     );
-    return conversations
-        .map((conversation) => conversation.copyWith(pinned: true))
-        .toList(growable: false);
   }
 
-  Future<List<dynamic>> _fetchChatCollection(
+  Future<List<Conversation>> _fetchConversationSummaries(
     String path, {
     required String debugLabel,
+    Map<String, dynamic>? queryParameters,
+    bool pinned = false,
+    bool archived = false,
   }) async {
     final scope = 'api/collection/${debugLabel.replaceAll(' ', '-')}';
     try {
-      final response = await _dio.get(path);
+      final response = await _dio.get(
+        path,
+        queryParameters: queryParameters,
+        options: Options(responseType: ResponseType.bytes),
+      );
       DebugLogger.log(
         'status',
         scope: scope,
         data: {'code': response.statusCode},
       );
-      if (response.data is List) {
-        return (response.data as List).cast<dynamic>();
-      }
-      DebugLogger.warning(
-        'unexpected-type',
-        scope: scope,
-        data: {'type': response.data.runtimeType},
+      return _parseConversationSummaryPayload(
+        regular: (!pinned && !archived) ? response.data : const <dynamic>[],
+        pinned: pinned ? response.data : const <dynamic>[],
+        archived: archived ? response.data : const <dynamic>[],
+        debugLabel: debugLabel,
       );
     } on DioException catch (e) {
       DebugLogger.warning(
@@ -1136,7 +1132,7 @@ class ApiService {
     } catch (e) {
       DebugLogger.warning('error-skip', scope: scope, data: {'error': e});
     }
-    return <dynamic>[];
+    return const <Conversation>[];
   }
 
   /// Fetches all pages from a paginated endpoint using parallel batch requests.
@@ -1152,7 +1148,7 @@ class ApiService {
   /// [batchSize] - Number of pages to fetch in parallel (default: 5)
   /// [maxPages] - Maximum number of pages to fetch (default: 100)
   /// [debugLabel] - Label for debug logging
-  Future<List<Map<String, dynamic>>> _fetchAllPagedResults({
+  Future<List<Conversation>> _fetchAllPagedConversationSummaries({
     required String endpoint,
     Map<String, dynamic>? baseParams,
     required int expectedPageSize,
@@ -1160,30 +1156,30 @@ class ApiService {
     int maxPages = 100,
     String? debugLabel,
   }) async {
-    final results = <Map<String, dynamic>>[];
+    final results = <Conversation>[];
     final label = debugLabel ?? endpoint;
 
     // Fetch first page to check if there's data
     final firstResponse = await _dio.get(
       endpoint,
       queryParameters: {...?baseParams, 'page': 1},
+      options: Options(responseType: ResponseType.bytes),
     );
-
-    final firstData = firstResponse.data;
-    if (firstData is! List) {
-      throw Exception('Expected array of $label, got ${firstData.runtimeType}');
-    }
-    if (firstData.isEmpty) {
+    final firstPage = await _parseConversationSummaryPayload(
+      regular: firstResponse.data,
+      debugLabel: 'parse_${label}_page_1',
+    );
+    if (firstPage.isEmpty) {
       _traceApi('$label: no results on first page');
       return results;
     }
 
-    results.addAll(firstData.whereType<Map<String, dynamic>>());
+    results.addAll(firstPage);
 
     // Use unfiltered length for pagination detection since the API returns
     // the same count regardless of filtering. If the first page has fewer
     // items than expected, we know there are no more pages.
-    final firstPageCount = firstData.length;
+    final firstPageCount = firstPage.length;
     if (firstPageCount < expectedPageSize) {
       _traceApi('$label: fetched ${results.length} items (single page)');
       return results;
@@ -1195,13 +1191,17 @@ class ApiService {
 
     while (currentPage <= maxPages) {
       final futures = <Future<Response<dynamic>>>[];
+      final pageNumbers = <int>[];
 
       // Queue up a batch of parallel requests
       for (int i = 0; i < batchSize && currentPage <= maxPages; i++) {
+        final pageNumber = currentPage++;
+        pageNumbers.add(pageNumber);
         futures.add(
           _dio.get(
             endpoint,
-            queryParameters: {...?baseParams, 'page': currentPage++},
+            queryParameters: {...?baseParams, 'page': pageNumber},
+            options: Options(responseType: ResponseType.bytes),
           ),
         );
       }
@@ -1210,21 +1210,18 @@ class ApiService {
       final responses = await Future.wait(futures);
       bool hasMore = false;
 
-      for (final response in responses) {
-        final data = response.data;
+      for (int index = 0; index < responses.length; index++) {
+        final pageConversations = await _parseConversationSummaryPayload(
+          regular: responses[index].data,
+          debugLabel: 'parse_${label}_page_${pageNumbers[index]}',
+        );
 
-        // Validate response type - throw on non-list (e.g., error objects)
-        // to preserve original error-surfacing behavior
-        if (data is! List) {
-          throw Exception('Expected array of $label, got ${data.runtimeType}');
-        }
-
-        if (data.isNotEmpty) {
-          results.addAll(data.whereType<Map<String, dynamic>>());
+        if (pageConversations.isNotEmpty) {
+          results.addAll(pageConversations);
           totalPages++;
           // If this page is full (has expected number of items), there might
           // be more pages. Use unfiltered length for consistent detection.
-          if (data.length >= expectedPageSize) {
+          if (pageConversations.length >= expectedPageSize) {
             hasMore = true;
           }
         }
@@ -1247,17 +1244,17 @@ class ApiService {
   // Parse OpenWebUI chat format to our Conversation format
   Future<Conversation> getConversation(String id) async {
     DebugLogger.log('fetch', scope: 'api/chat', data: {'id': id});
-    final response = await _dio.get('/api/v1/chats/$id');
+    final response = await _dio.get(
+      '/api/v1/chats/$id',
+      options: Options(responseType: ResponseType.bytes),
+    );
 
     DebugLogger.log('fetch-ok', scope: 'api/chat');
 
-    final json = await _workerManager
-        .schedule<Map<String, dynamic>, Map<String, dynamic>>(
-          parseFullConversationWorker,
-          {'conversation': response.data},
-          debugLabel: 'parse_conversation_full',
-        );
-    return Conversation.fromJson(json);
+    return _parseConversationPayload(
+      response.data,
+      debugLabel: 'parse_conversation_full',
+    );
   }
 
   // Parse full OpenWebUI chat with messages
@@ -1420,7 +1417,11 @@ class ApiService {
     _traceApi('Sending chat data with proper parent-child structure');
     _traceApi('Request data: $chatData');
 
-    final response = await _dio.post('/api/v1/chats/new', data: chatData);
+    final response = await _dio.post(
+      '/api/v1/chats/new',
+      data: chatData,
+      options: Options(responseType: ResponseType.bytes),
+    );
 
     DebugLogger.log(
       'create-status',
@@ -1429,14 +1430,10 @@ class ApiService {
     );
     DebugLogger.log('create-ok', scope: 'api/conversation');
 
-    final responseData = response.data;
-    final json = await _workerManager
-        .schedule<Map<String, dynamic>, Map<String, dynamic>>(
-          parseFullConversationWorker,
-          {'conversation': responseData},
-          debugLabel: 'parse_conversation_full',
-        );
-    return Conversation.fromJson(json);
+    return _parseConversationPayload(
+      response.data,
+      debugLabel: 'parse_conversation_full',
+    );
   }
 
   /// Replaces the server's stored chat history with the provided message list.
@@ -1634,11 +1631,7 @@ class ApiService {
   }
 
   Map<String, dynamic> _deepCloneJsonMap(Map<String, dynamic> source) {
-    final cloned = json.decode(json.encode(source));
-    if (cloned is Map<String, dynamic>) {
-      return cloned;
-    }
-    return Map<String, dynamic>.from(source);
+    return normalizeJsonLikeMap(source);
   }
 
   Map<String, dynamic>? _coerceJsonMap(dynamic value) {
@@ -1947,14 +1940,14 @@ class ApiService {
   // Clone conversation
   Future<Conversation> cloneConversation(String id) async {
     _traceApi('Cloning conversation: $id');
-    final response = await _dio.post('/api/v1/chats/$id/clone');
-    final json = await _workerManager
-        .schedule<Map<String, dynamic>, Map<String, dynamic>>(
-          parseFullConversationWorker,
-          {'conversation': response.data},
-          debugLabel: 'parse_conversation_full',
-        );
-    return Conversation.fromJson(json);
+    final response = await _dio.post(
+      '/api/v1/chats/$id/clone',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return _parseConversationPayload(
+      response.data,
+      debugLabel: 'parse_conversation_full',
+    );
   }
 
   // User Settings
@@ -2048,24 +2041,128 @@ class ApiService {
     return [];
   }
 
-  Future<List<Conversation>> _parseConversationSummaryList(
-    List<dynamic> regular, {
+  Future<Conversation> _parseConversationPayload(
+    Object? payload, {
     required String debugLabel,
-  }) async {
+  }) {
+    if (_shouldUseWorkerForConversationPayload(payload)) {
+      return _workerManager.schedule<Object?, Conversation>(
+        parseFullConversationModelWorker,
+        payload,
+        debugLabel: debugLabel,
+      );
+    }
+    return Future.value(parseFullConversationModel(payload));
+  }
+
+  Future<List<Conversation>> _parseConversationSummaryPayload({
+    Object? regular = const <dynamic>[],
+    Object? pinned = const <dynamic>[],
+    Object? archived = const <dynamic>[],
+    required String debugLabel,
+  }) {
     final payload = <String, dynamic>{
-      'regular': List<dynamic>.from(regular),
-      'pinned': const <dynamic>[],
-      'archived': const <dynamic>[],
+      'regular': regular,
+      'pinned': pinned,
+      'archived': archived,
     };
-    final parsed = await _workerManager
-        .schedule<Map<String, dynamic>, List<Map<String, dynamic>>>(
-          parseConversationSummariesWorker,
-          payload,
-          debugLabel: debugLabel,
-        );
-    return parsed
-        .map((json) => Conversation.fromJson(json))
-        .toList(growable: false);
+    if (_shouldUseWorkerForConversationSummaries(
+      regular: regular,
+      pinned: pinned,
+      archived: archived,
+    )) {
+      return _workerManager.schedule<Map<String, dynamic>, List<Conversation>>(
+        parseConversationSummaryModelsWorker,
+        payload,
+        debugLabel: debugLabel,
+      );
+    }
+    return Future.value(parseConversationSummaryModels(payload));
+  }
+
+  List<Conversation> _mergeConversationSummaries({
+    required List<Conversation> pinned,
+    required List<Conversation> archived,
+    required List<Conversation> regular,
+  }) {
+    final merged = <String, Conversation>{};
+    for (final conversation in pinned) {
+      merged[conversation.id] = conversation.copyWith(pinned: true);
+    }
+    for (final conversation in archived) {
+      merged.putIfAbsent(
+        conversation.id,
+        () => conversation.copyWith(archived: true),
+      );
+    }
+    for (final conversation in regular) {
+      merged.putIfAbsent(conversation.id, () => conversation);
+    }
+    return merged.values.toList(growable: false);
+  }
+
+  bool _shouldUseWorkerForConversationPayload(Object? payload) {
+    return _estimatePayloadBytes(payload) >= _conversationWorkerByteThreshold;
+  }
+
+  bool _shouldUseWorkerForConversationSummaries({
+    Object? regular,
+    Object? pinned,
+    Object? archived,
+  }) {
+    final payloadBytes =
+        _estimatePayloadBytes(regular) +
+        _estimatePayloadBytes(pinned) +
+        _estimatePayloadBytes(archived);
+    if (payloadBytes >= _conversationWorkerByteThreshold) {
+      return true;
+    }
+
+    final itemCount =
+        _estimateCollectionLength(regular) +
+        _estimateCollectionLength(pinned) +
+        _estimateCollectionLength(archived);
+    return itemCount >= _conversationSummaryWorkerItemThreshold;
+  }
+
+  int _estimatePayloadBytes(Object? payload) {
+    if (payload is Uint8List) {
+      return payload.lengthInBytes;
+    }
+    if (payload is List) {
+      if (payload.isEmpty) {
+        return 0;
+      }
+      if (payload.every((entry) => entry is int)) {
+        return payload.length;
+      }
+      if (payload.every((entry) => entry is Uint8List || entry is List<int>)) {
+        return payload.fold<int>(0, (total, entry) {
+          if (entry is Uint8List) {
+            return total + entry.lengthInBytes;
+          }
+          if (entry is List<int>) {
+            return total + entry.length;
+          }
+          return total;
+        });
+      }
+    }
+    return 0;
+  }
+
+  int _estimateCollectionLength(Object? payload) {
+    if (payload is List) {
+      if (payload.isEmpty) {
+        return 0;
+      }
+      if (payload.every((entry) => entry is int) ||
+          payload.every((entry) => entry is Uint8List || entry is List<int>)) {
+        return 0;
+      }
+      return payload.length;
+    }
+    return 0;
   }
 
   Future<List<Map<String, dynamic>>> _normalizeList(
@@ -2226,21 +2323,11 @@ class ApiService {
   ) async {
     // The backend endpoint has a hardcoded limit of 10 items per page,
     // so we use parallel pagination to fetch all conversations efficiently.
-    final allChats = await _fetchAllPagedResults(
+    return _fetchAllPagedConversationSummaries(
       endpoint: '/api/v1/chats/folder/$folderId/list',
       expectedPageSize: 10,
       debugLabel: 'folder-$folderId',
     );
-
-    // Parse in background isolate for better UI responsiveness
-    final parsedJson = await _workerManager
-        .schedule<Map<String, dynamic>, List<Map<String, dynamic>>>(
-          parseFolderSummariesWorker,
-          {'chats': allChats},
-          debugLabel: 'parse_folder_$folderId',
-        );
-
-    return parsedJson.map(Conversation.fromJson).toList(growable: false);
   }
 
   // Tags
@@ -2279,12 +2366,14 @@ class ApiService {
 
   Future<List<Conversation>> getConversationsByTag(String tag) async {
     _traceApi('Fetching conversations with tag: $tag');
-    final response = await _dio.get('/api/v1/chats/tags/$tag');
-    final data = response.data;
-    if (data is List) {
-      return _parseConversationSummaryList(data, debugLabel: 'parse_tag_$tag');
-    }
-    return [];
+    final response = await _dio.get(
+      '/api/v1/chats/tags/$tag',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return _parseConversationSummaryPayload(
+      regular: response.data,
+      debugLabel: 'parse_tag_$tag',
+    );
   }
 
   // Files
@@ -5096,12 +5185,12 @@ class ApiService {
     final response = await _dio.get(
       '/api/v1/chats/search',
       queryParameters: {'q': query},
+      options: Options(responseType: ResponseType.bytes),
     );
-    final results = response.data;
-    if (results is List) {
-      return _parseConversationSummaryList(results, debugLabel: 'parse_search');
-    }
-    return [];
+    return _parseConversationSummaryPayload(
+      regular: response.data,
+      debugLabel: 'parse_search',
+    );
   }
 
   // Debug method to test API endpoints
@@ -5271,20 +5360,11 @@ class ApiService {
   /// Get pinned chats
   Future<List<Conversation>> getPinnedChats() async {
     _traceApi('Fetching pinned chats');
-    final response = await _dio.get('/api/v1/chats/pinned');
-    final data = response.data;
-    if (data is List) {
-      return data
-          .whereType<Map>()
-          .map((chatData) {
-            final map = Map<String, dynamic>.from(chatData);
-            return Conversation.fromJson(
-              parseConversationSummary(map),
-            ).copyWith(pinned: true);
-          })
-          .toList(growable: false);
-    }
-    return [];
+    return _fetchConversationSummaries(
+      '/api/v1/chats/pinned',
+      debugLabel: 'parse_pinned_chats',
+      pinned: true,
+    );
   }
 
   /// Get archived chats
@@ -5294,23 +5374,12 @@ class ApiService {
     if (limit != null) queryParams['limit'] = limit;
     if (offset != null) queryParams['offset'] = offset;
 
-    final response = await _dio.get(
+    return _fetchConversationSummaries(
       '/api/v1/chats/archived',
       queryParameters: queryParams,
+      debugLabel: 'parse_archived_chats',
+      archived: true,
     );
-    final data = response.data;
-    if (data is List) {
-      return data
-          .whereType<Map>()
-          .map((chatData) {
-            final map = Map<String, dynamic>.from(chatData);
-            return Conversation.fromJson(
-              parseConversationSummary(map),
-            ).copyWith(archived: true);
-          })
-          .toList(growable: false);
-    }
-    return [];
   }
 
   /// Advanced search for chats and messages
@@ -5349,26 +5418,12 @@ class ApiService {
     final response = await _dio.get(
       '/api/v1/chats/search',
       queryParameters: queryParams,
+      options: Options(responseType: ResponseType.bytes),
     );
-    final data = response.data;
-    // The endpoint can return a List[ChatTitleIdResponse] or a map.
-    // Normalize to a List<Conversation> using our isolate parser.
-    if (data is List) {
-      return _parseConversationSummaryList(
-        data,
-        debugLabel: 'parse_search_direct',
-      );
-    }
-    if (data is Map<String, dynamic>) {
-      final list = (data['conversations'] ?? data['items'] ?? data['results']);
-      if (list is List) {
-        return _parseConversationSummaryList(
-          list,
-          debugLabel: 'parse_search_wrapped',
-        );
-      }
-    }
-    return const <Conversation>[];
+    return _parseConversationSummaryPayload(
+      regular: response.data,
+      debugLabel: 'parse_search_wrapped',
+    );
   }
 
   /// Search within messages content (capability-safe)
@@ -5467,14 +5522,12 @@ class ApiService {
     final response = await _dio.post(
       '/api/v1/chats/$chatId/duplicate',
       data: {'title': ?title},
+      options: Options(responseType: ResponseType.bytes),
     );
-    final json = await _workerManager
-        .schedule<Map<String, dynamic>, Map<String, dynamic>>(
-          parseFullConversationWorker,
-          {'conversation': response.data},
-          debugLabel: 'parse_conversation_full',
-        );
-    return Conversation.fromJson(json);
+    return _parseConversationPayload(
+      response.data,
+      debugLabel: 'parse_conversation_full',
+    );
   }
 
   /// Get recent chats with activity
@@ -5486,18 +5539,12 @@ class ApiService {
     final response = await _dio.get(
       '/api/v1/chats/recent',
       queryParameters: queryParams,
+      options: Options(responseType: ResponseType.bytes),
     );
-    final data = response.data;
-    if (data is List) {
-      return data
-          .whereType<Map<String, dynamic>>()
-          .map(
-            (chatData) =>
-                Conversation.fromJson(parseConversationSummary(chatData)),
-          )
-          .toList();
-    }
-    return [];
+    return _parseConversationSummaryPayload(
+      regular: response.data,
+      debugLabel: 'parse_recent_chats',
+    );
   }
 
   /// Get chat history with pagination and filters
@@ -5599,14 +5646,12 @@ class ApiService {
     final response = await _dio.post(
       '/api/v1/chats/templates/$templateId/create',
       data: {'variables': ?variables, 'title': ?title},
+      options: Options(responseType: ResponseType.bytes),
     );
-    final json = await _workerManager
-        .schedule<Map<String, dynamic>, Map<String, dynamic>>(
-          parseFullConversationWorker,
-          {'conversation': response.data},
-          debugLabel: 'parse_conversation_full',
-        );
-    return Conversation.fromJson(json);
+    return _parseConversationPayload(
+      response.data,
+      debugLabel: 'parse_conversation_full',
+    );
   }
 
   // ==================== END ADVANCED CHAT FEATURES ====================

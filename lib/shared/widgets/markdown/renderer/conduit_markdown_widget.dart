@@ -1,26 +1,33 @@
-import 'dart:collection';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:markdown/markdown.dart' as md;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/services/performance_profiler.dart';
 import '../../../../core/models/chat_message.dart';
+import '../compiled_markdown_document.dart';
+import '../markdown_compile_service.dart';
+import '../markdown_document_controller.dart';
+import '../markdown_loading_skeleton.dart';
 import 'block_renderer.dart';
-import 'details_block_syntax.dart';
 import 'inline_renderer.dart';
 import 'latex_preprocessor.dart';
+import 'latex_rendering_server.dart';
 import 'markdown_style.dart';
-import 'mention_inline_syntax.dart';
-
-final _parsedMarkdownCache = _ParsedMarkdownCache();
 
 @visibleForTesting
-void debugResetParsedMarkdownCache() => _parsedMarkdownCache.clear();
+const int debugMaxLatexStartupRetryCount = 5;
+
+const int _maxLatexStartupRetryCount = debugMaxLatexStartupRetryCount;
 
 @visibleForTesting
-int debugParsedMarkdownCacheSize() => _parsedMarkdownCache.length;
+void debugResetParsedMarkdownCache() => debugResetCompiledMarkdownCache();
 
 @visibleForTesting
-List<String> debugParsedMarkdownCacheKeys() => _parsedMarkdownCache.keys;
+int debugParsedMarkdownCacheSize() => debugCompiledMarkdownCacheSize();
+
+@visibleForTesting
+List<String> debugParsedMarkdownCacheKeys() => debugCompiledMarkdownCacheKeys();
 
 /// A widget that renders markdown content using the
 /// Conduit custom rendering pipeline.
@@ -35,34 +42,46 @@ List<String> debugParsedMarkdownCacheKeys() => _parsedMarkdownCache.keys;
 ///    [InlineSpan] trees, restoring LaTeX placeholders
 ///    as widget spans.
 ///
-/// The widget caches its parsed AST and only re-parses
-/// when [data] changes, avoiding unnecessary
-/// [TapGestureRecognizer] allocations during streaming.
-///
 /// ```dart
 /// ConduitMarkdownWidget(
 ///   data: '# Hello\n\nSome **bold** text.',
 ///   onLinkTap: (url, title) => launchUrl(Uri.parse(url)),
 /// )
 /// ```
-class ConduitMarkdownWidget extends StatefulWidget {
+class ConduitMarkdownWidget extends ConsumerStatefulWidget {
   /// Creates a markdown rendering widget.
   ///
   /// [data] is the raw markdown string. [onLinkTap] is
   /// called when the user taps a hyperlink. [imageBuilder]
   /// creates custom image widgets for block-level images.
   const ConduitMarkdownWidget({
-    required this.data,
+    this.data,
+    this.compiledDocument,
+    this.dataIsPrepared = false,
     this.onLinkTap,
     this.imageBuilder,
     this.sources,
     this.onSourceTap,
     this.stateScopeId,
+    this.heavyBlockPolicy = MarkdownHeavyBlockPolicy.eager,
+    this.debugTreatAsWidgetTest,
+    this.debugOnCompiledViewMounted,
+    this.debugOnCompiledViewDisposed,
     super.key,
-  });
+  }) : assert(
+         data != null || compiledDocument != null,
+         'Either data or compiledDocument must be provided.',
+       );
 
   /// The raw markdown content to render.
-  final String data;
+  final String? data;
+
+  /// Optional compiled markdown document. When provided the widget skips
+  /// async compilation and renders the document directly.
+  final CompiledMarkdownDocument? compiledDocument;
+
+  /// Whether [data] has already been normalized/prepared for markdown render.
+  final bool dataIsPrepared;
 
   /// Callback invoked when a link is tapped.
   final LinkTapCallback? onLinkTap;
@@ -79,123 +98,354 @@ class ConduitMarkdownWidget extends StatefulWidget {
   /// Optional scope used to preserve state for remounted markdown blocks.
   final String? stateScopeId;
 
+  /// Controls how expensive preview-backed blocks should behave.
+  final MarkdownHeavyBlockPolicy heavyBlockPolicy;
+
+  @visibleForTesting
+  final bool? debugTreatAsWidgetTest;
+
+  @visibleForTesting
+  final VoidCallback? debugOnCompiledViewMounted;
+
+  @visibleForTesting
+  final VoidCallback? debugOnCompiledViewDisposed;
+
   @override
-  State<ConduitMarkdownWidget> createState() => _ConduitMarkdownWidgetState();
+  ConsumerState<ConduitMarkdownWidget> createState() =>
+      _ConduitMarkdownWidgetState();
 }
 
-class _ConduitMarkdownWidgetState extends State<ConduitMarkdownWidget> {
-  InlineRenderer? _inlineRenderer;
-  _ParsedMarkdownDocument? _parsedDocument;
-  String _cachedData = '';
+class _ConduitMarkdownWidgetState extends ConsumerState<ConduitMarkdownWidget> {
+  late final MarkdownDocumentController _documentController;
+  CompiledMarkdownDocument? _compiledDocument;
+  String _preparedData = '';
+
+  bool get _isWidgetTest =>
+      widget.debugTreatAsWidgetTest ??
+      WidgetsBinding.instance.runtimeType.toString().contains('Test');
 
   @override
-  void dispose() {
-    _inlineRenderer?.disposeRecognizers();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _documentController = MarkdownDocumentController(
+      readCompiler: () => ref.read(markdownCompileServiceProvider),
+      isWidgetTest: () => _isWidgetTest,
+      onStateChanged: _applyCompiledDocumentState,
+    );
+    _primeDocument();
   }
 
-  /// Parses the markdown [data] into an AST, caching the
-  /// result. Only re-parses when [data] differs from the
-  /// previously cached value.
-  void _ensureParsed(String data) {
-    if (data == _cachedData && _parsedDocument != null) {
-      return;
+  @override
+  void didUpdateWidget(covariant ConduitMarkdownWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.compiledDocument != oldWidget.compiledDocument ||
+        widget.data != oldWidget.data ||
+        widget.dataIsPrepared != oldWidget.dataIsPrepared) {
+      _primeDocument();
     }
-
-    _cachedData = data;
-    _parsedDocument =
-        _parsedMarkdownCache.read(data) ?? _parsedMarkdownCache.write(data);
   }
 
   @override
   Widget build(BuildContext context) {
-    final style = ConduitMarkdownStyle.fromTheme(context);
-
-    _ensureParsed(widget.data);
-    final parsedDocument = _parsedDocument;
-    if (parsedDocument == null) {
+    final prepared =
+        widget.compiledDocument?.normalizedContent ?? _preparedData;
+    if (prepared.trim().isEmpty) {
       return const SizedBox.shrink();
     }
 
-    _inlineRenderer?.disposeRecognizers();
-    _inlineRenderer = InlineRenderer(
-      style,
-      parsedDocument.latexPreprocessor,
-      widget.onLinkTap,
-      widget.sources,
-      widget.onSourceTap,
-    );
+    final document = widget.compiledDocument ?? _compiledDocument;
+    if (document == null) {
+      return MarkdownLoadingSkeleton(contentLength: prepared.length);
+    }
 
-    final blockRenderer = BlockRenderer(
-      context,
-      style,
-      _inlineRenderer!,
-      parsedDocument.latexPreprocessor,
-      widget.onLinkTap,
-      widget.imageBuilder,
-      widget.stateScopeId,
+    return _CompiledMarkdownView(
+      document: document,
+      onLinkTap: widget.onLinkTap,
+      imageBuilder: widget.imageBuilder,
+      sources: widget.sources,
+      onSourceTap: widget.onSourceTap,
+      stateScopeId: widget.stateScopeId,
+      heavyBlockPolicy: widget.heavyBlockPolicy,
+      debugOnMounted: widget.debugOnCompiledViewMounted,
+      debugOnDisposed: widget.debugOnCompiledViewDisposed,
     );
+  }
 
-    return blockRenderer.renderBlocks(parsedDocument.nodes);
+  @override
+  void dispose() {
+    _documentController.dispose();
+    super.dispose();
+  }
+
+  void _primeDocument() {
+    final directDocument = widget.compiledDocument;
+    if (directDocument != null) {
+      final nextPrepared = directDocument.normalizedContent;
+      final changed =
+          nextPrepared != _preparedData || _compiledDocument != directDocument;
+      _preparedData = nextPrepared;
+      if (!changed) {
+        return;
+      }
+      _documentController.applyDirectDocument(directDocument);
+      return;
+    }
+
+    final raw = widget.data ?? '';
+    final prepared = widget.dataIsPrepared
+        ? raw
+        : prepareMarkdownContent(raw, streaming: false);
+    _preparedData = prepared;
+    _documentController.resolvePrepared(prepared, clearDocumentWhenAsync: true);
+  }
+
+  void _applyCompiledDocumentState(
+    String compiledPreparedContent,
+    CompiledMarkdownDocument? document,
+  ) {
+    if (!mounted) {
+      _compiledDocument = document;
+      return;
+    }
+    setState(() => _compiledDocument = document);
   }
 }
 
-class _ParsedMarkdownDocument {
-  _ParsedMarkdownDocument({
-    required this.nodes,
-    required this.latexPreprocessor,
+class _CompiledMarkdownView extends StatefulWidget {
+  const _CompiledMarkdownView({
+    required this.document,
+    this.onLinkTap,
+    this.imageBuilder,
+    this.sources,
+    this.onSourceTap,
+    this.stateScopeId,
+    this.heavyBlockPolicy = MarkdownHeavyBlockPolicy.eager,
+    this.debugOnMounted,
+    this.debugOnDisposed,
   });
 
-  final List<md.Node> nodes;
-  final LatexPreprocessor latexPreprocessor;
+  final CompiledMarkdownDocument document;
+  final LinkTapCallback? onLinkTap;
+  final ImageBuilder? imageBuilder;
+  final List<ChatSourceReference>? sources;
+  final void Function(int sourceIndex)? onSourceTap;
+  final String? stateScopeId;
+  final MarkdownHeavyBlockPolicy heavyBlockPolicy;
+  final VoidCallback? debugOnMounted;
+  final VoidCallback? debugOnDisposed;
 
-  factory _ParsedMarkdownDocument.parse(String data) {
-    final latexPreprocessor = LatexPreprocessor();
-    final preprocessed = latexPreprocessor.extract(data);
+  @override
+  State<_CompiledMarkdownView> createState() => _CompiledMarkdownViewState();
+}
 
-    final document = md.Document(
-      extensionSet: md.ExtensionSet.gitHubWeb,
-      blockSyntaxes: const [DetailsBlockSyntax()],
-      inlineSyntaxes: [MentionInlineSyntax()],
-      encodeHtml: false,
+class _CompiledMarkdownViewState extends State<_CompiledMarkdownView> {
+  InlineRenderer? _inlineRenderer;
+  LatexPreprocessor _latexPreprocessor = LatexPreprocessor();
+  Future<void>? _latexStartupFuture;
+  Timer? _latexStartupRetryTimer;
+  int _latexStartupRetryCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.debugOnMounted?.call();
+    _hydrateDocument(widget.document);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CompiledMarkdownView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.document != widget.document) {
+      _hydrateDocument(widget.document);
+    }
+  }
+
+  @override
+  void dispose() {
+    _cancelLatexStartupRetry();
+    widget.debugOnDisposed?.call();
+    _inlineRenderer?.disposeRecognizers();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final taskKey = PerformanceProfiler.instance.startTask(
+      'markdown_build',
+      scope: 'markdown',
+      data: {
+        'length': widget.document.normalizedContent.length,
+        'tier': widget.document.renderTier,
+        'heavyBlocks': widget.document.heavyBlockCount,
+      },
     );
-    return _ParsedMarkdownDocument(
-      nodes: document.parse(preprocessed),
-      latexPreprocessor: latexPreprocessor,
+    if (widget.document.isEmpty) {
+      PerformanceProfiler.instance.finishTask(
+        taskKey,
+        data: const {'status': 'empty'},
+      );
+      return const SizedBox.shrink();
+    }
+
+    try {
+      final style = ConduitMarkdownStyle.fromTheme(context);
+      _inlineRenderer?.disposeRecognizers();
+      _inlineRenderer = InlineRenderer(
+        style,
+        _latexPreprocessor,
+        widget.onLinkTap,
+        widget.sources,
+        widget.onSourceTap,
+        _latexStartupFuture,
+      );
+
+      final blockRenderer = BlockRenderer(
+        context,
+        style,
+        _inlineRenderer!,
+        _latexPreprocessor,
+        widget.onLinkTap,
+        widget.imageBuilder,
+        widget.stateScopeId,
+        null,
+        widget.heavyBlockPolicy,
+      );
+
+      return switch (widget.document.renderTier) {
+        MarkdownRenderTier.plainText => _buildPlainText(style),
+        MarkdownRenderTier.richText => _buildRichText(style),
+        MarkdownRenderTier.blocks => blockRenderer.renderCompiledBlocks(
+          widget.document.blocks,
+        ),
+      };
+    } finally {
+      PerformanceProfiler.instance.finishTask(
+        taskKey,
+        data: {
+          'tier': widget.document.renderTier,
+          'nodeCount': widget.document.nodes.length,
+          'blockCount': widget.document.blocks.length,
+        },
+      );
+    }
+  }
+
+  void _hydrateDocument(CompiledMarkdownDocument document) {
+    _cancelLatexStartupRetry();
+    _latexStartupRetryCount = 0;
+    _latexPreprocessor = document.buildLatexPreprocessor();
+    if (!document.hasLatex) {
+      _latexStartupFuture = null;
+      return;
+    }
+    _startLatexStartup();
+  }
+
+  void _startLatexStartup({bool notify = false}) {
+    final startupFuture = LatexRenderingServer.ensureStarted();
+    if (notify && mounted) {
+      setState(() {
+        _latexStartupFuture = startupFuture;
+      });
+    } else {
+      _latexStartupFuture = startupFuture;
+    }
+
+    unawaited(
+      startupFuture.then<void>(
+        (_) {
+          if (!mounted || !identical(_latexStartupFuture, startupFuture)) {
+            return;
+          }
+          _latexStartupRetryCount = 0;
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          if (!mounted ||
+              !identical(_latexStartupFuture, startupFuture) ||
+              !widget.document.hasLatex ||
+              LatexRenderingServer.isStarted) {
+            return;
+          }
+          _scheduleLatexStartupRetry();
+        },
+      ),
     );
+  }
+
+  void _scheduleLatexStartupRetry() {
+    if (_latexStartupRetryTimer != null) {
+      return;
+    }
+    if (_latexStartupRetryCount >= _maxLatexStartupRetryCount) {
+      return;
+    }
+
+    final delay = _latexStartupRetryDelay(_latexStartupRetryCount);
+    _latexStartupRetryCount += 1;
+    _latexStartupRetryTimer = Timer(delay, () {
+      _latexStartupRetryTimer = null;
+      if (!mounted ||
+          !widget.document.hasLatex ||
+          LatexRenderingServer.isStarted) {
+        return;
+      }
+      _startLatexStartup(notify: true);
+    });
+  }
+
+  void _cancelLatexStartupRetry() {
+    _latexStartupRetryTimer?.cancel();
+    _latexStartupRetryTimer = null;
+  }
+
+  Duration _latexStartupRetryDelay(int retryCount) {
+    final clampedRetryCount = retryCount.clamp(0, 3);
+    return Duration(milliseconds: 200 * (1 << clampedRetryCount));
+  }
+
+  Widget _buildPlainText(ConduitMarkdownStyle style) {
+    final text = _plainTextContent(widget.document);
+    if (text.trim().isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Text(text, style: style.body);
+  }
+
+  Widget _buildRichText(ConduitMarkdownStyle style) {
+    final inlineNodes = _richInlineNodes(widget.document);
+    if (inlineNodes.isEmpty) {
+      return _buildPlainText(style);
+    }
+    return Text.rich(_inlineRenderer!.render(inlineNodes));
   }
 }
 
-class _ParsedMarkdownCache {
-  static const int _maxEntries = 32;
-
-  final LinkedHashMap<String, _ParsedMarkdownDocument> _entries =
-      LinkedHashMap<String, _ParsedMarkdownDocument>();
-
-  _ParsedMarkdownDocument? read(String data) {
-    final cached = _entries.remove(data);
-    if (cached == null) {
-      return null;
-    }
-    _entries[data] = cached;
-    return cached;
+String _plainTextContent(CompiledMarkdownDocument document) {
+  if (document.nodes.isEmpty) {
+    return '';
   }
 
-  _ParsedMarkdownDocument write(String data) {
-    final parsed = _ParsedMarkdownDocument.parse(data);
-    _entries.remove(data);
-    _entries[data] = parsed;
-    while (_entries.length > _maxEntries) {
-      _entries.remove(_entries.keys.first);
-    }
-    return parsed;
+  final node = document.nodes.first;
+  if (node is CompiledMarkdownText) {
+    return node.text;
+  }
+  if (node is CompiledMarkdownElement &&
+      node.tag == 'p' &&
+      node.children.length == 1 &&
+      node.children.first is CompiledMarkdownText) {
+    return (node.children.first as CompiledMarkdownText).text;
+  }
+  return document.nodes.map((entry) => entry.textContent).join();
+}
+
+List<CompiledMarkdownNode> _richInlineNodes(CompiledMarkdownDocument document) {
+  if (document.nodes.isEmpty) {
+    return const <CompiledMarkdownNode>[];
   }
 
-  void clear() {
-    _entries.clear();
+  final node = document.nodes.first;
+  if (node is CompiledMarkdownElement && node.tag == 'p') {
+    return node.children;
   }
-
-  int get length => _entries.length;
-
-  List<String> get keys => List<String>.unmodifiable(_entries.keys);
+  return <CompiledMarkdownNode>[node];
 }

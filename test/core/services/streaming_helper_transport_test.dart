@@ -107,6 +107,8 @@ Map<String, dynamic> _serverAssistantMessage({
   List<String>? followUps,
   List<Map<String, dynamic>>? statusHistory,
   List<Map<String, dynamic>>? sources,
+  Map<String, dynamic>? usage,
+  Map<String, dynamic>? metadata,
 }) {
   return {
     'id': id,
@@ -118,6 +120,8 @@ Map<String, dynamic> _serverAssistantMessage({
     'follow_ups': ?followUps,
     'statusHistory': ?statusHistory,
     'sources': ?sources,
+    'usage': ?usage,
+    'metadata': ?metadata,
   };
 }
 
@@ -188,10 +192,10 @@ class _CallbackLog {
   final replacedContents = <String>[];
   final messageUpdaters = <ChatMessage Function(ChatMessage)>[];
   final statusUpdates = <(String, ChatStatusUpdate)>[];
-  final followUpUpdates = <(String, List<String>)>[];
   final codeExecutions = <(String, ChatCodeExecution)>[];
   final sourceReferences = <(String, ChatSourceReference)>[];
   final messageByIdUpdates = <(String, ChatMessage Function(ChatMessage))>[];
+  int messageByIdMutationCount = 0;
   int uiFinishCount = 0;
   int finishCount = 0;
   int flushCount = 0;
@@ -242,10 +246,6 @@ class _CallbackLog {
     statusUpdates.add((id, u));
   }
 
-  void setFollowUps(String id, List<String> f) {
-    followUpUpdates.add((id, f));
-  }
-
   void upsertCodeExecution(String id, ChatCodeExecution e) {
     codeExecutions.add((id, e));
   }
@@ -260,7 +260,12 @@ class _CallbackLog {
     if (index == -1) {
       return;
     }
-    final updated = updater(messages[index]);
+    final current = messages[index];
+    final updated = updater(current);
+    if (identical(updated, current)) {
+      return;
+    }
+    messageByIdMutationCount++;
     messages = [...messages.take(index), updated, ...messages.skip(index + 1)];
   }
 
@@ -308,6 +313,8 @@ ActiveChatStream _attach({
   String sessionId = 'sess-1',
   String? activeConversationId = 'conv-1',
   SocketService? socketService,
+  String? Function()? getVisibleStreamingContent,
+  void Function()? flushStreamingBuffer,
 }) {
   return attachUnifiedChunkedStreaming(
     session: session,
@@ -325,14 +332,14 @@ ActiveChatStream _attach({
     replaceLastMessageContent: log.replaceLastMessageContent,
     updateLastMessageWith: log.updateLastMessageWith,
     appendStatusUpdate: log.appendStatusUpdate,
-    setFollowUps: log.setFollowUps,
     upsertCodeExecution: log.upsertCodeExecution,
     appendSourceReference: log.appendSourceReference,
     updateMessageById: log.updateMessageById,
     completeStreamingUi: log.completeStreamingUi,
     finishStreaming: log.finishStreaming,
     getMessages: log.getMessages,
-    flushStreamingBuffer: log.flushStreamingBuffer,
+    getVisibleStreamingContent: getVisibleStreamingContent ?? () => null,
+    flushStreamingBuffer: flushStreamingBuffer ?? log.flushStreamingBuffer,
   );
 }
 
@@ -599,6 +606,42 @@ void main() {
       },
     );
 
+    test('httpStream finalizes reasoning-only responses on done', () async {
+      final log = _CallbackLog();
+      final byteStream = Stream<List<int>>.fromIterable([
+        _sseFrame({
+          'choices': [
+            {
+              'delta': {'reasoning_content': 'Plan'},
+            },
+          ],
+        }),
+        _sseDone(),
+      ]);
+
+      _attach(
+        session: ChatCompletionSession.httpStream(
+          messageId: 'msg-1',
+          sessionId: 'sess-1',
+          byteStream: byteStream,
+          abort: () async {},
+        ),
+        log: log,
+      );
+
+      await pumpMicrotasks();
+      await pumpMicrotasks();
+      await pumpMicrotasks();
+
+      check(log.messages.last.content).equals(
+        '<details type="reasoning" done="true" duration="0">\n'
+        '<summary>Thought for 0 seconds</summary>\n'
+        '&gt; Plan\n'
+        '</details>\n',
+      );
+      check(log.finishCount).equals(1);
+    });
+
     test(
       'taskSocket normalizes reasoning deltas from chat completion events',
       () async {
@@ -697,6 +740,136 @@ void main() {
       },
     );
 
+    test(
+      'taskSocket channel stream applies usage updates from data payloads',
+      () async {
+        final log = _CallbackLog();
+        final registrar = FakeSocketInjector();
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          socketService: _MockSocketService(registrar),
+        );
+
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('request:chat:completion', {
+          'channel': 'chan-1',
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        registrar.emitChannelLine(
+          'chan-1',
+          'data: {"usage":{"prompt_tokens":3,"completion_tokens":5}}',
+        );
+        await pumpMicrotasks();
+
+        final usage = log.messages.last.usage;
+        check(usage).isNotNull();
+        check(usage!['prompt_tokens']).equals(3);
+        check(usage['completion_tokens']).equals(5);
+      },
+    );
+
+    test(
+      'chat:completion batches output, usage, model, and sources once',
+      () async {
+        final log = _CallbackLog();
+        final registrar = FakeSocketInjector();
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          socketService: _MockSocketService(registrar),
+        );
+
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('chat:completion', {
+          'output': [
+            {
+              'type': 'message',
+              'id': 'out-1',
+              'status': 'complete',
+              'role': 'assistant',
+              'content': [
+                {'type': 'output_text', 'text': 'Structured output'},
+              ],
+            },
+          ],
+          'selected_model_id': 'gpt-4o',
+          'usage': {'prompt_tokens': 3, 'completion_tokens': 5},
+          'sources': [
+            {
+              'source': {'name': 'doc', 'url': 'https://example.com/doc'},
+              'document': ['snippet'],
+            },
+          ],
+        }, messageId: 'msg-1');
+
+        await pumpMicrotasks();
+
+        final lastMessage = log.messages.last;
+        check(log.messageByIdMutationCount).equals(1);
+        check(log.sourceReferences).isEmpty();
+        check(lastMessage.output).has((it) => it?.length, 'length').equals(1);
+        check(lastMessage.metadata).isNotNull();
+        check(lastMessage.metadata!['selectedModelId']).equals('gpt-4o');
+        check(lastMessage.metadata!['arena']).equals(true);
+        expect(
+          lastMessage.usage,
+          equals({'prompt_tokens': 3, 'completion_tokens': 5}),
+        );
+        check(lastMessage.sources).has((it) => it.length, 'length').equals(1);
+        check(lastMessage.sources.single.url).equals('https://example.com/doc');
+      },
+    );
+
+    test(
+      'taskSocket channel stream preserves malformed payload fallback',
+      () async {
+        final log = _CallbackLog();
+        final registrar = FakeSocketInjector();
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          socketService: _MockSocketService(registrar),
+        );
+
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('request:chat:completion', {
+          'channel': 'chan-1',
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        registrar.emitChannelLine('chan-1', 'data: {not json');
+        await pumpMicrotasks();
+
+        check(log.appendedChunks).deepEquals(['data: {not json']);
+        check(log.messages.last.content).equals('data: {not json');
+
+        registrar.emitChannelLine('chan-1', 'data: [DONE]');
+        await pumpMicrotasks();
+
+        check(log.finishCount).equals(1);
+      },
+    );
+
     // -----------------------------------------------------------------------
     // 2. taskSocket sessions consume socket deltas and finish once on done
     // -----------------------------------------------------------------------
@@ -760,9 +933,13 @@ void main() {
 
       await pumpMicrotasks();
 
-      check(log.followUpUpdates.length).equals(1);
-      check(log.followUpUpdates.single.$1).equals('msg-1');
-      check(log.followUpUpdates.single.$2).deepEquals(['Ask a follow-up']);
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.messages.last.followUps).deepEquals(['Ask a follow-up']);
+      check(log.messages.last.metadata).isNotNull();
+      expect(
+        log.messages.last.metadata!['followUps'],
+        equals(['Ask a follow-up']),
+      );
       check(log.uiFinishCount).equals(1);
       check(log.finishCount).equals(0);
     });
@@ -819,9 +996,10 @@ void main() {
 
         check(log.messages.last.id).equals('msg-1');
         check(log.messages.last.content).equals('Bound content');
-        check(log.followUpUpdates.length).equals(1);
-        check(log.followUpUpdates.single.$1).equals('msg-1');
-        check(log.followUpUpdates.single.$2).deepEquals(['Ask again']);
+        check(log.messageByIdMutationCount).equals(1);
+        check(log.messages.last.followUps).deepEquals(['Ask again']);
+        check(log.messages.last.metadata).isNotNull();
+        expect(log.messages.last.metadata!['followUps'], equals(['Ask again']));
         check(log.finishCount).equals(1);
       },
     );
@@ -861,7 +1039,8 @@ void main() {
 
         check(registrar.hasChatHandler).isTrue();
         check(log.messages.last.content).equals('');
-        check(log.followUpUpdates).isEmpty();
+        check(log.messages.last.followUps).isEmpty();
+        check(log.messageByIdMutationCount).equals(0);
         check(log.finishCount).equals(0);
       },
     );
@@ -942,7 +1121,8 @@ void main() {
 
         await pumpMicrotasks();
 
-        check(log.followUpUpdates).isEmpty();
+        check(log.messages.last.followUps).isEmpty();
+        check(log.messageByIdMutationCount).equals(0);
       },
     );
 
@@ -981,7 +1161,8 @@ void main() {
         await pumpMicrotasks();
         await pumpMicrotasks();
 
-        check(log.followUpUpdates).isEmpty();
+        check(log.messages.last.followUps).isEmpty();
+        check(log.messageByIdMutationCount).equals(0);
         check(registrar.hasChatHandler).isFalse();
         check(
           adapter.requestCount(method: 'POST', path: '/api/v1/chats/conv-1'),
@@ -1135,19 +1316,9 @@ void main() {
       await pumpMicrotasks();
       await pumpMicrotasks();
 
-      // Usage should have been applied via updateLastMessageWith
-      check(log.messageUpdaters.length).isGreaterOrEqual(1);
-      // Apply an updater to a blank message and check usage was set
-      final updated = log.messageUpdaters.first(
-        ChatMessage(
-          id: 'msg-1',
-          role: 'assistant',
-          content: '',
-          timestamp: DateTime.now(),
-        ),
-      );
-      check(updated.usage).isNotNull();
-      check(updated.usage!['total_tokens']).equals(42);
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.messages.last.usage).isNotNull();
+      check(log.messages.last.usage!['total_tokens']).equals(42);
     });
 
     test('jsonCompletion applies error metadata', () async {
@@ -1168,8 +1339,9 @@ void main() {
       await pumpMicrotasks();
 
       check(log.finishCount).equals(1);
-      // Should have applied the error via updateLastMessageWith
-      check(log.messageUpdaters.length).isGreaterOrEqual(1);
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.messages.last.error).isNotNull();
+      check(log.messages.last.error!.content).equals('something broke');
     });
 
     test('jsonCompletion applies sources metadata', () async {
@@ -1199,7 +1371,10 @@ void main() {
       await pumpMicrotasks();
       await pumpMicrotasks();
 
-      check(log.sourceReferences).isNotEmpty();
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.sourceReferences).isEmpty();
+      check(log.messages.last.sources).has((it) => it.length, 'length').equals(1);
+      check(log.messages.last.sources.single.url).equals('https://example.com');
     });
 
     // -----------------------------------------------------------------------
@@ -1267,7 +1442,11 @@ void main() {
       await pumpMicrotasks();
       await pumpMicrotasks();
 
-      check(log.messageUpdaters.length).isGreaterOrEqual(1);
+      check(log.messageByIdMutationCount).equals(1);
+      expect(
+        log.messages.last.usage,
+        equals({'prompt_tokens': 10, 'completion_tokens': 5}),
+      );
     });
 
     test('httpStream applies selected model update', () async {
@@ -1291,7 +1470,10 @@ void main() {
       await pumpMicrotasks();
       await pumpMicrotasks();
 
-      check(log.messageUpdaters.length).isGreaterOrEqual(1);
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.messages.last.metadata).isNotNull();
+      check(log.messages.last.metadata!['selectedModelId']).equals('gpt-4o');
+      check(log.messages.last.metadata!['arena']).equals(true);
     });
 
     test('httpStream applies sources update', () async {
@@ -1322,7 +1504,10 @@ void main() {
       await pumpMicrotasks();
       await pumpMicrotasks();
 
-      check(log.sourceReferences).isNotEmpty();
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.sourceReferences).isEmpty();
+      check(log.messages.last.sources).has((it) => it.length, 'length').equals(1);
+      check(log.messages.last.sources.single.url).equals('https://a.com');
     });
 
     test('httpStream applies error update', () async {
@@ -1348,7 +1533,9 @@ void main() {
       await pumpMicrotasks();
       await pumpMicrotasks();
 
-      check(log.messageUpdaters.length).isGreaterOrEqual(1);
+      check(log.messageByIdMutationCount).equals(1);
+      check(log.messages.last.error).isNotNull();
+      check(log.messages.last.error!.content).equals('rate limited');
       check(log.finishCount).equals(1);
     });
 
@@ -1405,6 +1592,8 @@ void main() {
                   'document': ['snippet'],
                 },
               ],
+              usage: const {'prompt_tokens': 7, 'completion_tokens': 11},
+              metadata: const {'serverFlag': true},
             ),
           ],
         );
@@ -1444,6 +1633,12 @@ void main() {
         check(lastMsg.statusHistory.single.description).equals('Searching');
         check(lastMsg.sources).has((it) => it.length, 'length').equals(1);
         check(lastMsg.sources.single.url).equals('https://example.com/doc');
+        expect(
+          lastMsg.usage,
+          equals({'prompt_tokens': 7, 'completion_tokens': 11}),
+        );
+        check(lastMsg.metadata).isNotNull();
+        check(lastMsg.metadata!['serverFlag']).equals(true);
         check(log.finishCount).equals(1);
         check(
           adapter.requestCount(method: 'GET', path: '/api/v1/chats/conv-1'),
@@ -1560,6 +1755,49 @@ void main() {
 
         check(log.messages.last.content).equals('Recovered answer');
         check(log.finishCount).equals(1);
+      },
+    );
+
+    test(
+      'httpStream event completion done trusts visible streaming content before empty recovery checks',
+      () async {
+        final log = _CallbackLog();
+        const visibleStreamingContent = 'Visible streamed answer';
+        final api = _buildFakeApi(
+          pollResponse: _serverConversationResponse(
+            messages: [_serverAssistantMessage(content: 'Recovered answer')],
+          ),
+        );
+        final adapter = api.dio.httpClientAdapter as _StubAdapter;
+
+        _attach(
+          session: ChatCompletionSession.httpStream(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            conversationId: 'conv-1',
+            byteStream: Stream<List<int>>.fromIterable([
+              _sseFrame({
+                'type': 'chat:completion',
+                'data': {'done': true},
+              }),
+            ]),
+            abort: () async {},
+          ),
+          log: log,
+          api: api,
+          activeConversationId: 'conv-1',
+          getVisibleStreamingContent: () => visibleStreamingContent,
+        );
+
+        await pumpMicrotasks();
+        await pumpMicrotasks();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await pumpMicrotasks();
+
+        check(log.finishCount).equals(1);
+        check(
+          adapter.requestCount(method: 'GET', path: '/api/v1/chats/conv-1'),
+        ).equals(0);
       },
     );
 
@@ -2000,6 +2238,81 @@ void main() {
       },
     );
 
+    test(
+      'httpStream snapshot refresh batches follow-ups and metadata into one mutation',
+      () async {
+        final log = _CallbackLog(
+          initialMessages: [
+            ChatMessage(
+              id: 'msg-1',
+              role: 'assistant',
+              content: 'Answer',
+              timestamp: DateTime.now(),
+              isStreaming: true,
+            ),
+          ],
+        );
+        final api = _buildFakeApi(
+          pollResponse: _serverConversationResponse(
+            messages: [
+              _serverAssistantMessage(
+                content: 'Answer',
+                followUps: const ['Ask again'],
+                statusHistory: const [
+                  {'description': 'Searching', 'done': true},
+                ],
+                sources: const [
+                  {
+                    'source': {
+                      'name': 'doc',
+                      'url': 'https://example.com/doc',
+                    },
+                    'document': ['snippet'],
+                  },
+                ],
+                usage: const {'prompt_tokens': 5, 'completion_tokens': 8},
+                metadata: const {'serverFlag': true},
+              ),
+            ],
+          ),
+        );
+
+        _attach(
+          session: ChatCompletionSession.httpStream(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            conversationId: 'conv-1',
+            byteStream: Stream<List<int>>.fromIterable([_sseDone()]),
+            abort: () async {},
+          ),
+          log: log,
+          api: api,
+          activeConversationId: 'conv-1',
+        );
+
+        await pumpMicrotasks();
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        for (var i = 0; i < 3; i++) {
+          await pumpMicrotasks();
+        }
+
+        final lastMsg = log.messages.last;
+        check(log.finishCount).equals(1);
+        check(log.messageByIdMutationCount).equals(1);
+        check(lastMsg.followUps).deepEquals(['Ask again']);
+        check(lastMsg.statusHistory).has((it) => it.length, 'length').equals(1);
+        check(lastMsg.statusHistory.single.description).equals('Searching');
+        check(lastMsg.sources).has((it) => it.length, 'length').equals(1);
+        check(lastMsg.sources.single.url).equals('https://example.com/doc');
+        expect(
+          lastMsg.usage,
+          equals({'prompt_tokens': 5, 'completion_tokens': 8}),
+        );
+        check(lastMsg.metadata).isNotNull();
+        check(lastMsg.metadata!['serverFlag']).equals(true);
+      },
+    );
+
     // -----------------------------------------------------------------------
     // 7. httpStream premature end recovers from newer server state
     // -----------------------------------------------------------------------
@@ -2151,6 +2464,63 @@ void main() {
       final lastContent = log.messages.last.content;
       check(lastContent.length).isGreaterThan('short'.length);
     });
+
+    test(
+      'httpStream recovery preserves longer visible streaming content than stale server snapshots',
+      () async {
+        final log = _CallbackLog(
+          initialMessages: fakeStreamingAssistantMessages(content: 'lagging'),
+        );
+        const visibleStreamingContent =
+            'I am the newer visible streaming content';
+
+        final byteStream = Stream<List<int>>.empty();
+        final api = _buildFakeApi(
+          pollResponse: {
+            'chat': {
+              'messages': [
+                {'id': 'msg-1', 'content': 'short stale', 'done': true},
+              ],
+            },
+          },
+        );
+
+        void flushVisibleStreamingBuffer() {
+          log.flushStreamingBuffer();
+          if (log.messages.isEmpty || log.messages.last.role != 'assistant') {
+            return;
+          }
+          final last = log.messages.last;
+          log.messages = [
+            ...log.messages.sublist(0, log.messages.length - 1),
+            last.copyWith(content: visibleStreamingContent),
+          ];
+        }
+
+        _attach(
+          session: ChatCompletionSession.httpStream(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            conversationId: 'conv-1',
+            byteStream: byteStream,
+            abort: () async {},
+          ),
+          log: log,
+          api: api,
+          activeConversationId: 'conv-1',
+          getVisibleStreamingContent: () => visibleStreamingContent,
+          flushStreamingBuffer: flushVisibleStreamingBuffer,
+        );
+
+        await pumpMicrotasks();
+        for (var i = 0; i < 10; i++) {
+          await pumpMicrotasks();
+        }
+
+        check(log.messages.last.content).equals(visibleStreamingContent);
+        check(log.replacedContents).isEmpty();
+      },
+    );
 
     // -----------------------------------------------------------------------
     // 10. Rename: ActiveChatStream replaces ActiveSocketStream
@@ -2389,6 +2759,49 @@ void main() {
       check(lastMsg.files).isNotNull();
       check(lastMsg.files!.length).equals(1);
       check(lastMsg.files![0]['url']).equals('https://example.com/gen.png');
+    });
+
+    test('duplicate status events do not rewrite identical metadata', () async {
+      final log = _CallbackLog();
+      final registrar = FakeSocketInjector();
+      final statusPayload = <String, dynamic>{
+        'action': 'knowledge_search',
+        'description': 'Searching',
+        'done': false,
+      };
+
+      _attach(
+        session: ChatCompletionSession.taskSocket(
+          messageId: 'msg-1',
+          sessionId: 'sess-1',
+          taskId: 'task-1',
+        ),
+        log: log,
+        socketService: _MockSocketService(registrar),
+      );
+
+      await pumpMicrotasks();
+
+      registrar.emitChatEvent('status', statusPayload);
+      await pumpMicrotasks();
+
+      check(log.messageByIdMutationCount).equals(1);
+
+      registrar.emitChatEvent(
+        'status',
+        Map<String, dynamic>.from(statusPayload),
+      );
+      await pumpMicrotasks();
+
+      final lastMsg = log.messages.last;
+      check(log.messageByIdMutationCount).equals(1);
+      check(lastMsg.statusHistory.length).equals(1);
+      check(lastMsg.statusHistory.single.description).equals('Searching');
+      check(lastMsg.metadata).isNotNull();
+      check(lastMsg.metadata!['status']).isA<Map<String, dynamic>>();
+      check(
+        (lastMsg.metadata!['status'] as Map<String, dynamic>)['description'],
+      ).equals('Searching');
     });
 
     // -----------------------------------------------------------------------

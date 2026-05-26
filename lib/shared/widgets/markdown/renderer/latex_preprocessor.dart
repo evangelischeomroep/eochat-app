@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tex/flutter_tex.dart';
 
+import '../../jovial_svg_image.dart';
 import 'latex_rendering_server.dart';
 
 /// Extracts LaTeX expressions before markdown parsing and
@@ -22,13 +23,22 @@ import 'latex_rendering_server.dart';
 class LatexPreprocessor {
   /// Creates a preprocessor instance for a single parse
   /// operation.
-  LatexPreprocessor();
+  LatexPreprocessor()
+    : _blockExpressions = <String, String>{},
+      _inlineExpressions = <String, String>{};
+
+  LatexPreprocessor.fromExpressions(
+    Map<String, String> blockExpressions,
+    Map<String, String> inlineExpressions,
+  ) : _blockExpressions = Map<String, String>.from(blockExpressions),
+      _inlineExpressions = Map<String, String>.from(inlineExpressions),
+      _counter = blockExpressions.length + inlineExpressions.length;
 
   /// Block-level LaTeX expressions (placeholder key to TeX).
-  final _blockExpressions = <String, String>{};
+  final Map<String, String> _blockExpressions;
 
   /// Inline LaTeX expressions (placeholder key to TeX).
-  final _inlineExpressions = <String, String>{};
+  final Map<String, String> _inlineExpressions;
 
   /// Monotonically increasing counter for unique keys.
   int _counter = 0;
@@ -75,6 +85,12 @@ class LatexPreprocessor {
   /// Whether any LaTeX was found during [extract].
   bool get hasLatex =>
       _blockExpressions.isNotEmpty || _inlineExpressions.isNotEmpty;
+
+  Map<String, String> get blockExpressions =>
+      Map<String, String>.unmodifiable(_blockExpressions);
+
+  Map<String, String> get inlineExpressions =>
+      Map<String, String>.unmodifiable(_inlineExpressions);
 
   /// Replaces LaTeX expressions with placeholder tokens.
   ///
@@ -189,6 +205,7 @@ class LatexPreprocessor {
     String tex, {
     required TextStyle textStyle,
     required bool isBlock,
+    Future<void>? startupFuture,
   }) {
     final color = textStyle.color ?? Colors.black;
     final fontSize = textStyle.fontSize ?? 14.0;
@@ -196,13 +213,16 @@ class LatexPreprocessor {
     Widget buildMath() {
       return Math2SVG(
         math: tex,
+        // `flutter_tex` caches rendered SVGs internally; keep alive helps
+        // preserve that state for still-mounted formulas in scrolling views.
+        wantKeepAlive: true,
         loadingWidgetBuilder: (_) => _buildLatexFallback(tex, textStyle),
         errorWidgetBuilder: (_, _) => _buildLatexFallback(tex, textStyle),
         formulaWidgetBuilder: (context, svg) {
           final height = _svgExToPixels(svg, fontSize);
           return ColorFiltered(
             colorFilter: ColorFilter.mode(color, BlendMode.srcATop),
-            child: SvgPicture.string(svg, height: height),
+            child: JovialSvgImage.string(svg, height: height),
           );
         },
       );
@@ -211,7 +231,7 @@ class LatexPreprocessor {
     final math = LatexRenderingServer.isStarted
         ? buildMath()
         : FutureBuilder<void>(
-            future: LatexRenderingServer.ensureStarted(),
+            future: startupFuture ?? LatexRenderingServer.ensureStarted(),
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done ||
                   snapshot.hasError) {
