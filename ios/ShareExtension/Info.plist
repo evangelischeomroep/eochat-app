@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>Ask EOchat</string>
+    <string>$(EOCHAT_DISPLAY_NAME_SHARE)</string>
     <key>AppGroupId</key>
     <string>$(APP_GROUP_ID)</string>
 

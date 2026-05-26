@@ -4,7 +4,7 @@
 	<dict>
 		<key>BGTaskSchedulerPermittedIdentifiers</key>
 		<array>
-			<string>nl.eo.eochat.refresh</string>
+			<string>$(EOCHAT_BG_TASK_ID)</string>
 		</array>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
@@ -46,17 +46,17 @@
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
 				<key>CFBundleURLName</key>
-				<string>nl.eo.eochat.share</string>
+				<string>$(EOCHAT_BUNDLE_APP_RELEASE).share</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>ShareMedia-nl.eo.eochat</string>
+					<string>ShareMedia-$(EOCHAT_BUNDLE_APP_RELEASE)</string>
 				</array>
 			</dict>
 			<dict>
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
 				<key>CFBundleURLName</key>
-				<string>nl.eo.eochat.widget</string>
+				<string>$(EOCHAT_BUNDLE_APP_RELEASE).widget</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
 					<string>$(APP_URL_SCHEME)</string>

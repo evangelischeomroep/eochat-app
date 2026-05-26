@@ -1,0 +1,39 @@
+// EOchat fork-specific iOS build settings.
+//
+// Centralised here so the project file (project.pbxproj) and Info.plist stay
+// closer to vanilla upstream Conduit. To rebrand or change identifiers, edit
+// this file only — the pbxproj references these variables via $(VAR).
+//
+// Included from Debug.xcconfig and Release.xcconfig so all build
+// configurations (Debug, Release, Profile) see the same variable set.
+
+// Apple Developer team for code signing.
+EOCHAT_DEVELOPMENT_TEAM = S935HE8ULL
+
+// Product bundle identifiers per-target per-config.
+// (Profile re-uses the Debug bundle IDs to keep upstream's Profile-as-debug
+// signing scheme.)
+EOCHAT_BUNDLE_APP_RELEASE = nl.eo.eochat
+EOCHAT_BUNDLE_APP_DEBUG = nl.eo.eochat.debug
+EOCHAT_BUNDLE_TESTS = nl.eo.eochat.RunnerTests
+EOCHAT_BUNDLE_WIDGET_RELEASE = nl.eo.eochat.ConduitWidget
+EOCHAT_BUNDLE_WIDGET_DEBUG = nl.eo.eochat.debug.ConduitWidget
+EOCHAT_BUNDLE_SHARE_RELEASE = nl.eo.eochat.ShareExtension
+EOCHAT_BUNDLE_SHARE_DEBUG = nl.eo.eochat.debug.ShareExtension
+
+// App group used by widgets and share extension.
+EOCHAT_APP_GROUP_RELEASE = group.nl.eo.eochat
+EOCHAT_APP_GROUP_DEBUG = group.nl.eo.eochat.debug
+
+// URL scheme for deep links + share-media routing.
+EOCHAT_URL_SCHEME_RELEASE = eochat
+EOCHAT_URL_SCHEME_DEBUG = eochat-debug
+
+// Display names (CFBundleDisplayName via INFOPLIST_KEY_*).
+EOCHAT_DISPLAY_NAME_APP_RELEASE = EOchat
+EOCHAT_DISPLAY_NAME_APP_DEBUG = EOchat Debug
+EOCHAT_DISPLAY_NAME_WIDGET = EOchat Widget
+EOCHAT_DISPLAY_NAME_SHARE = Ask EOchat
+
+// Background task scheduler identifier used in Info.plist.
+EOCHAT_BG_TASK_ID = nl.eo.eochat.refresh
