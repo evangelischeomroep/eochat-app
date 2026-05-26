@@ -177,6 +177,13 @@ flavour, edit one file.
 - `Podfile` carries an EOchat-tagged `post_install` block that generates
   a dSYM for `objective_c.framework`. Tag your future post-install
   additions the same way so the merge tool can spot them.
+- Extension targets (`ShareExtension`, `ConduitWidgetExtension`) do not
+  reliably inherit `Runner`'s xcconfig chain. If `project.pbxproj` uses
+  `$(EOCHAT_*)` values in those targets, each extension build config
+  (Debug/Release/Profile) must have a `baseConfigurationReference` to an
+  extension xcconfig that includes `EOchatBranding.xcconfig` (and Pods
+  xcconfig where relevant). If this link breaks, Xcode reports
+  "Bundle identifier is missing" even when `EOCHAT_BUNDLE_*` is defined.
 
 ---
 
