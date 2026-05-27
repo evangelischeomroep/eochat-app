@@ -1,5 +1,6 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>AppGroupId</key>
@@ -9,7 +10,7 @@
 		<string>$(EOCHAT_BG_TASK_ID)</string>
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
+	<true />
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -68,41 +69,47 @@
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>FLTEnableImpeller</key>
-	<true/>
+	<true />
 	<key>FLTEnableWideGamut</key>
-	<true/>
+	<true />
 	<key>ITSAppUsesNonExemptEncryption</key>
-	<false/>
+	<false />
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>https</string>
 		<string>http</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
-	<true/>
+	<true />
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<true/>
+		<true />
 		<key>NSAllowsLocalNetworking</key>
-		<true/>
+		<true />
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>EOchat uses the camera to take photos or videos you choose to share in chats. For example, you can snap a photo of a document and attach it to a message.</string>
+	<string
+        >EOchat uses the camera to take photos or videos you choose to share in chats. For example, you can snap a photo of a document and attach it to a message.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>EOchat uses your location to keep location-aware chats and prompts up to date. When enabled, your current location may be sent to and stored with your account on your connected server.</string>
+	<string
+        >EOchat uses your location to keep location-aware chats and prompts up to date. When enabled, your current location may be sent to and stored with your account on your connected server.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>EOchat uses your location to keep location-aware chats and prompts up to date, including when enabled for ongoing updates. Your location may be sent to and stored with your account on your connected server.</string>
+	<string
+        >EOchat uses your location to keep location-aware chats and prompts up to date, including when enabled for ongoing updates. Your location may be sent to and stored with your account on your connected server.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>EOchat uses the microphone to record voice messages and enable voice-to-text in chats. For example, when you hold the mic button in a conversation, we capture your speech to send as an audio message or transcript.</string>
+	<string
+        >EOchat uses the microphone to record voice messages and enable voice-to-text in chats. For example, when you hold the mic button in a conversation, we capture your speech to send as an audio message or transcript.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>EOchat needs access to your photo library so you can select existing images or videos to share in chats. For example, you can pick a screenshot to include in a conversation.</string>
+	<string
+        >EOchat needs access to your photo library so you can select existing images or videos to share in chats. For example, you can pick a screenshot to include in a conversation.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>EOchat uses on-device speech recognition so you can dictate messages hands‑free. Your speech is converted to text on your device when available.</string>
+	<string
+        >EOchat uses on-device speech recognition so you can dictate messages hands‑free. Your speech is converted to text on your device when available.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
+		<false />
 		<key>UISceneConfigurations</key>
 		<dict>
 			<key>UIWindowSceneSessionRoleApplication</key>
@@ -121,7 +128,7 @@
 		</dict>
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
+	<true />
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
@@ -131,7 +138,7 @@
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIStatusBarHidden</key>
-	<false/>
+	<false />
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -146,6 +153,6 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
-	<true/>
+	<true />
 </dict>
 </plist>
