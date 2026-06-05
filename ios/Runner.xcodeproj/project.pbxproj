@@ -370,7 +370,7 @@
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				24812099A551BA4570C59A8E /* [CP] Embed Pods Frameworks */,
 				C10E41C5BC1B71D016E9688D /* [CP] Copy Pods Resources */,
-				0035924A5D5B5D2F169B6940 /* [EOchat] Generate objective_c.framework dSYM */,
+				235BC5808F0A0D732735A911 /* [EOchat] Generate objective_c.framework dSYM */,
 			);
 			buildRules = (
 			);
@@ -518,7 +518,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		0035924A5D5B5D2F169B6940 /* [EOchat] Generate objective_c.framework dSYM */ = {
+		235BC5808F0A0D732735A911 /* [EOchat] Generate objective_c.framework dSYM */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
