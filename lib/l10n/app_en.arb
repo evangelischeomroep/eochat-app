@@ -2674,7 +2674,31 @@
   },
   "appAndChatSubtitle": "Theme, language, chat behavior, and advanced overrides",
   "@appAndChatSubtitle": {
-    "description": "Subtitle for the app and chat settings hub tile."
+    "description": "Subtitle for app customization settings."
+  },
+  "settingsTitle": "Settings",
+  "@settingsTitle": {
+    "description": "Title for the settings menu."
+  },
+  "profileTitle": "Profile",
+  "@profileTitle": {
+    "description": "Title for the profile section in settings."
+  },
+  "appearanceTitle": "Appearance",
+  "@appearanceTitle": {
+    "description": "Title for appearance-related settings."
+  },
+  "chatsTitle": "Chats",
+  "@chatsTitle": {
+    "description": "Title for chat-related settings."
+  },
+  "aiAndMemoryTitle": "AI and Memory",
+  "@aiAndMemoryTitle": {
+    "description": "Title for AI and memory settings."
+  },
+  "dataAndConnectionTitle": "Data and Connection",
+  "@dataAndConnectionTitle": {
+    "description": "Title for data and connection settings."
   },
   "accountSettingsTitle": "Account",
   "@accountSettingsTitle": {

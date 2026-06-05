@@ -10,17 +10,18 @@ String nativeQuickActionsTitle(AppLocalizations l10n) {
   return l10n.quickActionsDescription;
 }
 
-String nativeSettingsTitle(AppLocalizations _) => 'Settings';
+String nativeSettingsTitle(AppLocalizations l10n) => l10n.settingsTitle;
 
-String nativeProfileTitle(AppLocalizations _) => 'Profile';
+String nativeProfileTitle(AppLocalizations l10n) => l10n.profileTitle;
 
-String nativeAppearanceTitle(AppLocalizations _) => 'Appearance';
+String nativeAppearanceTitle(AppLocalizations l10n) => l10n.appearanceTitle;
 
-String nativeChatsTitle(AppLocalizations _) => 'Chats';
+String nativeChatsTitle(AppLocalizations l10n) => l10n.chatsTitle;
 
-String nativeAiMemoryTitle(AppLocalizations _) => 'AI and Memory';
+String nativeAiMemoryTitle(AppLocalizations l10n) => l10n.aiAndMemoryTitle;
 
-String nativeDataConnectionTitle(AppLocalizations _) => 'Data and Connection';
+String nativeDataConnectionTitle(AppLocalizations l10n) =>
+    l10n.dataAndConnectionTitle;
 
 String? resolveNativeSheetModelName(List<Model> models, String? modelId) {
   if (modelId == null || modelId.isEmpty) return null;
