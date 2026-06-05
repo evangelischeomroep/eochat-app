@@ -305,7 +305,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       path: Routes.serverConnection,
       name: RouteNames.serverConnection,
       pageBuilder: (context, state) =>
-          _buildPlatformPage(state: state, child: const ServerConnectionPage()),
+          ForkOverrides.skipSetupScreenWhenPreconfigured
+              ? _buildNoTransitionPage(
+                  state: state,
+                  child: const ServerConnectionPage(),
+                )
+              : _buildPlatformPage(
+                  state: state,
+                  child: const ServerConnectionPage(),
+                ),
     ),
     GoRoute(
       path: Routes.connectionIssue,
@@ -318,22 +326,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       name: RouteNames.authentication,
       pageBuilder: (context, state) {
         final extra = state.extra;
-        // Support both AuthFlowConfig (new) and ServerConfig (legacy)
+        final Widget child;
         if (extra is AuthFlowConfig) {
-          return _buildPlatformPage(
-            state: state,
-            child: AuthenticationPage(
-              serverConfig: extra.serverConfig,
-              backendConfig: extra.backendConfig,
-            ),
+          child = AuthenticationPage(
+            serverConfig: extra.serverConfig,
+            backendConfig: extra.backendConfig,
+          );
+        } else {
+          child = AuthenticationPage(
+            serverConfig: extra is ServerConfig ? extra : null,
           );
         }
-        return _buildPlatformPage(
-          state: state,
-          child: AuthenticationPage(
-            serverConfig: extra is ServerConfig ? extra : null,
-          ),
-        );
+        return ForkOverrides.forceSsoOnly
+            ? _buildNoTransitionPage(state: state, child: child)
+            : _buildPlatformPage(state: state, child: child);
       },
     ),
     GoRoute(
@@ -341,12 +347,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       name: RouteNames.ssoAuth,
       pageBuilder: (context, state) {
         final config = state.extra;
-        return _buildPlatformPage(
-          state: state,
-          child: SsoAuthPage(
-            serverConfig: config is ServerConfig ? config : null,
-          ),
+        final child = SsoAuthPage(
+          serverConfig: config is ServerConfig ? config : null,
         );
+        return ForkOverrides.forceSsoOnly
+            ? _buildNoTransitionPage(state: state, child: child)
+            : _buildPlatformPage(state: state, child: child);
       },
     ),
     GoRoute(

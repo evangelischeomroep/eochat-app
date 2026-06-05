@@ -242,14 +242,23 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
         scope: 'auth/connection',
       );
 
-      // Don't save server config yet - wait until authentication succeeds
-      // The config is passed to the authentication page along with backend config
       if (mounted) {
-        final authFlowConfig = AuthFlowConfig(
-          serverConfig: tempConfig,
-          backendConfig: backendConfig,
-        );
-        context.pushNamed(RouteNames.authentication, extra: authFlowConfig);
+        if (ForkOverrides.forceSsoOnly) {
+          // Server verified — save config now and skip the authentication page,
+          // which would only auto-navigate here anyway.
+          await _saveServerConfig(tempConfig);
+          if (mounted) {
+            context.pushNamed(RouteNames.ssoAuth, extra: tempConfig);
+          }
+        } else {
+          context.pushNamed(
+            RouteNames.authentication,
+            extra: AuthFlowConfig(
+              serverConfig: tempConfig,
+              backendConfig: backendConfig,
+            ),
+          );
+        }
       }
     } catch (e, stack) {
       DebugLogger.error(

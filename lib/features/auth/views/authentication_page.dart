@@ -108,7 +108,6 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
     super.initState();
     _setDefaultAuthMode();
     _loadSavedCredentials();
-    // Check for auth errors (e.g., forced logout due to API key)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAuthStateError();
     });
@@ -283,6 +282,25 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
 
   @override
   Widget build(BuildContext context) {
+    // For SSO-only forks, skip rendering auth UI — we're auto-navigating to SSO.
+    if (_forceSsoOnly) {
+      return AdaptiveRouteShell(
+        backgroundColor: context.conduitTheme.surfaceBackground,
+        body: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                context.conduitTheme.loadingIndicator,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     // Listen for auth state changes to run post-login side effects.
     ref.listen<AsyncValue<AuthState>>(authStateManagerProvider, (
       previous,
