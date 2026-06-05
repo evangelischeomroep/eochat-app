@@ -1,306 +1,161 @@
-# EOchat Fork — Maintenance Guide
+# EOchat Fork — Upstream Maintenance Playbook
 
-EOchat is a long-lived fork of [Conduit](https://github.com/cogwheel0/conduit)
-that ships as the EO (Evangelische Omroep) branded chat client. We track
-upstream actively and merge releases (`vX.Y.Z` tags) into `main`. Stay close
-to upstream — the smaller our divergence, the cheaper merges become.
+EOchat is a long-lived fork of [Conduit](https://github.com/cogwheel0/conduit).
 
-This document describes the **architectural conventions** the fork uses so
-divergence stays cheap. It is not an exhaustive inventory of every changed
-line; for that, run `git diff upstream/main` after `git fetch upstream`.
+## 1) Primary goal (always)
 
----
+**Stay as close to upstream as possible.**
 
-## North star: minimise the diff against upstream
+Small diff = cheap merges = fewer regressions.
 
-Every fork modification carries an ongoing maintenance tax — paid in time
-spent resolving merge conflicts. Before adding fork-specific code, prefer in
-this order:
+Before adding fork behavior, always prefer:
 
-1. **Configure** — change behaviour via `ForkOverrides` (Dart) or
-   `EOchatBranding.xcconfig` (iOS). No source code edits required.
-2. **Wrap** — add a one-line `if (ForkOverrides.flag) ...` around upstream
-   code. Survives almost any edit upstream makes inside the wrapped block.
-3. **Add** — drop a new fork-only file next to upstream code. New files
-   never conflict.
-4. **Edit upstream** — last resort. Touch as few lines as possible; document
-   the *why* in a comment.
+1. **Configure** (`ForkOverrides`, `EOchatBranding.xcconfig`)
+2. **Wrap** (small `if (ForkOverrides.flag) ...` around upstream)
+3. **Add file** (fork-only file next to upstream)
+4. **Edit upstream file** (last resort, smallest possible edit)
 
-If a fork modification can't fit one of patterns 1–3, treat it as a code
-smell and ask whether the upstream design has an extension point we missed.
+If you are about to do #4, first ask: *can this be moved to config/wrapper/new-file?*
 
 ---
 
-## Where fork-specific code lives
+## 2) Where fork behavior belongs
 
-| Concern | Location | Pattern |
-|---|---|---|
-| Runtime feature flags | `lib/core/config/fork_overrides.dart` | `static const ... = bool.fromEnvironment(...)` overridable via `--dart-define` |
-| Startup behaviour | `lib/core/config/fork_startup_watchdog.dart` | Standalone provider, no upstream edits |
-| Theme (EO brand palette) | `lib/shared/theme/eochat_palette.dart` | New palette registered in `TweakcnThemes.all` |
-| iOS bundle config | `ios/Flutter/EOchatBranding.xcconfig` | xcconfig variables referenced from `project.pbxproj` and `Info.plist` |
-| iOS post-install hooks | `ios/Podfile` `post_install` blocks | Tagged `[EOchat] …` in the build phase name |
-| App icons, screenshots | `ios/Runner/Assets.xcassets/AppIcon*`, `android/.../mipmap-*`, `assets/icons` | Asset replacement only — no upstream code edits |
-| Localised brand strings | Per-locale `lib/l10n/app_*.arb` | New `themePaletteEochat*` keys; upstream `*Conduit*` keys stay vanilla |
-| Android native side | `android/app/src/main/kotlin/app/cogwheel/conduit/*.kt` | Sources stay on upstream's directory path; only the `package` declaration changes (see below) |
+- Runtime flags: `lib/core/config/fork_overrides.dart`
+- EO palette: `lib/shared/theme/eochat_palette.dart`
+- iOS brand identifiers: `ios/Flutter/EOchatBranding.xcconfig`
+- iOS extension xcconfig glue:
+  - `ios/ConduitWidget/ConduitWidget.xcconfig`
+  - `ios/ShareExtension/ShareExtension.debug.xcconfig`
+  - `ios/ShareExtension/ShareExtension.release.xcconfig`
+  - `ios/ShareExtension/ShareExtension.profile.xcconfig`
+- Android native package/channel identifiers: `nl.eo.eochat` values in Kotlin + matching Dart call sites
 
-When in doubt, grep for `ForkOverrides`, `EOCHAT_`, and `nl.eo.eochat` —
-those three prefixes should cover most fork-aware code in the project.
-
-### Files that intentionally touch upstream code
-
-These are the *only* upstream files we knowingly edit inline today. If you
-add a new fork behaviour, see whether it can avoid extending this list:
-
-- `lib/core/router/app_router.dart` — fork branch when a server is preconfigured.
-- `lib/core/providers/app_startup_providers.dart` — bootstraps the default
-  server config when the manual setup screen is not skipped.
-- `lib/features/auth/views/server_connection_page.dart` — pre-populates the
-  URL field with the preconfigured server.
-- `lib/features/auth/views/authentication_page.dart` — auto-opens the
-  preferred SSO provider when `forceSsoOnly` is set.
-- `lib/features/profile/views/profile_page.dart` and
-  `lib/features/navigation/widgets/sidebar_user_pill.dart` — donation gate.
-- `lib/shared/services/brand_service.dart` — brand name/description fallback.
-- `lib/shared/theme/color_tokens.dart` — default palette fallback.
-- `lib/shared/theme/tweakcn_themes.dart` — registers `eochat` palette, alias
-  map for legacy `'conduit'` ids.
-- `lib/core/auth/native_cookie_manager.dart` — method-channel name.
-
-Every other fork behaviour should live in a fork-owned file (anything under
-`lib/core/config/`, `lib/shared/theme/eochat_palette.dart`).
+Search prefixes that usually locate fork code quickly:
+- `ForkOverrides`
+- `EOCHAT_`
+- `nl.eo.eochat`
 
 ---
 
-## ForkOverrides: the configuration boundary
+## 3) Allowed inline edits to upstream files
 
-`ForkOverrides` is the single source of truth for runtime fork behaviour.
-Every flag has the same shape:
+Keep this list short. Current known inline-touch files:
 
-```dart
-static const bool showDonationLinks = bool.fromEnvironment(
-  'SHOW_DONATION_LINKS',
-  defaultValue: false,
-);
-```
+- `lib/core/router/app_router.dart`
+- `lib/core/providers/app_startup_providers.dart`
+- `lib/features/auth/views/server_connection_page.dart`
+- `lib/features/auth/views/authentication_page.dart`
+- `lib/features/profile/views/profile_page.dart`
+- `lib/features/navigation/widgets/sidebar_user_pill.dart`
+- `lib/shared/services/brand_service.dart`
+- `lib/shared/theme/color_tokens.dart`
+- `lib/shared/theme/tweakcn_themes.dart`
+- `lib/core/auth/native_cookie_manager.dart`
 
-This gives us three things:
-
-1. **The fork value lives in one file** (default in code) — easy to audit.
-2. **CI / builds can override** via `--dart-define=SHOW_DONATION_LINKS=true`
-   without touching code.
-3. **Call sites stay tiny** — a one-line `if (ForkOverrides.flag) ...` is
-   the entire diff against upstream at the use-site.
-
-Brand strings (`brandName`, `brandDescription`) follow the same pattern but
-return `null` when the override is empty, so the upstream default is used
-unmodified. This keeps the call site as `ForkOverrides.brandNameOverride
-?? 'Conduit'`, which is robust if upstream ever changes their default.
-
-**Add new fork flags here, not at the call site.**
+If a new fork behavior needs another upstream file, document why in the PR.
 
 ---
 
-## Theme: separate palette, don't overwrite
+## 4) Android invariant (important)
 
-Earlier versions of the fork overwrote the `_conduitLight` / `_conduitDark`
-variants in `tweakcn_themes.dart` with EO colours. Any upstream tweak to
-the Conduit theme caused a conflict.
+Kotlin source path stays upstream-like:
+`android/app/src/main/kotlin/app/cogwheel/conduit/...`
 
-Now:
+But Kotlin package is forked:
+`package nl.eo.eochat`
 
-- `lib/shared/theme/eochat_palette.dart` owns the EO palette (constants,
-  light/dark variants, `eochatPalette` definition).
-- `lib/shared/theme/tweakcn_themes.dart` stays close to vanilla. Fork delta
-  is one import, one static field, one entry in the `all` list, and a
-  legacy-id alias map for users who stored `'conduit'` before the split.
-- The default fallback in `color_tokens.dart` is `TweakcnThemes.eochat`.
+Do **not** rename directories to match package unless you intentionally accept a large future merge tax.
 
-To tweak EO colours, edit `eochat_palette.dart` only.
-To add a *third* fork palette later, mirror that pattern: new file, one
-entry in the registry, done.
+Keep native identifiers synchronized across Kotlin + Dart:
+- Method channels (e.g. `nl.eo.eochat/cookies`, `nl.eo.eochat/assistant`)
+- Broadcast actions
+- Any package-qualified `R` references
 
 ---
 
-## Android: package decoupled from directory
+## 5) iOS invariant (most merge-sensitive)
 
-The Kotlin sources still live at `android/app/src/main/kotlin/app/cogwheel/conduit/`
-— the upstream directory path — but each file declares `package nl.eo.eochat`.
+### Source of truth
+All EOchat IDs live in `ios/Flutter/EOchatBranding.xcconfig`.
 
-This is intentional. Renaming the directory to match the package would make
-every upstream commit that touches those Kotlin files conflict on a path
-that no longer exists. Decoupling the path from the package lets Kotlin
-resolve `nl.eo.eochat.R`, `nl.eo.eochat.MainActivity` etc. correctly while
-keeping the source tree byte-identical to upstream for diff purposes.
+`project.pbxproj` and plist/build settings should reference `$(EOCHAT_...)` (not hardcoded literals).
 
-Native identifiers must be kept in sync across the Kotlin/Dart boundary:
+### Extension wiring requirement
+`ShareExtension` and `ConduitWidgetExtension` configs must include branding xcconfig, directly or indirectly.
 
-- **Method channels** — `nl.eo.eochat/cookies`, `nl.eo.eochat/assistant`.
-  Referenced from both `lib/core/auth/native_cookie_manager.dart` and
-  `MainActivity.kt`. Rename one, rename both.
-- **Broadcast actions** — `nl.eo.eochat.TIME_LIMIT_APPROACHING`,
-  `nl.eo.eochat.FOREGROUND_SERVICE_FAILED`, etc. Declared in Kotlin and
-  matched by intent filters.
-- **Resource references** — `nl.eo.eochat.R.layout.assistant_overlay`
-  (lookup paths in Kotlin). The R class is generated under the package,
-  not the directory.
+Required includes (as of now):
+- `ConduitWidget.xcconfig` includes `../Flutter/EOchatBranding.xcconfig`
+- each `ShareExtension.*.xcconfig` includes `../Flutter/EOchatBranding.xcconfig`
 
-If you ever do rename the directory (e.g., upstream stops touching those
-files for a few releases), update `MainActivity.kt` package, the directory,
-the `applicationId` in `android/app/build.gradle.kts`, and the
-`AndroidManifest.xml` `android:name` attributes together.
+If this breaks, Xcode may report missing bundle identifiers even though EOCHAT vars exist.
 
-## iOS bundle config: xcconfig is the source of truth
+### Profile asymmetry (intentional)
+Keep upstream convention:
+- Profile uses **Debug** `APP_GROUP_ID` and `APP_URL_SCHEME`
+- Profile uses **Release** bundle identifiers
 
-All EOchat-specific iOS identifiers — bundle IDs, app group, URL scheme,
-display names, background-task ID, development team — live in
-`ios/Flutter/EOchatBranding.xcconfig`. The xcconfig is included by both
-`Debug.xcconfig` and `Release.xcconfig`, so every build configuration
-(Debug / Release / Profile) sees the same variables.
-
-`project.pbxproj` and the `Info.plist` files reference `$(EOCHAT_*)`
-instead of embedding literal strings. To rebrand or spin up a new
-flavour, edit one file.
-
-**Caveats:**
-
-- Upstream still uses literal values in `project.pbxproj`, so merging a
-  pbxproj change will conflict on these lines. The cost-saver isn't the
-  merge — it's that we now have one place to look when the rebrand
-  question comes up.
-- A few `Info.plist` keys (`CFBundleDisplayName`, `CFBundleName`,
-  permission descriptions like `NSCameraUsageDescription`) still embed
-  the brand string. `INFOPLIST_KEY_*` build settings override the first
-  two at build time; permission strings would need localisation in
-  `InfoPlist.strings` to be fully extracted. Worth doing if upstream's
-  permission strings drift often.
-- `Podfile` carries an EOchat-tagged `post_install` block that generates
-  a dSYM for `objective_c.framework`. Tag your future post-install
-  additions the same way so the merge tool can spot them.
-- Extension targets (`ShareExtension`, `ConduitWidgetExtension`) do not
-  reliably inherit `Runner`'s xcconfig chain. If `project.pbxproj` uses
-  `$(EOCHAT_*)` values in those targets, each extension build config
-  (Debug/Release/Profile) must have a `baseConfigurationReference` to an
-  extension xcconfig that includes `EOchatBranding.xcconfig` (and Pods
-  xcconfig where relevant). If this link breaks, Xcode reports
-  "Bundle identifier is missing" even when `EOCHAT_BUNDLE_*` is defined.
+Do not “simplify” this unless you change all targets consistently and validate signing/deeplinks.
 
 ---
 
-## Localisation
-
-EOchat lives in NL primarily, but we keep all upstream locales. Two
-conventions:
-
-- **Don't override upstream keys** to mean different things. When the
-  fork needs a new string, add a new key (`themePaletteEochat*`,
-  `appTitle`, etc.) rather than redefining an upstream one.
-- **Re-run `flutter gen-l10n`** after editing any `.arb` file. The
-  generated `app_localizations*.dart` is committed, so the regeneration
-  needs to land in the same commit as the ARB edits.
-
-`appTitle` is currently overridden in every locale to read "EOchat"; that
-predates the split and is OK because the string is genuinely the app name.
-
----
-
-## Server, auth, brand surface
-
-These are configured at build time via `ForkOverrides`:
-
-- `preconfigureServer` + `preconfiguredServerUrl` skip the
-  server-selection screen and point all installs at `https://chat.eo.nl`.
-- `skipSetupScreenWhenPreconfigured` jumps straight to auth.
-- `forceSsoOnly` + `preferredSsoProvider` ('microsoft') hide the
-  email/password form and prefer the Microsoft SSO button.
-- `enableStartupLoadingWatchdog` + `startupLoadingTimeoutMs` (12s) make
-  the splash bail out if auth never resolves, so users can recover from a
-  bad cached token instead of staring at a spinner.
-
-All have safe defaults — building without any `--dart-define` produces
-the EOchat-branded build. Pass overrides only when you need a variant
-(e.g., a staging server).
-
----
-
-## Merging from upstream
-
-The expected workflow:
+## 6) Upstream merge workflow (release tags only)
 
 ```sh
-git fetch upstream
-git merge vX.Y.Z          # always merge a tagged release, not a branch
-# resolve conflicts (see below)
+git fetch upstream --tags
+git merge vX.Y.Z
+# resolve conflicts
 flutter pub get
 flutter gen-l10n
 flutter analyze
-# Walk every `ForkOverrides.X` call site — verify the override still applies
-# after upstream's restructure (this is what the 09aed909 "update custom
-# fork overrides accordingly" commit was about).
-# Verify iOS still builds — xcconfig changes don't show up in `flutter analyze`.
 ```
 
-**Conflicts you should expect:**
+Then run targeted iOS sanity check:
 
-| File | Cause | Resolution rule |
-|---|---|---|
-| `ios/Runner.xcodeproj/project.pbxproj` | Bundle IDs etc. on different literal lines than ours | Keep the `$(EOCHAT_*)` references; the variable definitions are in `EOchatBranding.xcconfig` |
-| `ios/Runner/Info.plist` | Brand strings, permissions | Keep EOchat strings; adopt new upstream permission keys with EOchat branding |
-| `pubspec.yaml` | Version bumps | Adopt upstream version unless we deliberately pinned |
-| `ios/Podfile.lock` | Generated | Take upstream's and rerun `pod install` |
-| `lib/l10n/app_*.arb` | New strings or upstream rewordings | Adopt upstream; only override when EOchat needs a different string |
+```sh
+xcodebuild -project ios/Runner.xcodeproj -target Runner -configuration Debug -showBuildSettings
+xcodebuild -project ios/Runner.xcodeproj -target Runner -configuration Release -showBuildSettings
+xcodebuild -project ios/Runner.xcodeproj -target Runner -configuration Profile -showBuildSettings
 
-**Conflicts you should NOT expect** (if you do, it's a sign the fork has
-drifted from the conventions in this file):
+xcodebuild -project ios/Runner.xcodeproj -target ShareExtension -configuration Debug -showBuildSettings
+xcodebuild -project ios/Runner.xcodeproj -target ShareExtension -configuration Release -showBuildSettings
+xcodebuild -project ios/Runner.xcodeproj -target ShareExtension -configuration Profile -showBuildSettings
 
-- `lib/shared/theme/tweakcn_themes.dart` — should be near-vanilla.
-- `lib/shared/services/brand_service.dart` — only the two `?? 'Conduit'`
-  fallbacks should differ.
-- `lib/features/**` files outside the short list above — feature code
-  should be wrapped via `ForkOverrides`, not edited inline.
+xcodebuild -project ios/Runner.xcodeproj -target ConduitWidgetExtension -configuration Debug -showBuildSettings
+xcodebuild -project ios/Runner.xcodeproj -target ConduitWidgetExtension -configuration Release -showBuildSettings
+xcodebuild -project ios/Runner.xcodeproj -target ConduitWidgetExtension -configuration Profile -showBuildSettings
+```
 
-If you find yourself editing upstream code directly to add a fork
-behaviour, stop and add a `ForkOverrides` flag instead.
-
-### Lessons baked in from past merges
-
-These are non-obvious things that have bitten us before — worth a quick
-sanity check on every merge:
-
-- After every upstream merge, walk every `ForkOverrides.X` call site and
-  confirm the override still has the effect you expect. Upstream
-  refactors routinely move the code our `if (ForkOverrides...)` wraps,
-  and the `if` can silently become a no-op if the surrounding control
-  flow changes shape. (Commit `09aed909`'s entire job was this kind of
-  re-verification after the v3.1.0 merge.)
-- Profile-config builds on iOS use Debug-flavour `APP_GROUP_ID` and
-  `APP_URL_SCHEME` together with Release-flavour bundle IDs. This is
-  upstream's own convention, but the asymmetry is easy to mess up when
-  resolving pbxproj conflicts. The xcconfig variables encode this
-  asymmetry — keep using them rather than reverting to literals.
-- `ios/Podfile.lock` is generated; never hand-resolve it. Take upstream's
-  version and rerun `pod install` (CocoaPods regenerates the lock from
-  our Podfile, which still contains the EOchat dSYM-tagged `post_install`
-  block).
+Verify resolved values for each target/config:
+- `APP_GROUP_ID`
+- `APP_URL_SCHEME`
+- `PRODUCT_BUNDLE_IDENTIFIER`
+- `DEVELOPMENT_TEAM`
+- `INFOPLIST_FILE`
 
 ---
 
-## Known follow-ups
+## 7) Common conflict policy
 
-- `chat_page.dart` and `model_selector_sheet.dart` use `ScrollCacheExtent`
-  from `package:flutter/rendering.dart`, which only exists on Flutter
-  master. Pin Flutter or patch these out depending on the stable channel
-  you target.
-- iOS permission strings (`NSCameraUsageDescription` etc.) are still
-  literal EOchat strings in `Info.plist`. Move to `InfoPlist.strings`
-  per locale when upstream next changes them.
-- `themePaletteEochat*` translations were added in 11 locales; only
-  English and Dutch are owned by the EO team. Other locales are
-  best-effort and should be reviewed by native speakers if EOchat ever
-  ships in those markets.
-- A few `Info.plist` strings still inline the brand name
-  (`CFBundleDisplayName`, `CFBundleName`, `NS*UsageDescription`). The
-  display-name keys are overridden at build time by `INFOPLIST_KEY_*`
-  build settings, but the permission strings are read directly. Moving
-  permission descriptions into `InfoPlist.strings` per locale would
-  close the last fork delta in `Info.plist`.
+- `ios/Runner.xcodeproj/project.pbxproj`: keep `$(EOCHAT_*)` indirection
+- `ios/Runner/Info.plist`: keep EOchat branding, adopt new upstream keys/structure
+- `ios/Podfile.lock`: generated file; take upstream side, regenerate via CocoaPods if needed
+- `pubspec.yaml`: usually take upstream version bumps unless intentionally pinned
+- `lib/l10n/app_*.arb`: take upstream updates; add EOchat-specific keys instead of redefining upstream semantics
+
+---
+
+## 8) ForkOverrides rule
+
+Every fork runtime behavior should be represented in `ForkOverrides` first.
+
+Call sites should stay minimal (`if (ForkOverrides.someFlag) ...`).
+
+After each upstream merge, re-check each `ForkOverrides` call site to ensure refactors did not make the wrapper ineffective.
+
+---
+
+## 9) Known follow-ups (short list)
+
+- Move iOS permission strings from `Info.plist` into localized `InfoPlist.strings`.
+- Review non-EN/NL EO palette translations with native speakers if those locales become product-critical.
