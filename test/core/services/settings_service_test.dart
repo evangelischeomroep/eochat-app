@@ -28,10 +28,6 @@ void main() {
         check(settings.highContrast).equals(false);
       });
 
-      test('largeText defaults to false', () {
-        check(settings.largeText).equals(false);
-      });
-
       test('darkMode defaults to true', () {
         check(settings.darkMode).equals(true);
       });
@@ -58,6 +54,10 @@ void main() {
 
       test('quickPills defaults to empty list', () {
         check(settings.quickPills).isEmpty();
+      });
+
+      test('pinnedModels defaults to empty list', () {
+        check(settings.pinnedModels).isEmpty();
       });
 
       test('sendOnEnter defaults to false', () {
@@ -126,12 +126,12 @@ void main() {
           hapticFeedback: false,
           disableHapticsWhileStreaming: true,
           highContrast: true,
-          largeText: true,
           darkMode: false,
           voiceHoldToTalk: true,
           voiceAutoSendFinal: true,
           socketTransportMode: 'polling',
           quickPills: ['web', 'image'],
+          pinnedModels: ['gpt-4o', 'claude-sonnet'],
           sendOnEnter: true,
           sttPreference: SttPreference.serverOnly,
           ttsSpeechRate: 0.8,
@@ -148,12 +148,12 @@ void main() {
         check(modified.hapticFeedback).equals(false);
         check(modified.disableHapticsWhileStreaming).equals(true);
         check(modified.highContrast).equals(true);
-        check(modified.largeText).equals(true);
         check(modified.darkMode).equals(false);
         check(modified.voiceHoldToTalk).equals(true);
         check(modified.voiceAutoSendFinal).equals(true);
         check(modified.socketTransportMode).equals('polling');
         check(modified.quickPills).deepEquals(['web', 'image']);
+        check(modified.pinnedModels).deepEquals(['gpt-4o', 'claude-sonnet']);
         check(modified.sendOnEnter).equals(true);
         check(modified.sttPreference).equals(SttPreference.serverOnly);
         check(modified.ttsSpeechRate).equals(0.8);
@@ -274,6 +274,16 @@ void main() {
         check(a).not((it) => it.equals(b));
       });
 
+      test('pinnedModels order matters', () {
+        final a = const AppSettings().copyWith(
+          pinnedModels: ['gpt-4o', 'claude-sonnet'],
+        );
+        final b = const AppSettings().copyWith(
+          pinnedModels: ['claude-sonnet', 'gpt-4o'],
+        );
+        check(a).not((it) => it.equals(b));
+      });
+
       test('socketTransportMode is excluded from equality', () {
         final a = const AppSettings().copyWith(socketTransportMode: 'ws');
         final b = const AppSettings().copyWith(socketTransportMode: 'polling');
@@ -306,6 +316,15 @@ void main() {
         );
         check(a.hashCode).equals(b.hashCode);
       });
+
+      test('socketTransportMode is excluded from hashCode', () {
+        final a = const AppSettings().copyWith(socketTransportMode: 'ws');
+        final b = const AppSettings().copyWith(
+          socketTransportMode: 'polling',
+        );
+        check(a).equals(b);
+        check(a.hashCode).equals(b.hashCode);
+      });
     });
   });
 
@@ -334,6 +353,24 @@ void main() {
         AndroidAssistantTrigger.values,
       ).contains(AndroidAssistantTrigger.voiceCall);
     });
+  });
+
+  group('Pinned models', () {
+    test(
+      'sanitizes blanks and duplicates while preserving first-seen order',
+      () {
+        final sanitized = SettingsService.sanitizePinnedModels([
+          'gpt-4o',
+          '',
+          'claude-sonnet',
+          'gpt-4o',
+          ' claude-sonnet ',
+          '   ',
+        ]);
+
+        check(sanitized).deepEquals(['gpt-4o', 'claude-sonnet']);
+      },
+    );
   });
 
   group('AndroidAssistantTriggerStorage', () {

@@ -167,6 +167,36 @@ void main() {
 
       check(restored.isHidden).isTrue();
     });
+
+    test('extracts OpenWebUI model tags from live and cached payloads', () {
+      final model = Model.fromJson({
+        'id': 'tagged-model',
+        'name': 'Tagged Model',
+        'tags': [
+          {'name': 'coding'},
+          {'name': 'Reasoning'},
+          {'id': 'reasoning'},
+          'fast',
+          {'name': ' '},
+        ],
+        'info': {
+          'meta': {
+            'tags': [
+              {'name': 'tools'},
+            ],
+          },
+        },
+      });
+
+      check(
+        model.modelTags,
+      ).deepEquals(['tools', 'coding', 'Reasoning', 'fast']);
+
+      final restored = Model.fromJson(model.toJson());
+      check(
+        restored.modelTags,
+      ).deepEquals(['tools', 'coding', 'Reasoning', 'fast']);
+    });
   });
 
   group('Prompt', () {
@@ -485,7 +515,6 @@ void main() {
       check(settings.maxTokens).equals(2048);
       check(settings.streamResponses).isFalse();
       check(settings.density).equals('comfortable');
-      check(settings.fontSize).equals(14.0);
       check(settings.language).equals('en');
       check(settings.reduceMotion).isFalse();
       check(settings.hapticFeedback).isTrue();
@@ -504,7 +533,6 @@ void main() {
         'saveConversations': false,
         'shareUsageData': true,
         'density': 'compact',
-        'fontSize': 16.0,
         'language': 'fr',
         'reduceMotion': true,
         'hapticFeedback': false,

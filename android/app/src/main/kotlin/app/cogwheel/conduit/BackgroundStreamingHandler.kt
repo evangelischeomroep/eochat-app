@@ -20,24 +20,26 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodCall
-import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.plugin.common.MethodChannel.Result
 import kotlinx.coroutines.*
 
 private data class StreamingLease(
     val id: String,
     val kind: String,
     val requiresMicrophone: Boolean,
+    val startedAtMillis: Long = 0L,
 ) {
     val isVoice: Boolean get() = kind == KIND_VOICE
     val isSocket: Boolean get() = id == SOCKET_KEEPALIVE_ID
 
-    fun toPlatformMap(): Map<String, Any> = mapOf(
-        "id" to id,
-        "kind" to kind,
-        "requiresMicrophone" to requiresMicrophone,
+    fun toPlatformLease(): PlatformBackgroundStreamLease = PlatformBackgroundStreamLease(
+        id = id,
+        kind = if (isVoice) {
+            PlatformBackgroundStreamKind.VOICE
+        } else {
+            PlatformBackgroundStreamKind.CHAT
+        },
+        requiresMicrophone = requiresMicrophone,
+        startedAtMillis = startedAtMillis,
     )
 
     companion object {
@@ -81,7 +83,7 @@ class BackgroundStreamingService : Service() {
         const val EXTRA_LEASE_IDS = "leaseIds"
         const val EXTRA_LEASE_KINDS = "leaseKinds"
         const val EXTRA_MIC_LEASE_IDS = "micLeaseIds"
-        
+
         const val ACTION_TIME_LIMIT_APPROACHING =
             "nl.eo.eochat.TIME_LIMIT_APPROACHING"
         const val ACTION_MIC_PERMISSION_FALLBACK =
@@ -265,7 +267,7 @@ class BackgroundStreamingService : Service() {
             false
         }
     }
-    
+
     private fun sendFailureNotification(e: Exception) {
         // Send broadcast intent to notify MainActivity
         val intent = Intent("nl.eo.eochat.FOREGROUND_SERVICE_FAILED")
@@ -364,10 +366,10 @@ class BackgroundStreamingService : Service() {
 
         manager.createNotificationChannel(channel)
     }
-    
+
     private val wakeLockHandler = Handler(Looper.getMainLooper())
     private var wakeLockTimeoutRunnable: Runnable? = null
-    
+
     private fun updateWakeLock() {
         if (activeLeases.isEmpty()) {
             releaseWakeLock()
@@ -417,12 +419,12 @@ class BackgroundStreamingService : Service() {
         }
         wakeLockHandler.postDelayed(wakeLockTimeoutRunnable!!, timeoutMs)
     }
-    
+
     private fun releaseWakeLock() {
         // Cancel manual timeout handler
         wakeLockTimeoutRunnable?.let { wakeLockHandler.removeCallbacks(it) }
         wakeLockTimeoutRunnable = null
-        
+
         try {
             wakeLock?.let {
                 if (it.isHeld) {
@@ -436,14 +438,14 @@ class BackgroundStreamingService : Service() {
         }
         wakeLock = null
     }
-    
+
     private fun keepAlive() {
         // Check if we've hit Android 14's dataSync time limit
         // We stop at 5 hours to provide a 1-hour buffer before Android's 6-hour hard limit
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && isForeground) {
             val uptime = System.currentTimeMillis() - foregroundStartTime
             val fiveHours = 5 * 60 * 60 * 1000L
-            
+
             if (uptime > fiveHours) {
                 println("BackgroundStreamingService: Time limit reached (${uptime / 3600000}h), stopping service")
                 // Notify Flutter before stopping
@@ -454,7 +456,7 @@ class BackgroundStreamingService : Service() {
                 return
             }
         }
-        
+
         if (activeLeases.isNotEmpty()) {
             updateWakeLock()
             println(
@@ -466,12 +468,12 @@ class BackgroundStreamingService : Service() {
             println("BackgroundStreamingService: Keep alive without active leases")
         }
     }
-    
+
     private fun stopStreaming() {
         println("BackgroundStreamingService: Stopping service...")
         activeLeases = emptyList()
         releaseWakeLock()
-        
+
         if (isForeground) {
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -485,7 +487,7 @@ class BackgroundStreamingService : Service() {
             }
             isForeground = false
         }
-        
+
         stopSelf()
         println("BackgroundStreamingService: Service stopped")
     }
@@ -521,8 +523,8 @@ class BackgroundStreamingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 }
 
-class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCallHandler {
-    private lateinit var channel: MethodChannel
+class BackgroundStreamingHandler(private val activity: MainActivity) : BackgroundStreamingHostApi {
+    private lateinit var flutterApi: BackgroundStreamingFlutterApi
     private lateinit var context: Context
 
     private val activeLeases = linkedMapOf<String, StreamingLease>()
@@ -559,14 +561,12 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
             }
         }
     }
-    
-    companion object {
-        private const val CHANNEL_NAME = "eochat/background_streaming"
-    }
+
 
     fun setup(flutterEngine: FlutterEngine) {
-        channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
-        channel.setMethodCallHandler(this)
+        val messenger = flutterEngine.dartExecutor.binaryMessenger
+        flutterApi = BackgroundStreamingFlutterApi(messenger)
+        BackgroundStreamingHostApi.setUp(messenger, this)
         context = activity.applicationContext
         isActivityForeground = !activity.isFinishing
 
@@ -577,7 +577,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
             lifecycleObserverRegistered = true
         }
     }
-    
+
     private fun hasNotificationPermission(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
         return ContextCompat.checkSelfPermission(
@@ -585,56 +585,60 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
             Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
     }
-    
+
     private fun setupBroadcastReceiver() {
         if (receiverRegistered) return
-        
+
         broadcastReceiver = object : android.content.BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
                     "nl.eo.eochat.FOREGROUND_SERVICE_FAILED" -> {
                         val error = intent.getStringExtra("error") ?: "Unknown error"
                         val errorType = intent.getStringExtra("errorType") ?: "Exception"
-                        
+
                         println("BackgroundStreamingHandler: Service failure received: $errorType - $error")
-                        
+
                         // Notify Flutter about the service failure
-                        channel.invokeMethod("serviceFailed", mapOf(
-                            "error" to error,
-                            "errorType" to errorType,
-                            "streamIds" to activeLeases.keys.toList()
-                        ))
-                        
+                        flutterApi.serviceFailed(
+                            PlatformServiceFailureEvent(
+                                error = error,
+                                errorType = errorType,
+                                streamIds = activeLeases.keys.toList(),
+                            )
+                        ) {}
+
                         // Clear active streams since service failed
                         activeLeases.clear()
                         isServiceRequested = false
                     }
-                    
+
                     BackgroundStreamingService.ACTION_TIME_LIMIT_APPROACHING -> {
                         val remainingMinutes = intent.getIntExtra(
                             BackgroundStreamingService.EXTRA_REMAINING_MINUTES, -1
                         )
                         println("BackgroundStreamingHandler: Time limit approaching - $remainingMinutes minutes remaining")
-                        
-                        channel.invokeMethod("timeLimitApproaching", mapOf(
-                            "remainingMinutes" to remainingMinutes
-                        ))
+
+                        flutterApi.timeLimitApproaching(
+                            PlatformTimeLimitWarningEvent(
+                                remainingMinutes = remainingMinutes.toLong(),
+                            )
+                        ) {}
                     }
-                    
+
                     BackgroundStreamingService.ACTION_MIC_PERMISSION_FALLBACK -> {
                         println("BackgroundStreamingHandler: Microphone permission fallback triggered")
-                        channel.invokeMethod("microphonePermissionFallback", null)
+                        flutterApi.microphonePermissionFallback {}
                     }
                 }
             }
         }
-        
+
         val filter = android.content.IntentFilter().apply {
             addAction("nl.eo.eochat.FOREGROUND_SERVICE_FAILED")
             addAction(BackgroundStreamingService.ACTION_TIME_LIMIT_APPROACHING)
             addAction(BackgroundStreamingService.ACTION_MIC_PERMISSION_FALLBACK)
         }
-        
+
         // Use ContextCompat.registerReceiver for unified handling across API levels
         // RECEIVER_NOT_EXPORTED ensures security on all versions (internal broadcasts only)
         ContextCompat.registerReceiver(
@@ -646,70 +650,44 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
         receiverRegistered = true
     }
 
-    override fun onMethodCall(call: MethodCall, result: Result) {
-        when (call.method) {
-            "startBackgroundExecution" -> {
-                val streamIds = call.argument<List<String>>("streamIds")
-                val requiresMic = call.argument<Boolean>("requiresMicrophone") ?: false
-                if (streamIds != null) {
-                    val leases = parseMethodLeases(
-                        call.argument<List<Any>>("leases"),
-                        streamIds,
-                        requiresMic,
-                    )
-                    if (startBackgroundExecution(leases)) {
-                        result.success(null)
-                    } else {
-                        result.error(
-                            "SERVICE_START_FAILED",
-                            "Unable to start Android background streaming service",
-                            null,
-                        )
-                    }
-                } else {
-                    result.error("INVALID_ARGS", "Stream IDs required", null)
-                }
-            }
-            
-            "stopBackgroundExecution" -> {
-                val streamIds = call.argument<List<String>>("streamIds")
-                if (streamIds != null) {
-                    stopBackgroundExecution(streamIds)
-                    result.success(null)
-                } else {
-                    result.error("INVALID_ARGS", "Stream IDs required", null)
-                }
-            }
-            
-            "keepAlive" -> {
-                keepAlive()
-                result.success(null)
-            }
-            
-            "checkNotificationPermission" -> {
-                result.success(hasNotificationPermission())
-            }
-            
-            "getActiveStreamCount" -> {
-                // Return count for Flutter-native state reconciliation
-                result.success(activeLeases.size)
-            }
-
-            "getActiveStreamLeases" -> {
-                result.success(activeLeases.values.map { it.toPlatformMap() })
-            }
-            
-            "stopAllBackgroundExecution" -> {
-                // Stop all streams (used for reconciliation when orphaned service detected)
-                val allStreams = activeLeases.keys.toList()
-                stopBackgroundExecution(allStreams)
-                result.success(null)
-            }
-            
-            else -> {
-                result.notImplemented()
-            }
+    override fun startBackgroundExecution(request: PlatformBackgroundStartRequest) {
+        val leases = parsePlatformLeases(
+            request.leases,
+            request.streamIds,
+            request.requiresMicrophone,
+        )
+        if (!startBackgroundExecution(leases)) {
+            throw FlutterError(
+                "SERVICE_START_FAILED",
+                "Unable to start Android background streaming service",
+                null,
+            )
         }
+    }
+
+    override fun stopBackgroundExecution(request: PlatformBackgroundStopRequest) {
+        stopBackgroundExecution(request.streamIds)
+    }
+
+    override fun keepAlive(request: PlatformBackgroundKeepAliveRequest) {
+        keepAlive()
+    }
+
+    override fun checkBackgroundRefreshStatus(): Boolean = true
+
+    override fun checkNotificationPermission(): Boolean = hasNotificationPermission()
+
+    override fun setExternalAudioSessionOwner(
+        request: PlatformBackgroundAudioSessionOwnerRequest,
+    ) = Unit
+
+    override fun getActiveStreamCount(): Long = activeLeases.size.toLong()
+
+    override fun getActiveStreamLeases(): List<PlatformBackgroundStreamLease> =
+        activeLeases.values.map { it.toPlatformLease() }
+
+    override fun stopAllBackgroundExecution() {
+        stopBackgroundExecution(activeLeases.keys.toList())
     }
 
     private fun startBackgroundExecution(leases: List<StreamingLease>): Boolean {
@@ -748,26 +726,31 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
         }
     }
 
-    private fun parseMethodLeases(
-        rawLeases: List<Any>?,
+    private fun parsePlatformLeases(
+        rawLeases: List<PlatformBackgroundStreamLease>,
         streamIds: List<String>,
         requiresMic: Boolean,
     ): List<StreamingLease> {
-        if (!rawLeases.isNullOrEmpty()) {
-            return rawLeases.mapNotNull { raw ->
-                val map = raw as? Map<*, *> ?: return@mapNotNull null
-                val id = map["id"] as? String ?: return@mapNotNull null
+        if (rawLeases.isNotEmpty()) {
+            return rawLeases.mapNotNull { lease ->
+                val id = lease.id
                 if (id == StreamingLease.SOCKET_KEEPALIVE_ID) {
                     return@mapNotNull null
                 }
                 StreamingLease(
                     id = id,
-                    kind = map["kind"] as? String ?: StreamingLease.KIND_CHAT,
-                    requiresMicrophone = map["requiresMicrophone"] as? Boolean ?: false,
+                    kind = if (lease.kind == PlatformBackgroundStreamKind.VOICE) {
+                        StreamingLease.KIND_VOICE
+                    } else {
+                        StreamingLease.KIND_CHAT
+                    },
+                    requiresMicrophone = lease.requiresMicrophone,
+                    startedAtMillis = lease.startedAtMillis,
                 )
             }
         }
 
+        val startedAtMillis = System.currentTimeMillis()
         return streamIds
             .filter { it != StreamingLease.SOCKET_KEEPALIVE_ID }
             .map { id ->
@@ -779,6 +762,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
                         StreamingLease.KIND_CHAT
                     },
                     requiresMicrophone = requiresMic,
+                    startedAtMillis = startedAtMillis,
                 )
             }
     }
@@ -853,11 +837,13 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
     }
 
     private fun notifyServiceFailure(e: Exception) {
-        channel.invokeMethod("serviceFailed", mapOf(
-            "error" to (e.message ?: "Unknown error"),
-            "errorType" to e.javaClass.simpleName,
-            "streamIds" to activeLeases.keys.toList(),
-        ))
+        flutterApi.serviceFailed(
+            PlatformServiceFailureEvent(
+                error = e.message ?: "Unknown error",
+                errorType = e.javaClass.simpleName,
+                streamIds = activeLeases.keys.toList(),
+            )
+        ) {}
     }
 
     private fun startBackgroundMonitoring() {
@@ -868,30 +854,24 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
                 // This is a safety mechanism to clean up if Flutter fails to
                 // call stopBackgroundExecution (e.g., crash recovery).
                 delay(5 * 60 * 1000L)
-                
+
                 // Notify Dart side to check stream health
-                channel.invokeMethod("checkStreams", null, object : MethodChannel.Result {
-                    override fun success(result: Any?) {
-                        when (result) {
-                            is Int -> {
-                                if (result == 0) {
-                                    activeLeases.clear()
-                                    stopForegroundService()
-                                } else if (!isActivityForeground && isServiceRequested) {
-                                    keepAlive()
-                                }
+                flutterApi.checkStreams { result ->
+                    result
+                        .onSuccess { count ->
+                            if (count == 0L) {
+                                activeLeases.clear()
+                                stopForegroundService()
+                            } else if (!isActivityForeground && isServiceRequested) {
+                                keepAlive()
                             }
                         }
-                    }
-                    
-                    override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
-                        println("BackgroundStreamingHandler: Error checking streams: $errorMessage")
-                    }
-                    
-                    override fun notImplemented() {
-                        println("BackgroundStreamingHandler: checkStreams method not implemented")
-                    }
-                })
+                        .onFailure { error ->
+                            println(
+                                "BackgroundStreamingHandler: Error checking streams: ${error.message}",
+                            )
+                        }
+                }
             }
         }
     }
@@ -913,17 +893,17 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
         if (isActivityForeground) {
             return
         }
-        
+
         if (!isServiceRequested) {
             println("BackgroundStreamingHandler: Keep alive ignored; service is not running")
             return
         }
-        
+
         try {
             val serviceIntent = Intent(context, BackgroundStreamingService::class.java)
             serviceIntent.action = "KEEP_ALIVE"
             putLeases(serviceIntent)
-            
+
             // Only update an already requested service. Starting a new service
             // from a background keep-alive path can crash on Android O+.
             context.startService(serviceIntent)
@@ -989,7 +969,7 @@ class BackgroundStreamingHandler(private val activity: MainActivity) : MethodCal
             activity.lifecycle.removeObserver(activityLifecycleObserver)
             lifecycleObserverRegistered = false
         }
-        
+
         // Unregister broadcast receiver
         if (receiverRegistered) {
             try {

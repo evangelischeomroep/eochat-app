@@ -42,9 +42,6 @@ class TweakcnThemeVariant {
     required this.info,
     required this.infoForeground,
     this.radius = 16,
-    this.fontSans = const <String>[],
-    this.fontSerif = const <String>[],
-    this.fontMono = const <String>[],
   });
 
   final Color background;
@@ -81,9 +78,6 @@ class TweakcnThemeVariant {
   final Color info;
   final Color infoForeground;
   final double radius;
-  final List<String> fontSans;
-  final List<String> fontSerif;
-  final List<String> fontMono;
 }
 
 /// Definition of a tweakcn theme that provides both light and dark variants.
@@ -155,41 +149,6 @@ class TweakcnThemes {
     info: const Color(0xFF10A37F), // tertiary (reuse as info)
     infoForeground: const Color(0xFFFFFFFF), // onTertiary
     radius: 10,
-    fontSans: const <String>[
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'ui-serif',
-      'Georgia',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'ui-monospace',
-      'SFMono-Regular',
-      'SF Mono',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   static final TweakcnThemeVariant _conduitDark = TweakcnThemeVariant(
@@ -227,41 +186,6 @@ class TweakcnThemes {
     info: const Color(0xFF10A37F), // tertiary (reuse as info)
     infoForeground: const Color(0xFFECECEC), // onBackground
     radius: 10,
-    fontSans: const <String>[
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'ui-serif',
-      'Georgia',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'ui-monospace',
-      'SFMono-Regular',
-      'SF Mono',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   static final TweakcnThemeVariant _t3ChatLight = TweakcnThemeVariant(
@@ -373,40 +297,6 @@ class TweakcnThemes {
     info: const Color(0xFF9C87F5),
     infoForeground: const Color(0xFF141413),
     radius: 8,
-    fontSans: const <String>[
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'ui-serif',
-      'Georgia',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'ui-monospace',
-      'SFMono-Regular',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   static final TweakcnThemeVariant _claudeDark = TweakcnThemeVariant(
@@ -444,40 +334,6 @@ class TweakcnThemes {
     info: const Color(0xFFB39CFF),
     infoForeground: const Color(0xFF1B1B19),
     radius: 8,
-    fontSans: const <String>[
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'ui-serif',
-      'Georgia',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'ui-monospace',
-      'SFMono-Regular',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   // Catppuccin (from @catppuccin.css)
@@ -516,42 +372,6 @@ class TweakcnThemes {
     info: const Color(0xFF04A5E5), // chart-2
     infoForeground: const Color(0xFFFFFFFF),
     radius: 6,
-    fontSans: const <String>[
-      'Montserrat',
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'Georgia',
-      'ui-serif',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'Fira Code',
-      'ui-monospace',
-      'SFMono-Regular',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   static final TweakcnThemeVariant _catppuccinDark = TweakcnThemeVariant(
@@ -589,42 +409,6 @@ class TweakcnThemes {
     info: const Color(0xFF89DCEB), // chart-2
     infoForeground: const Color(0xFF181825),
     radius: 6,
-    fontSans: const <String>[
-      'Montserrat',
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'Georgia',
-      'ui-serif',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'Fira Code',
-      'ui-monospace',
-      'SFMono-Regular',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   // Tangerine (from @tangerine.css)
@@ -663,43 +447,6 @@ class TweakcnThemes {
     info: const Color(0xFF334C82),
     infoForeground: const Color(0xFFFFFFFF),
     radius: 12,
-    fontSans: const <String>[
-      'Inter',
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'Source Serif 4',
-      'ui-serif',
-      'Georgia',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'JetBrains Mono',
-      'ui-monospace',
-      'SFMono-Regular',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   static final TweakcnThemeVariant _tangerineDark = TweakcnThemeVariant(
@@ -737,43 +484,6 @@ class TweakcnThemes {
     info: const Color(0xFF466494),
     infoForeground: const Color(0xFF1C2433),
     radius: 12,
-    fontSans: const <String>[
-      'Inter',
-      'ui-sans-serif',
-      'system-ui',
-      '-apple-system',
-      'BlinkMacSystemFont',
-      'Segoe UI',
-      'Roboto',
-      'Helvetica Neue',
-      'Arial',
-      'Noto Sans',
-      'sans-serif',
-      'Apple Color Emoji',
-      'Segoe UI Emoji',
-      'Segoe UI Symbol',
-      'Noto Color Emoji',
-    ],
-    fontSerif: const <String>[
-      'Source Serif 4',
-      'ui-serif',
-      'Georgia',
-      'Cambria',
-      'Times New Roman',
-      'Times',
-      'serif',
-    ],
-    fontMono: const <String>[
-      'JetBrains Mono',
-      'ui-monospace',
-      'SFMono-Regular',
-      'Menlo',
-      'Monaco',
-      'Consolas',
-      'Liberation Mono',
-      'Courier New',
-      'monospace',
-    ],
   );
 
   static final TweakcnThemeDefinition claude = TweakcnThemeDefinition(

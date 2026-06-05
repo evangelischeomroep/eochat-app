@@ -29,6 +29,7 @@ import '../utils/embed_utils.dart';
 import '../utils/json_normalization.dart';
 import '../utils/message_tree_utils.dart' as message_tree;
 import 'conversation_parsing.dart';
+import 'settings_service.dart';
 import 'worker_manager.dart';
 import 'server_tls_http_client_factory.dart';
 
@@ -1324,7 +1325,7 @@ class ApiService {
         if (msg.role == 'assistant' && msg.model != null)
           'modelName': msg.model,
         if (msg.role == 'assistant') 'modelIdx': 0,
-        if (msg.role == 'assistant' && !msg.isStreaming) 'done': true,
+        if (assistantMessageResponseCompleted(msg)) 'done': true,
         // User message fields
         if (msg.role == 'user' && model != null) 'models': [model],
         if (msg.attachmentIds != null && msg.attachmentIds!.isNotEmpty)
@@ -1366,7 +1367,7 @@ class ApiService {
         if (msg.role == 'assistant' && msg.model != null)
           'modelName': msg.model,
         if (msg.role == 'assistant') 'modelIdx': 0,
-        if (msg.role == 'assistant' && !msg.isStreaming) 'done': true,
+        if (assistantMessageResponseCompleted(msg)) 'done': true,
         // User message fields
         if (msg.role == 'user' && model != null) 'models': [model],
         if (msg.attachmentIds != null && msg.attachmentIds!.isNotEmpty)
@@ -1489,10 +1490,11 @@ class ApiService {
         if (msg.role == 'assistant' && msg.model != null)
           'modelName': msg.model,
         if (msg.role == 'assistant') 'modelIdx': 0,
-        // Mirror OpenWebUI's pre-send save behavior: leave streaming
-        // assistant placeholders unfinished so the backend can continue
-        // writing into the same branch during completion.
-        if (msg.role == 'assistant' && !msg.isStreaming) 'done': true,
+        // Mirror OpenWebUI's pre-send save behavior: only leave truly
+        // in-progress assistant placeholders unfinished. Once the assistant
+        // has settled its response content, mark it done even if follow-ups or
+        // other trailing updates are still arriving.
+        if (assistantMessageResponseCompleted(msg)) 'done': true,
         if (msg.role == 'user' && model != null) 'models': [model],
         if (msg.attachmentIds != null && msg.attachmentIds!.isNotEmpty)
           'attachment_ids': List<String>.from(msg.attachmentIds!),
@@ -1535,7 +1537,7 @@ class ApiService {
         if (msg.role == 'assistant' && msg.model != null)
           'modelName': msg.model,
         if (msg.role == 'assistant') 'modelIdx': 0,
-        if (msg.role == 'assistant' && !msg.isStreaming) 'done': true,
+        if (assistantMessageResponseCompleted(msg)) 'done': true,
         if (msg.role == 'user' && model != null) 'models': [model],
         if (msg.attachmentIds != null && msg.attachmentIds!.isNotEmpty)
           'attachment_ids': List<String>.from(msg.attachmentIds!),
@@ -2020,6 +2022,22 @@ class ApiService {
     final settings = _deepCloneJsonMap(await getUserSettings());
     final ui = _coerceJsonMap(settings['ui']) ?? <String, dynamic>{};
     ui['memory'] = enabled;
+    settings['ui'] = ui;
+
+    final response = await _dio.post(
+      '/api/v1/users/user/settings/update',
+      data: settings,
+    );
+    final data = _coerceResponseMap(response.data) ?? settings;
+    return ServerUserSettings.fromJson(data);
+  }
+
+  Future<ServerUserSettings> updateUserPinnedModels(
+    List<String> modelIds,
+  ) async {
+    final settings = _deepCloneJsonMap(await getUserSettings());
+    final ui = _coerceJsonMap(settings['ui']) ?? <String, dynamic>{};
+    ui['pinnedModels'] = SettingsService.sanitizePinnedModels(modelIds);
     settings['ui'] = ui;
 
     final response = await _dio.post(
@@ -4008,7 +4026,10 @@ class ApiService {
     );
     final data = response.data;
     if (data is List) {
-      return data.cast<Map<String, dynamic>>();
+      return _hydrateChannelMessageDataList(
+        channelId,
+        data.cast<Map<String, dynamic>>(),
+      );
     }
     return [];
   }
@@ -4034,7 +4055,10 @@ class ApiService {
         'meta': ?meta,
       },
     );
-    return response.data as Map<String, dynamic>;
+    return _hydrateChannelMessageData(
+      channelId,
+      response.data as Map<String, dynamic>,
+    );
   }
 
   Future<Map<String, dynamic>> updateChannelMessage(
@@ -4161,7 +4185,9 @@ class ApiService {
       '/api/v1/channels/$channelId/messages'
       '/$messageId',
     );
-    return response.data as Map<String, dynamic>?;
+    final message = response.data as Map<String, dynamic>?;
+    if (message == null) return null;
+    return _hydrateChannelMessageData(channelId, message);
   }
 
   /// Fetches thread replies for a message.
@@ -4182,7 +4208,10 @@ class ApiService {
     );
     final data = response.data;
     if (data is List) {
-      return data.cast<Map<String, dynamic>>();
+      return _hydrateChannelMessageDataList(
+        channelId,
+        data.cast<Map<String, dynamic>>(),
+      );
     }
     return [];
   }
@@ -4218,7 +4247,10 @@ class ApiService {
     );
     final data = response.data;
     if (data is List) {
-      return data.cast<Map<String, dynamic>>();
+      return _hydrateChannelMessageDataList(
+        channelId,
+        data.cast<Map<String, dynamic>>(),
+      );
     }
     return [];
   }
@@ -4237,6 +4269,49 @@ class ApiService {
       '/$messageId/data',
     );
     return response.data as Map<String, dynamic>?;
+  }
+
+  Future<List<Map<String, dynamic>>> _hydrateChannelMessageDataList(
+    String channelId,
+    List<Map<String, dynamic>> messages,
+  ) {
+    if (!messages.any((message) => message['data'] == true)) {
+      return Future.value(messages);
+    }
+    return Future.wait(
+      messages.map((message) => _hydrateChannelMessageData(channelId, message)),
+    );
+  }
+
+  Future<Map<String, dynamic>> _hydrateChannelMessageData(
+    String channelId,
+    Map<String, dynamic> message,
+  ) async {
+    if (message['data'] != true) {
+      return message;
+    }
+
+    final messageId = message['id'];
+    if (messageId is! String || messageId.isEmpty) {
+      return message;
+    }
+
+    try {
+      final data = await getMessageData(channelId, messageId);
+      if (data == null) {
+        return message;
+      }
+      return {...message, 'data': data};
+    } catch (error, stackTrace) {
+      DebugLogger.error(
+        'channel-message-data-hydrate-failed',
+        scope: 'api/channels',
+        error: error,
+        stackTrace: stackTrace,
+        data: {'channelId': channelId, 'messageId': messageId},
+      );
+      return message;
+    }
   }
 
   // Chat streaming with conversation context
@@ -5136,6 +5211,7 @@ class ApiService {
     String filePath,
     String fileName, {
     String? contentType,
+    Map<String, dynamic>? metadata,
   }) async {
     _traceApi('Starting file upload: $fileName from $filePath');
 
@@ -5155,6 +5231,8 @@ class ApiService {
           filename: fileName,
           contentType: mimeType != null ? DioMediaType.parse(mimeType) : null,
         ),
+        if (metadata != null && metadata.isNotEmpty)
+          'metadata': jsonEncode(metadata),
       });
 
       _traceApi('Uploading to /api/v1/files/');

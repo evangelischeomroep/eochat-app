@@ -45,7 +45,6 @@ class SettingsService {
   static const String _disableHapticsWhileStreamingKey =
       PreferenceKeys.disableHapticsWhileStreaming;
   static const String _highContrastKey = PreferenceKeys.highContrast;
-  static const String _largeTextKey = PreferenceKeys.largeText;
   static const String _darkModeKey = PreferenceKeys.darkMode;
   static const String _defaultModelKey = PreferenceKeys.defaultModel;
   // Voice input settings
@@ -69,6 +68,7 @@ class SettingsService {
       PreferenceKeys.voiceSilenceDuration;
   static const String _androidAssistantTriggerKey =
       PreferenceKeys.androidAssistantTrigger;
+  static const String _pinnedModelsKey = PreferenceKeys.pinnedModels;
   static Box<dynamic>? _preferencesBox() {
     if (!Hive.isBoxOpen(HiveBoxNames.preferences)) {
       return null;
@@ -143,17 +143,6 @@ class SettingsService {
     return _putPreference(_highContrastKey, value);
   }
 
-  /// Get large text preference
-  static Future<bool> getLargeText() {
-    final value = _getPreference<bool>(_largeTextKey);
-    return Future.value(value ?? false);
-  }
-
-  /// Set large text preference
-  static Future<void> setLargeText(bool value) {
-    return _putPreference(_largeTextKey, value);
-  }
-
   /// Get dark mode preference
   static Future<bool> getDarkMode() {
     final value = _getPreference<bool>(_darkModeKey);
@@ -198,7 +187,6 @@ class SettingsService {
       _hapticFeedbackKey: settings.hapticFeedback,
       _disableHapticsWhileStreamingKey: settings.disableHapticsWhileStreaming,
       _highContrastKey: settings.highContrast,
-      _largeTextKey: settings.largeText,
       _darkModeKey: settings.darkMode,
       _voiceHoldToTalkKey: settings.voiceHoldToTalk,
       _voiceAutoSendKey: settings.voiceAutoSendFinal,
@@ -214,6 +202,7 @@ class SettingsService {
       _androidAssistantTriggerKey:
           settings.androidAssistantTrigger.storageValue,
       PreferenceKeys.temporaryChatByDefault: settings.temporaryChatByDefault,
+      _pinnedModelsKey: settings.pinnedModels.toList(),
     };
 
     await box.putAll(updates);
@@ -426,6 +415,31 @@ class SettingsService {
     return _putPreference(PreferenceKeys.temporaryChatByDefault, value);
   }
 
+  static List<String> sanitizePinnedModels(Iterable<String> modelIds) {
+    final sanitized = <String>[];
+    final seen = <String>{};
+    for (final modelId in modelIds) {
+      final trimmed = modelId.trim();
+      if (trimmed.isEmpty || !seen.add(trimmed)) {
+        continue;
+      }
+      sanitized.add(trimmed);
+    }
+    return sanitized;
+  }
+
+  static Future<List<String>> getPinnedModels() {
+    final raw = _preferencesBox()?.get(_pinnedModelsKey);
+    if (raw is! List) {
+      return Future.value(const []);
+    }
+    return Future.value(sanitizePinnedModels(raw.whereType<String>()));
+  }
+
+  static Future<void> setPinnedModels(List<String> modelIds) {
+    return _putPreference(_pinnedModelsKey, sanitizePinnedModels(modelIds));
+  }
+
   static Future<int> getVoiceSilenceDuration() {
     final value = _getPreference<int>(_voiceSilenceDurationKey);
     return Future.value(
@@ -482,23 +496,6 @@ class SettingsService {
     return Duration(milliseconds: adjustedMs.clamp(50, 1000));
   }
 
-  /// Get text scale factor considering user preferences
-  static double getEffectiveTextScaleFactor(
-    BuildContext context,
-    AppSettings settings,
-  ) {
-    final textScaler = MediaQuery.of(context).textScaler;
-    double baseScale = textScaler.scale(1.0);
-
-    // Apply large text preference
-    if (settings.largeText) {
-      baseScale *= 1.3;
-    }
-
-    // Ensure reasonable bounds
-    return baseScale.clamp(0.8, 3.0);
-  }
-
   static AppSettings _loadSettingsSync(Box<dynamic> box) {
     return AppSettings(
       reduceMotion: (box.get(_reduceMotionKey) as bool?) ?? false,
@@ -507,7 +504,6 @@ class SettingsService {
       disableHapticsWhileStreaming:
           (box.get(_disableHapticsWhileStreamingKey) as bool?) ?? false,
       highContrast: (box.get(_highContrastKey) as bool?) ?? false,
-      largeText: (box.get(_largeTextKey) as bool?) ?? false,
       darkMode: (box.get(_darkModeKey) as bool?) ?? true,
       defaultModel: box.get(_defaultModelKey) as String?,
       voiceLocaleId: box.get(_voiceLocaleKey) as String?,
@@ -542,6 +538,10 @@ class SettingsService {
               .clamp(minVoiceSilenceDurationMs, maxVoiceSilenceDurationMs),
       temporaryChatByDefault:
           (box.get(PreferenceKeys.temporaryChatByDefault) as bool?) ?? false,
+      pinnedModels: sanitizePinnedModels(
+        ((box.get(_pinnedModelsKey) as List<dynamic>?) ?? const <dynamic>[])
+            .whereType<String>(),
+      ),
     );
   }
 }
@@ -558,7 +558,6 @@ class AppSettings {
   final bool hapticFeedback;
   final bool disableHapticsWhileStreaming;
   final bool highContrast;
-  final bool largeText;
   final bool darkMode;
   final String? defaultModel;
   final String? voiceLocaleId;
@@ -580,13 +579,13 @@ class AppSettings {
   final AndroidAssistantTrigger androidAssistantTrigger;
   final int voiceSilenceDuration;
   final bool temporaryChatByDefault;
+  final List<String> pinnedModels;
   const AppSettings({
     this.reduceMotion = false,
     this.animationSpeed = 1.0,
     this.hapticFeedback = true,
     this.disableHapticsWhileStreaming = false,
     this.highContrast = false,
-    this.largeText = false,
     this.darkMode = true,
     this.defaultModel,
     this.voiceLocaleId,
@@ -608,6 +607,7 @@ class AppSettings {
     this.androidAssistantTrigger = AndroidAssistantTrigger.overlay,
     this.voiceSilenceDuration = SettingsService.defaultVoiceSilenceDurationMs,
     this.temporaryChatByDefault = false,
+    this.pinnedModels = const [],
   });
 
   AppSettings copyWith({
@@ -616,7 +616,6 @@ class AppSettings {
     bool? hapticFeedback,
     bool? disableHapticsWhileStreaming,
     bool? highContrast,
-    bool? largeText,
     bool? darkMode,
     Object? defaultModel = const _DefaultValue(),
     Object? voiceLocaleId = const _DefaultValue(),
@@ -638,6 +637,7 @@ class AppSettings {
     int? voiceSilenceDuration,
     AndroidAssistantTrigger? androidAssistantTrigger,
     bool? temporaryChatByDefault,
+    List<String>? pinnedModels,
   }) {
     return AppSettings(
       reduceMotion: reduceMotion ?? this.reduceMotion,
@@ -646,7 +646,6 @@ class AppSettings {
       disableHapticsWhileStreaming:
           disableHapticsWhileStreaming ?? this.disableHapticsWhileStreaming,
       highContrast: highContrast ?? this.highContrast,
-      largeText: largeText ?? this.largeText,
       darkMode: darkMode ?? this.darkMode,
       defaultModel: defaultModel is _DefaultValue
           ? this.defaultModel
@@ -679,6 +678,7 @@ class AppSettings {
       voiceSilenceDuration: voiceSilenceDuration ?? this.voiceSilenceDuration,
       temporaryChatByDefault:
           temporaryChatByDefault ?? this.temporaryChatByDefault,
+      pinnedModels: pinnedModels ?? this.pinnedModels,
     );
   }
 
@@ -691,7 +691,6 @@ class AppSettings {
         other.hapticFeedback == hapticFeedback &&
         other.disableHapticsWhileStreaming == disableHapticsWhileStreaming &&
         other.highContrast == highContrast &&
-        other.largeText == largeText &&
         other.darkMode == darkMode &&
         other.defaultModel == defaultModel &&
         other.voiceLocaleId == voiceLocaleId &&
@@ -711,6 +710,7 @@ class AppSettings {
         other.androidAssistantTrigger == androidAssistantTrigger &&
         other.voiceSilenceDuration == voiceSilenceDuration &&
         other.temporaryChatByDefault == temporaryChatByDefault &&
+        _listEquals(other.pinnedModels, pinnedModels) &&
         _listEquals(other.quickPills, quickPills);
     // socketTransportMode intentionally not included in == to avoid frequent rebuilds
   }
@@ -723,7 +723,6 @@ class AppSettings {
       hapticFeedback,
       disableHapticsWhileStreaming,
       highContrast,
-      largeText,
       darkMode,
       defaultModel,
       voiceLocaleId,
@@ -732,7 +731,6 @@ class AppSettings {
       chatWebSearchEnabled,
       chatImageGenerationEnabled,
       sttPreference,
-      socketTransportMode,
       sendOnEnter,
       ttsVoice,
       ttsSpeechRate,
@@ -745,6 +743,7 @@ class AppSettings {
       voiceSilenceDuration,
       temporaryChatByDefault,
       Object.hashAllUnordered(quickPills),
+      Object.hashAll(pinnedModels),
     ]);
   }
 }
@@ -818,11 +817,6 @@ class AppSettingsNotifier extends _$AppSettingsNotifier {
     await SettingsService.setHighContrast(value);
   }
 
-  Future<void> setLargeText(bool value) async {
-    state = state.copyWith(largeText: value);
-    await SettingsService.setLargeText(value);
-  }
-
   Future<void> setDarkMode(bool value) async {
     state = state.copyWith(darkMode: value);
     await SettingsService.setDarkMode(value);
@@ -887,6 +881,27 @@ class AppSettingsNotifier extends _$AppSettingsNotifier {
   Future<void> setTemporaryChatByDefault(bool value) async {
     state = state.copyWith(temporaryChatByDefault: value);
     await SettingsService.setTemporaryChatByDefault(value);
+  }
+
+  Future<void> setPinnedModels(List<String> modelIds) async {
+    final sanitized = SettingsService.sanitizePinnedModels(modelIds);
+    state = state.copyWith(pinnedModels: sanitized);
+    await SettingsService.setPinnedModels(sanitized);
+  }
+
+  Future<void> togglePinnedModel(String modelId) async {
+    final trimmed = modelId.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+
+    final current = state.pinnedModels;
+    final updated = current.contains(trimmed)
+        ? current.where((id) => id != trimmed).toList(growable: false)
+        : SettingsService.sanitizePinnedModels([...current, trimmed]);
+
+    state = state.copyWith(pinnedModels: updated);
+    await SettingsService.setPinnedModels(updated);
   }
 
   Future<void> setSttPreference(SttPreference preference) async {

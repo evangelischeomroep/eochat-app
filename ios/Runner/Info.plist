@@ -106,6 +106,16 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string
         >EOchat uses on-device speech recognition so you can dictate messages hands‑free. Your speech is converted to text on your device when available.</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true />
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>processing</string>
+		<string>voip</string>
+	</array>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -117,26 +127,16 @@
 				<dict>
 					<key>UISceneClassName</key>
 					<string>UIWindowScene</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).ConduitSceneDelegate</string>
 					<key>UISceneConfigurationName</key>
 					<string>flutter</string>
-					<key>UISceneDelegateClassName</key>
-					<string>FlutterSceneDelegate</string>
 					<key>UISceneStoryboardFile</key>
 					<string>Main</string>
 				</dict>
 			</array>
 		</dict>
 	</dict>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true />
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-		<string>processing</string>
-		<string>voip</string>
-	</array>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
 	<key>UIStatusBarHidden</key>
 	<false />
 	<key>UISupportedInterfaceOrientations</key>

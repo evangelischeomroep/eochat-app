@@ -53,9 +53,6 @@ final TweakcnThemeVariant _eochatLight = TweakcnThemeVariant(
   info: EOchatBrand.purpleTint,
   infoForeground: const Color(0xFFFFFFFF),
   radius: 10,
-  fontSans: _fontSans,
-  fontSerif: _fontSerif,
-  fontMono: _fontMono,
 );
 
 final TweakcnThemeVariant _eochatDark = TweakcnThemeVariant(
@@ -93,48 +90,7 @@ final TweakcnThemeVariant _eochatDark = TweakcnThemeVariant(
   info: const Color(0xFFB07EFF),
   infoForeground: const Color(0xFF1A0030),
   radius: 10,
-  fontSans: _fontSans,
-  fontSerif: _fontSerif,
-  fontMono: _fontMono,
 );
-
-const _fontSans = <String>[
-  'ui-sans-serif',
-  'system-ui',
-  '-apple-system',
-  'BlinkMacSystemFont',
-  'Segoe UI',
-  'Roboto',
-  'Helvetica Neue',
-  'Arial',
-  'Noto Sans',
-  'sans-serif',
-  'Apple Color Emoji',
-  'Segoe UI Emoji',
-  'Segoe UI Symbol',
-  'Noto Color Emoji',
-];
-
-const _fontSerif = <String>[
-  'ui-serif',
-  'Georgia',
-  'Cambria',
-  'Times New Roman',
-  'Times',
-  'serif',
-];
-
-const _fontMono = <String>[
-  'ui-monospace',
-  'SFMono-Regular',
-  'SF Mono',
-  'Menlo',
-  'Monaco',
-  'Consolas',
-  'Liberation Mono',
-  'Courier New',
-  'monospace',
-];
 
 /// Public palette definition used by `TweakcnThemes`.
 final TweakcnThemeDefinition eochatPalette = TweakcnThemeDefinition(

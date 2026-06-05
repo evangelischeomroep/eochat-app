@@ -23,6 +23,7 @@ import '../../../shared/widgets/web_content_embed.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import '../providers/chat_providers.dart'
     show
+        chatComposerTextInsertionTargetId,
         isChatStreamingProvider,
         sendMessageWithContainer,
         streamingContentProvider;
@@ -167,11 +168,23 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   bool get _shouldAnimateOnMount =>
       widget.animateOnMount && !_disableAnimations;
 
+  bool get _responseCompleted {
+    if (_activeVersionIndex >= 0) {
+      return true;
+    }
+    if (!widget.isStreaming) {
+      return true;
+    }
+    return widget.message.metadata?['responseDone'] == true;
+  }
+
+  bool get _uiTreatsAsStreaming => widget.isStreaming && !_responseCompleted;
+
   // press state handled by shared ChatActionButton
 
   Future<void> _handleFollowUpTap(String suggestion) async {
     final trimmed = suggestion.trim();
-    if (trimmed.isEmpty || widget.isStreaming) {
+    if (trimmed.isEmpty || widget.isStreaming || !_responseCompleted) {
       return;
     }
     try {
@@ -270,7 +283,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     }
 
     // Update typing indicator gate when message properties that affect emptiness change
-    if (_didTypingIndicatorInputsChange(oldWidget)) {
+    if (_didTypingIndicatorInputsChange(oldWidget) ||
+        oldWidget.message.metadata?['responseDone'] !=
+            widget.message.metadata?['responseDone']) {
       _updateTypingIndicatorGate();
     }
 
@@ -585,12 +600,15 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
     return ConduitCard(
       padding: const EdgeInsets.all(Spacing.sm),
-      child: RichText(text: buildSpans()),
+      child: RichText(
+        text: buildSpans(),
+        textScaler: MediaQuery.textScalerOf(context),
+      ),
     );
   }
 
   bool get _shouldShowTypingIndicator =>
-      widget.isStreaming && _isAssistantResponseEmpty;
+      _uiTreatsAsStreaming && _isAssistantResponseEmpty;
 
   bool get _isAssistantResponseEmpty {
     final content = _displayedContent.trim();
@@ -680,7 +698,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               style: AppTypography.bodySmallStyle.copyWith(
                 color: theme.textSecondary,
                 fontWeight: FontWeight.w500,
-                letterSpacing: 0.1,
+                letterSpacing: AppTypography.letterSpacingNormal,
               ),
             ),
           ),
@@ -903,7 +921,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   Widget _buildDocumentationMessage() {
     final displayStatusHistory = filterVisibleStatusUpdates(
       widget.message.statusHistory,
-      isStreaming: widget.isStreaming,
+      isStreaming: _uiTreatsAsStreaming,
     );
     final hasStatusTimeline = displayStatusHistory.isNotEmpty;
     final activeCodeExecutions = _resolveActiveCodeExecutions();
@@ -912,7 +930,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final hasFollowUps =
         widget.showFollowUps &&
         activeFollowUps.isNotEmpty &&
-        !widget.isStreaming;
+        _responseCompleted;
     final bool showingVersion = _activeVersionIndex >= 0;
     final activeFiles = showingVersion
         ? widget.message.versions[_activeVersionIndex].files
@@ -956,7 +974,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                 if (hasStatusTimeline) ...[
                   StreamingStatusWidget(
                     updates: displayStatusHistory,
-                    isStreaming: widget.isStreaming,
+                    isStreaming: _uiTreatsAsStreaming,
                   ),
                   const SizedBox(height: Spacing.xs),
                 ],
@@ -1004,7 +1022,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           ),
 
           // Action buttons below the message content (only after streaming completes)
-          if (!widget.isStreaming) ...[
+          if (_responseCompleted) ...[
             if (footer != null)
               Padding(
                 padding: EdgeInsets.only(
@@ -1101,6 +1119,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     // Open WebUI-style <details> blocks directly.
     final processedContent = _processContentForImages(content);
     final activeSources = _resolveActiveSources();
+    final bodyTreatsAsStreaming = _uiTreatsAsStreaming;
 
     Widget buildDefault(BuildContext context) {
       final cheapStreamingTextContent = _cheapStreamingTextContent(
@@ -1112,7 +1131,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
       return StreamingMarkdownWidget(
         content: processedContent,
-        isStreaming: widget.isStreaming,
+        isStreaming: bodyTreatsAsStreaming,
+        askConduitComposerTargetId: chatComposerTextInsertionTargetId,
         stateScopeId: _markdownStateScopeId(),
         onTapLink: (url, _) => _launchUri(url),
         sources: activeSources,
@@ -1124,7 +1144,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               attachmentId: uri.toString(),
               isMarkdownFormat: true,
               constraints: const BoxConstraints(maxWidth: 500, maxHeight: 400),
-              disableAnimation: widget.isStreaming,
+              disableAnimation: bodyTreatsAsStreaming,
             ),
           );
         },
@@ -1136,7 +1156,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       final contextData = AssistantResponseContext(
         message: widget.message,
         markdown: processedContent,
-        isStreaming: widget.isStreaming,
+        isStreaming: bodyTreatsAsStreaming,
         buildDefault: buildDefault,
       );
       return responseBuilder(context, contextData);
@@ -1146,14 +1166,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   }
 
   String _cheapStreamingTextContent(String content) {
-    if (!widget.isStreaming || !content.contains(']:')) {
+    if (!_uiTreatsAsStreaming || !content.contains(']:')) {
       return content;
     }
     return ConduitMarkdownPreprocessor.stripLinkReferenceDefinitions(content);
   }
 
   bool _shouldUseCheapStreamingText(String content) {
-    if (!widget.isStreaming) {
+    if (!_uiTreatsAsStreaming) {
       return false;
     }
 
@@ -1313,7 +1333,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                   maxWidth: 500,
                   maxHeight: 400,
                 ),
-                disableAnimation: widget.isStreaming,
+                disableAnimation: _uiTreatsAsStreaming,
               ),
             )
           : Wrap(
@@ -1333,7 +1353,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                     maxWidth: imageCount == 2 ? 245 : 160,
                     maxHeight: imageCount == 2 ? 245 : 160,
                   ),
-                  disableAnimation: widget.isStreaming,
+                  disableAnimation: _uiTreatsAsStreaming,
                 );
               }).toList(),
             ),
@@ -1517,7 +1537,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           attachmentId: attachmentId,
           isMarkdownFormat: true,
           constraints: const BoxConstraints(maxWidth: 300, maxHeight: 100),
-          disableAnimation: widget.isStreaming,
+          disableAnimation: _uiTreatsAsStreaming,
         );
       }).toList(),
     );
@@ -1694,7 +1714,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         isActiveMessage &&
         (ttsState.status == TtsPlaybackStatus.loading ||
             ttsState.status == TtsPlaybackStatus.initializing);
-    final bool disableDueToStreaming = widget.isStreaming && !isActiveMessage;
+    final bool contentActionsBlockedByStreaming =
+        widget.isStreaming && !isActiveMessage;
     final bool ttsAvailable = !ttsState.initialized || ttsState.available;
     final bool showStopState =
         isActiveMessage && (isSpeaking || isPaused || isBusy);
@@ -1706,7 +1727,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         messageId.isNotEmpty;
     final bool canStartTts =
         shouldShowTtsButton &&
-        !disableDueToStreaming &&
+        !contentActionsBlockedByStreaming &&
         ttsAvailable &&
         !showPreparingTtsState;
     final bool canRegenerate = widget.onRegenerate != null && !isChatStreaming;
@@ -1739,13 +1760,15 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
             ? CupertinoIcons.doc_on_clipboard
             : Icons.content_copy,
         label: l10n.copy,
-        onTap: widget.onCopy,
+        onTap: widget.isStreaming ? null : widget.onCopy,
         sfSymbol: 'doc.on.clipboard',
       ),
       if (shouldShowTtsButton)
         _AssistantFooterAction(
           id: 'tts',
-          icon: (showStopState || showPreparingTtsState) ? stopIcon : listenIcon,
+          icon: (showStopState || showPreparingTtsState)
+              ? stopIcon
+              : listenIcon,
           label: (showStopState || showPreparingTtsState)
               ? l10n.ttsStop
               : l10n.ttsListen,

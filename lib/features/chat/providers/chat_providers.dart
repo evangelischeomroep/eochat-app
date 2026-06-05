@@ -183,6 +183,28 @@ String? _connectedSocketSessionId(SocketService? socketService) {
   return sessionId;
 }
 
+Future<String?> _ensureConnectedSocketSessionId(
+  SocketService? socketService, {
+  Duration timeout = const Duration(milliseconds: 1200),
+}) async {
+  if (socketService == null) {
+    return null;
+  }
+
+  if (!socketService.isConnected) {
+    try {
+      await socketService.ensureConnected(timeout: timeout);
+    } catch (e) {
+      DebugLogger.log(
+        'Socket reconnect before chat send failed: $e',
+        scope: 'chat/providers',
+      );
+    }
+  }
+
+  return _connectedSocketSessionId(socketService);
+}
+
 /// The content of the currently streaming assistant message.
 /// Only the actively streaming message widget should watch this.
 /// This avoids rebuilding all visible messages on every chunk.
@@ -261,6 +283,49 @@ class PrefilledInputText extends _$PrefilledInputText {
   void set(String? value) => state = value;
 
   void clear() => state = null;
+}
+
+const String chatComposerTextInsertionTargetId = 'chat-composer';
+
+class ComposerTextInsertion {
+  const ComposerTextInsertion({
+    required this.id,
+    required this.targetId,
+    required this.text,
+  });
+
+  final int id;
+  final String targetId;
+  final String text;
+}
+
+final composerTextInsertionProvider =
+    NotifierProvider<ComposerTextInsertionNotifier, ComposerTextInsertion?>(
+      ComposerTextInsertionNotifier.new,
+    );
+
+class ComposerTextInsertionNotifier extends Notifier<ComposerTextInsertion?> {
+  int _nextId = 0;
+
+  @override
+  ComposerTextInsertion? build() => null;
+
+  void insert({required String targetId, required String text}) {
+    if (text.trim().isEmpty) {
+      return;
+    }
+    state = ComposerTextInsertion(
+      id: ++_nextId,
+      targetId: targetId,
+      text: text,
+    );
+  }
+
+  void clear(int id) {
+    if (state?.id == id) {
+      state = null;
+    }
+  }
 }
 
 // Trigger to request focus on the chat input (increment to signal)
@@ -1498,6 +1563,17 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     state = next;
   }
 
+  Map<String, dynamic>? _metadataWithoutResponseDone(
+    Map<String, dynamic>? metadata,
+  ) {
+    if (metadata == null || metadata.isEmpty) {
+      return metadata;
+    }
+    final next = Map<String, dynamic>.from(metadata);
+    next.remove('responseDone');
+    return next.isEmpty ? null : next;
+  }
+
   // Archive the last assistant message's current content as a previous version
   // and clear it to prepare for regeneration, keeping the same message id.
   void archiveLastAssistantAsVersion() {
@@ -1510,6 +1586,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
     final updated = last.copyWith(
       // Start a fresh stream for the new generation
       isStreaming: true,
+      metadata: _metadataWithoutResponseDone(last.metadata),
       content: '',
       files: null,
       followUps: const [],
@@ -1971,6 +2048,16 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>> {
   }
 }
 
+bool _shouldIncludeConversationHistoryMessage(ChatMessage message) {
+  if (message.role.isEmpty || message.content.isEmpty) {
+    return false;
+  }
+  if (message.role != 'assistant') {
+    return true;
+  }
+  return assistantMessageResponseCompleted(message);
+}
+
 bool _isArchivedAssistantVariant(ChatMessage message) {
   return message.role == 'assistant' &&
       message.metadata?['archivedVariant'] == true;
@@ -2041,10 +2128,14 @@ Future<String> _preseedAssistantAndPersist(
           last.id == assistantMessageId &&
           last.role == 'assistant' &&
           !last.isStreaming) {
-        (ref.read(chatMessagesProvider.notifier) as ChatMessagesNotifier)
-            .updateLastMessageWithFunction(
-              (ChatMessage m) => m.copyWith(isStreaming: true),
-            );
+        final notifier =
+            ref.read(chatMessagesProvider.notifier) as ChatMessagesNotifier;
+        notifier.updateLastMessageWithFunction(
+          (ChatMessage m) => m.copyWith(
+            isStreaming: true,
+            metadata: notifier._metadataWithoutResponseDone(m.metadata),
+          ),
+        );
       }
     } catch (_) {}
   }
@@ -3092,7 +3183,7 @@ Future<void> regenerateMessage(
       if (_isArchivedAssistantVariant(msg)) {
         continue;
       }
-      if (msg.role.isNotEmpty && msg.content.isNotEmpty && !msg.isStreaming) {
+      if (_shouldIncludeConversationHistoryMessage(msg)) {
         final cleaned = ToolCallsParser.sanitizeForApi(msg.content);
 
         // Prefer provided attachments for the last user message; otherwise use message attachments
@@ -3193,9 +3284,12 @@ Future<void> regenerateMessage(
 
     final modelItem = _buildLocalModelItem(selectedModel);
 
-    // Socket is optional — only needed for taskSocket transport.
+    // Reconnect before choosing session_id so eligible sends stay on the
+    // task/socket transport instead of falling back to fragile HTTP streaming.
     final socketService = ref.read(socketServiceProvider);
-    final socketSessionId = _connectedSocketSessionId(socketService);
+    final socketSessionId = await _ensureConnectedSocketSessionId(
+      socketService,
+    );
 
     List<Map<String, dynamic>>? toolServers;
     try {
@@ -3699,9 +3793,9 @@ Future<void> _sendMessageInternal(
       <Map<String, dynamic>>[];
 
   for (final msg in messages) {
-    // Skip only empty assistant message placeholders that are currently streaming
-    // Include completed messages (both user and assistant) for conversation history
-    if (msg.role.isNotEmpty && msg.content.isNotEmpty && !msg.isStreaming) {
+    // Skip in-progress assistant placeholders, but include assistant replies
+    // that already settled their response content in the responseDone gap.
+    if (_shouldIncludeConversationHistoryMessage(msg)) {
       // Prepare cleaned text content (strip tool details etc.)
       final cleaned = ToolCallsParser.sanitizeForApi(msg.content);
 
@@ -3790,9 +3884,12 @@ Future<void> _sendMessageInternal(
   try {
     final modelItem = _buildLocalModelItem(selectedModel);
 
-    // Socket is optional — only needed for taskSocket transport.
+    // Reconnect before choosing session_id so eligible sends stay on the
+    // task/socket transport instead of falling back to fragile HTTP streaming.
     final socketService = ref.read(socketServiceProvider);
-    final socketSessionId = _connectedSocketSessionId(socketService);
+    final socketSessionId = await _ensureConnectedSocketSessionId(
+      socketService,
+    );
 
     List<Map<String, dynamic>>? toolServers;
     try {

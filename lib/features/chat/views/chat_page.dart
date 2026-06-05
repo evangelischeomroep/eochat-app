@@ -17,8 +17,8 @@ import 'dart:math' as math;
 import '../../../shared/widgets/responsive_drawer_layout.dart';
 import 'dart:async';
 import '../../../core/providers/app_providers.dart';
-import '../../../core/network/image_header_utils.dart';
 import '../../../core/services/native_sheet_bridge.dart';
+import '../../../core/services/native_sheet_hydration_service.dart';
 import '../../../core/services/performance_profiler.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/settings_service.dart';
@@ -168,6 +168,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   ProviderSubscription<String?>? _conversationIdSub;
   int _initialBottomSettleGeneration = 0;
   int _extentCacheInvalidationGeneration = 0;
+  final Set<String> _pendingRowExtentInvalidationMessageIds = <String>{};
+  bool _rowExtentInvalidationScheduled = false;
 
   bool get _wantsPinToTop => _pinToTopState.isActive;
   String? get _pinnedUserMessageId => _pinToTopState.userMessageId;
@@ -476,6 +478,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _reviewerModeSub?.close();
     _conversationIdSub?.close();
     _markdownPrewarmTimer?.cancel();
+    _pendingRowExtentInvalidationMessageIds.clear();
     _endScrollProfile(reason: 'disposed');
     _messageListController.dispose();
     _scrollController.dispose();
@@ -705,49 +708,73 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     try {
       DebugLogger.log('Picking image...', scope: 'chat/page');
-      final attachment = fromCamera
-          ? await fileService.takePhoto()
-          : await fileService.pickImage();
-      if (attachment == null) {
-        DebugLogger.log('No image selected', scope: 'chat/page');
+      final List<LocalAttachment> attachments;
+      if (fromCamera) {
+        final attachment = await fileService.takePhoto() as LocalAttachment?;
+        if (attachment == null) {
+          DebugLogger.log('No image selected', scope: 'chat/page');
+          return;
+        }
+        attachments = [attachment];
+      } else {
+        attachments = List<LocalAttachment>.from(
+          await fileService.pickImages(),
+        );
+      }
+
+      if (attachments.isEmpty) {
+        DebugLogger.log('No images selected', scope: 'chat/page');
         return;
       }
 
-      DebugLogger.log(
-        'Image selected: ${attachment.file.path}',
-        scope: 'chat/page',
-      );
-      DebugLogger.log(
-        'Image display name: ${attachment.displayName}',
-        scope: 'chat/page',
-      );
-      final imageSize = await attachment.file.length();
-      DebugLogger.log('Image size: $imageSize bytes', scope: 'chat/page');
+      final imageSizes = <LocalAttachment, int>{};
+      for (final attachment in attachments) {
+        DebugLogger.log(
+          'Image selected: ${attachment.file.path}',
+          scope: 'chat/page',
+        );
+        DebugLogger.log(
+          'Image display name: ${attachment.displayName}',
+          scope: 'chat/page',
+        );
+        final imageSize = await attachment.file.length();
+        imageSizes[attachment] = imageSize;
+        DebugLogger.log('Image size: $imageSize bytes', scope: 'chat/page');
 
-      // Validate file size (default 20MB limit like OpenWebUI)
-      if (!validateFileSize(imageSize, 20)) {
-        if (!mounted) return;
-        return;
+        // Validate file size (default 20MB limit like OpenWebUI)
+        if (!validateFileSize(imageSize, 20)) {
+          if (!mounted) return;
+          return;
+        }
       }
 
-      // Add image to the attachment list
-      ref.read(attachedFilesProvider.notifier).addFiles([attachment]);
-      DebugLogger.log('Image added to attachment list', scope: 'chat/page');
+      // Add images to the attachment list
+      ref.read(attachedFilesProvider.notifier).addFiles(attachments);
+      DebugLogger.log(
+        'Images added to attachment list: ${attachments.length}',
+        scope: 'chat/page',
+      );
 
       // Enqueue upload via task queue for unified retry/progress
-      DebugLogger.log('Enqueueing image upload...', scope: 'chat/page');
+      DebugLogger.log('Enqueueing image upload(s)...', scope: 'chat/page');
       final activeConv = ref.read(activeConversationProvider);
-      try {
-        await ref
-            .read(taskQueueProvider.notifier)
-            .enqueueUploadMedia(
-              conversationId: activeConv?.id,
-              filePath: attachment.file.path,
-              fileName: attachment.displayName,
-              fileSize: imageSize,
-            );
-      } catch (e) {
-        DebugLogger.log('Enqueue image upload failed: $e', scope: 'chat/page');
+      for (final attachment in attachments) {
+        try {
+          await ref
+              .read(taskQueueProvider.notifier)
+              .enqueueUploadMedia(
+                conversationId: activeConv?.id,
+                filePath: attachment.file.path,
+                fileName: attachment.displayName,
+                fileSize:
+                    imageSizes[attachment] ?? await attachment.file.length(),
+              );
+        } catch (e) {
+          DebugLogger.log(
+            'Enqueue image upload failed: $e',
+            scope: 'chat/page',
+          );
+        }
       }
     } catch (e) {
       DebugLogger.log('Image attachment error: $e', scope: 'chat/page');
@@ -1021,6 +1048,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _scheduleInitialScrollToBottom();
   }
 
+  void _handleMessageRowSizeChange(String messageId) {
+    if (!mounted || _isDeactivated) {
+      return;
+    }
+
+    _pendingRowExtentInvalidationMessageIds.add(messageId);
+    _scheduleRowExtentInvalidation();
+  }
+
   void _updateBottomAnchorTracking() {
     if (!_scrollController.hasClients) {
       _isAnchoredToBottom = true;
@@ -1255,6 +1291,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _markdownPrewarmTimer = null;
     _markdownPrewarmGeneration++;
     _lastMarkdownPrewarmSignature = null;
+    _pendingRowExtentInvalidationMessageIds.clear();
     if (!preserveStreamingPin) {
       _pinToTopState = const _PinToTopState.inactive();
       _invalidateChatListStableLayoutMetadata();
@@ -1288,14 +1325,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _initialBottomSettleGeneration += 1;
   }
 
-  void _scheduleInitialScrollToBottom({int attempt = 0, int? generation}) {
+  void _scheduleInitialScrollToBottom({
+    int attempt = 0,
+    int? generation,
+    bool allowDuringStreaming = false,
+  }) {
     final settleGeneration =
         generation ?? (_initialBottomSettleGeneration += 1);
     _scheduleAfterScrollAttachment(() {
       if (!mounted || _initialBottomSettleGeneration != settleGeneration) {
         return;
       }
-      if (_hasActiveStreamingAssistant(ref.read(chatMessagesProvider))) {
+      if (!allowDuringStreaming &&
+          _hasActiveStreamingAssistant(ref.read(chatMessagesProvider))) {
         return;
       }
       if (_isUserInteractingWithScroll) {
@@ -1312,13 +1354,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             _initialBottomSettleGeneration != settleGeneration ||
             !_scrollController.hasClients ||
             _isUserInteractingWithScroll ||
-            _hasActiveStreamingAssistant(ref.read(chatMessagesProvider))) {
+            (!allowDuringStreaming &&
+                _hasActiveStreamingAssistant(ref.read(chatMessagesProvider)))) {
           return;
         }
         if (_distanceFromBottom() > _scrollCorrectionEpsilon) {
           _scheduleInitialScrollToBottom(
             attempt: attempt + 1,
             generation: settleGeneration,
+            allowDuringStreaming: allowDuringStreaming,
           );
         }
       });
@@ -1462,6 +1506,58 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         return;
       }
       _messageListController.invalidateAllExtents();
+    });
+  }
+
+  void _scheduleRowExtentInvalidation({int attempt = 0}) {
+    if (_rowExtentInvalidationScheduled) {
+      return;
+    }
+    _rowExtentInvalidationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _rowExtentInvalidationScheduled = false;
+      if (!mounted || _isDeactivated) {
+        _pendingRowExtentInvalidationMessageIds.clear();
+        return;
+      }
+      if (_pendingRowExtentInvalidationMessageIds.isEmpty) {
+        return;
+      }
+      if (!_messageListController.isAttached ||
+          _messageListController.isLocked) {
+        if (attempt < 2) {
+          _scheduleRowExtentInvalidation(attempt: attempt + 1);
+        } else {
+          _pendingRowExtentInvalidationMessageIds.clear();
+        }
+        return;
+      }
+
+      final changedIndices = _messageRowIndicesForIds(
+        ref.read(chatMessagesProvider),
+        _pendingRowExtentInvalidationMessageIds,
+      );
+      _pendingRowExtentInvalidationMessageIds.clear();
+      if (changedIndices.isEmpty) {
+        return;
+      }
+      for (final index in changedIndices) {
+        _messageListController.invalidateExtent(index);
+      }
+
+      final shouldKeepBottomAnchored =
+          _shouldKeepConversationBottomAnchoredOnContentSizeChange(
+            isAnchoredToBottom: _isAnchoredToBottom,
+            isUserInteractingWithScroll: _isUserInteractingWithScroll,
+            wantsPinToTop: _wantsPinToTop,
+          );
+
+      if (shouldKeepBottomAnchored) {
+        _scheduleInitialScrollToBottom(allowDuringStreaming: true);
+        return;
+      }
+
+      _updateScrollToBottomVisibility();
     });
   }
 
@@ -1821,8 +1917,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
                   if (isUser) {
                     final isPinTarget = index == pinnedUserMessageIndex;
-                    return KeyedSubtree(
-                      key: isPinTarget
+                    return _buildMeasuredMessageRow(
+                      messageId: messageId,
+                      rowKey: isPinTarget
                           ? _pinnedUserMessageKey
                           : ValueKey<String>('message-$messageId'),
                       child: Consumer(
@@ -1861,8 +1958,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     );
                   }
 
-                  return KeyedSubtree(
-                    key: ValueKey<String>('message-$messageId'),
+                  return _buildMeasuredMessageRow(
+                    messageId: messageId,
+                    rowKey: ValueKey<String>('message-$messageId'),
                     child: Consumer(
                       builder: (context, rowRef, _) {
                         final latestMessage = rowRef.watch(
@@ -1917,6 +2015,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               child: SizedBox(height: MediaQuery.of(context).size.height),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMeasuredMessageRow({
+    required String messageId,
+    required Key rowKey,
+    required Widget child,
+  }) {
+    return KeyedSubtree(
+      key: rowKey,
+      child: MeasureSize(
+        onChange: (_) => _handleMessageRowSizeChange(messageId),
+        child: child,
       ),
     );
   }
@@ -2139,8 +2251,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       fontWeight: FontWeight.w600,
       color: context.conduitTheme.textPrimary,
     );
+    final textScaler = MediaQuery.textScalerOf(context);
     final greetingHeight =
-        (greetingStyle.fontSize ?? 24) * (greetingStyle.height ?? 1.1);
+        textScaler.scale(greetingStyle.fontSize ?? 24) *
+        (greetingStyle.height ?? 1.1);
     final String? resolvedGreetingName = hasGreeting ? greetingName : null;
     final greetingText = resolvedGreetingName != null
         ? l10n.greetingTitle(resolvedGreetingName)
@@ -2243,8 +2357,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       ],
                     ),
                   ] else ...[
-                    SizedBox(
-                      height: greetingHeight,
+                    ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: greetingHeight),
                       child: AnimatedOpacity(
                         duration: const Duration(milliseconds: 260),
                         curve: Curves.easeOutCubic,
@@ -2309,6 +2423,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     onSendMessage: _handleMessageSend,
                     enabled: !isLoadingConversation,
                     bottomPadding: 0,
+                    composerTextInsertionTargetId:
+                        chatComposerTextInsertionTargetId,
                     onVoiceInput: null,
                     onVoiceCall: _handleVoiceCall,
                     onFileAttachment: _handleFileAttachment,
@@ -2540,35 +2656,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Future<void> _openModelSelector(BuildContext context) async {
-    final modelsAsync = ref.read(modelsProvider);
-
-    if (modelsAsync.isLoading) {
-      try {
-        final models = await ref.read(modelsProvider.future);
-        if (!mounted || !context.mounted) return;
-        await _showModelDropdown(context, ref, models);
-      } catch (e) {
-        DebugLogger.error(
-          'model-load-failed',
-          scope: 'chat/model-selector',
-          error: e,
-        );
-      }
-    } else if (modelsAsync.hasValue) {
-      await _showModelDropdown(context, ref, modelsAsync.value!);
-    } else if (modelsAsync.hasError) {
-      try {
-        ref.invalidate(modelsProvider);
-        final models = await ref.read(modelsProvider.future);
-        if (!mounted || !context.mounted) return;
-        await _showModelDropdown(context, ref, models);
-      } catch (e) {
-        DebugLogger.error(
-          'model-refresh-failed',
-          scope: 'chat/model-selector',
-          error: e,
-        );
-      }
+    try {
+      final models = await ref
+          .read(nativeSheetHydrationServiceProvider)
+          .loadModels();
+      if (!mounted || !context.mounted) return;
+      await _showModelDropdown(context, ref, models);
+    } catch (e) {
+      DebugLogger.error(
+        'model-load-failed',
+        scope: 'chat/model-selector',
+        error: e,
+      );
     }
   }
 
@@ -2814,12 +2913,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   ) async {
     // Ensure keyboard is closed before presenting modal
     final hadFocus = ref.read(composerHasFocusProvider);
-    final api = ref.read(apiServiceProvider);
-    final avatarHeaders =
-        buildImageHeadersFromContainer(
-          ProviderScope.containerOf(context, listen: false),
-        ) ??
-        const <String, String>{};
     _dismissComposerFocus();
 
     Future<void> restoreFocusIfNeeded() async {
@@ -2836,21 +2929,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     if (Platform.isIOS) {
       try {
-        final selectedId = await NativeSheetBridge.instance
+        final selectedId = await ref
+            .read(nativeSheetHydrationServiceProvider)
             .presentModelSelector(
+              context,
               title: AppLocalizations.of(context)!.chooseModel,
               selectedModelId: ref.read(selectedModelProvider)?.id,
-              models: models
-                  .map(
-                    (model) => NativeSheetModelOption(
-                      id: model.id,
-                      name: model.name,
-                      subtitle: model.description ?? model.id,
-                      avatarUrl: resolveModelIconUrlForModel(api, model),
-                      avatarHeaders: avatarHeaders,
-                    ),
-                  )
-                  .toList(),
+              models: models,
+              allowsPinning: true,
               rethrowErrors: true,
             );
         if (!mounted) return;
@@ -2878,7 +2964,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     await ThemedSheets.showCustom<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => ModelSelectorSheet(models: models, ref: ref),
+      builder: (context) => ModelSelectorSheet(models: models),
     );
     await restoreFocusIfNeeded();
   }
@@ -3158,9 +3244,9 @@ bool _shouldKeepConversationBottomAnchoredOnInsetChange({
   required bool wantsPinToTop,
 }) {
   const insetChangeEpsilon = 1.0;
-  final insetExpanded =
-      nextBottomInset > previousBottomInset + insetChangeEpsilon;
-  return insetExpanded &&
+  final insetChanged =
+      (nextBottomInset - previousBottomInset).abs() > insetChangeEpsilon;
+  return insetChanged &&
       isAnchoredToBottom &&
       !isUserInteractingWithScroll &&
       !wantsPinToTop;
@@ -3180,6 +3266,32 @@ bool _shouldKeepConversationBottomAnchoredOnComposerHeightChange({
       isAnchoredToBottom &&
       !isUserInteractingWithScroll &&
       !wantsPinToTop;
+}
+
+bool _shouldKeepConversationBottomAnchoredOnContentSizeChange({
+  required bool isAnchoredToBottom,
+  required bool isUserInteractingWithScroll,
+  required bool wantsPinToTop,
+}) {
+  return isAnchoredToBottom && !isUserInteractingWithScroll && !wantsPinToTop;
+}
+
+List<int> _messageRowIndicesForIds(
+  List<ChatMessage> messages,
+  Iterable<String> messageIds,
+) {
+  final pendingIds = messageIds.toSet();
+  if (pendingIds.isEmpty || messages.isEmpty) {
+    return const <int>[];
+  }
+
+  final indices = <int>[];
+  for (var index = 0; index < messages.length; index += 1) {
+    if (pendingIds.contains(messages[index].id)) {
+      indices.add(index);
+    }
+  }
+  return List<int>.unmodifiable(indices);
 }
 
 double _estimateMessageListExtentForIndex(
@@ -3267,6 +3379,27 @@ bool debugShouldKeepConversationBottomAnchoredOnComposerHeightChangeForTesting({
     isUserInteractingWithScroll: isUserInteractingWithScroll,
     wantsPinToTop: wantsPinToTop,
   );
+}
+
+@visibleForTesting
+bool debugShouldKeepConversationBottomAnchoredOnContentSizeChangeForTesting({
+  required bool isAnchoredToBottom,
+  required bool isUserInteractingWithScroll,
+  required bool wantsPinToTop,
+}) {
+  return _shouldKeepConversationBottomAnchoredOnContentSizeChange(
+    isAnchoredToBottom: isAnchoredToBottom,
+    isUserInteractingWithScroll: isUserInteractingWithScroll,
+    wantsPinToTop: wantsPinToTop,
+  );
+}
+
+@visibleForTesting
+List<int> debugMessageRowIndicesForIdsForTesting(
+  List<ChatMessage> messages,
+  Iterable<String> messageIds,
+) {
+  return _messageRowIndicesForIds(messages, messageIds);
 }
 
 @visibleForTesting
