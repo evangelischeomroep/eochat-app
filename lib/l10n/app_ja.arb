@@ -3078,5 +3078,22 @@
   "securityCertificateError": "セキュリティ証明書エラーです。サーバーの識別情報を確認できません。",
   "@securityCertificateError": {
     "description": "Error shown when the server TLS certificate cannot be trusted or verified."
-  }
+  },
+  "callkitNotificationPermissionTitle": "通知の権限",
+  "callkitNotificationPermissionRationale": "通話アラートには通知権限が必要です。",
+  "callkitNotificationPermissionPostMessage": "着信を表示するために通知を許可してください。",
+  "callkitActionAccept": "応答",
+  "callkitActionDecline": "拒否",
+  "callkitMissedCallSubtitle": "不在着信",
+  "callkitCallBackAction": "折り返し",
+  "callkitCallingSubtitle": "発信中…",
+  "callkitHangUpAction": "通話終了",
+  "callkitIncomingCallChannelName": "着信",
+  "callkitMissedCallChannelName": "不在着信",
+  "settingsTitle": "設定",
+  "profileTitle": "プロフィール",
+  "appearanceTitle": "外観",
+  "chatsTitle": "チャット",
+  "aiAndMemoryTitle": "AI とメモリ",
+  "dataAndConnectionTitle": "データと接続"
 }

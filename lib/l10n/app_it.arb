@@ -1783,5 +1783,22 @@
   "failedToLoadTools": "Impossibile caricare gli strumenti",
   "@failedToLoadTools": {
     "description": "Error shown when the composer overflow menu cannot load tools."
-  }
+  },
+  "callkitNotificationPermissionTitle": "Autorizzazione alle notifiche",
+  "callkitNotificationPermissionRationale": "Gli avvisi di chiamata richiedono l’autorizzazione alle notifiche.",
+  "callkitNotificationPermissionPostMessage": "Consenti le notifiche per mostrare le chiamate in arrivo.",
+  "callkitActionAccept": "Accetta",
+  "callkitActionDecline": "Rifiuta",
+  "callkitMissedCallSubtitle": "Chiamata persa",
+  "callkitCallBackAction": "Richiama",
+  "callkitCallingSubtitle": "Chiamata in corso…",
+  "callkitHangUpAction": "Riaggancia",
+  "callkitIncomingCallChannelName": "Chiamata in arrivo",
+  "callkitMissedCallChannelName": "Chiamata persa",
+  "settingsTitle": "Impostazioni",
+  "profileTitle": "Profilo",
+  "appearanceTitle": "Aspetto",
+  "chatsTitle": "Chat",
+  "aiAndMemoryTitle": "IA e memoria",
+  "dataAndConnectionTitle": "Dati e connessione"
 }

@@ -1555,5 +1555,22 @@
   "failedToLoadTools": "도구를 불러올 수 없습니다",
   "@failedToLoadTools": {
     "description": "Error shown when the composer overflow menu cannot load tools."
-  }
+  },
+  "callkitNotificationPermissionTitle": "알림 권한",
+  "callkitNotificationPermissionRationale": "통화 알림을 받으려면 알림 권한이 필요합니다.",
+  "callkitNotificationPermissionPostMessage": "수신 전화를 표시하려면 알림을 허용하세요.",
+  "callkitActionAccept": "수락",
+  "callkitActionDecline": "거절",
+  "callkitMissedCallSubtitle": "부재중 전화",
+  "callkitCallBackAction": "다시 전화",
+  "callkitCallingSubtitle": "통화 중…",
+  "callkitHangUpAction": "전화 끊기",
+  "callkitIncomingCallChannelName": "수신 전화",
+  "callkitMissedCallChannelName": "부재중 전화",
+  "settingsTitle": "설정",
+  "profileTitle": "프로필",
+  "appearanceTitle": "모양",
+  "chatsTitle": "채팅",
+  "aiAndMemoryTitle": "AI 및 메모리",
+  "dataAndConnectionTitle": "데이터 및 연결"
 }

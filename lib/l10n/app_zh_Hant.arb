@@ -1783,5 +1783,22 @@
   "failedToLoadTools": "無法載入工具",
   "@failedToLoadTools": {
     "description": "Error shown when the composer overflow menu cannot load tools."
-  }
+  },
+  "callkitNotificationPermissionTitle": "通知權限",
+  "callkitNotificationPermissionRationale": "通話提醒需要通知權限。",
+  "callkitNotificationPermissionPostMessage": "允許通知以顯示來電。",
+  "callkitActionAccept": "接聽",
+  "callkitActionDecline": "拒絕",
+  "callkitMissedCallSubtitle": "未接來電",
+  "callkitCallBackAction": "回撥",
+  "callkitCallingSubtitle": "通話中…",
+  "callkitHangUpAction": "掛斷",
+  "callkitIncomingCallChannelName": "來電",
+  "callkitMissedCallChannelName": "未接來電",
+  "settingsTitle": "設定",
+  "profileTitle": "個人資料",
+  "appearanceTitle": "外觀",
+  "chatsTitle": "聊天",
+  "aiAndMemoryTitle": "AI 與記憶",
+  "dataAndConnectionTitle": "資料與連線"
 }

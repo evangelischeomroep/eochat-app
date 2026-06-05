@@ -1783,5 +1783,22 @@
   "failedToLoadTools": "Не удалось загрузить инструменты",
   "@failedToLoadTools": {
     "description": "Error shown when the composer overflow menu cannot load tools."
-  }
+  },
+  "callkitNotificationPermissionTitle": "Разрешение на уведомления",
+  "callkitNotificationPermissionRationale": "Для уведомлений о звонках требуется разрешение на уведомления.",
+  "callkitNotificationPermissionPostMessage": "Разрешите уведомления, чтобы показывать входящие звонки.",
+  "callkitActionAccept": "Принять",
+  "callkitActionDecline": "Отклонить",
+  "callkitMissedCallSubtitle": "Пропущенный звонок",
+  "callkitCallBackAction": "Перезвонить",
+  "callkitCallingSubtitle": "Идёт вызов…",
+  "callkitHangUpAction": "Завершить",
+  "callkitIncomingCallChannelName": "Входящий звонок",
+  "callkitMissedCallChannelName": "Пропущенный звонок",
+  "settingsTitle": "Настройки",
+  "profileTitle": "Профиль",
+  "appearanceTitle": "Оформление",
+  "chatsTitle": "Чаты",
+  "aiAndMemoryTitle": "ИИ и память",
+  "dataAndConnectionTitle": "Данные и подключение"
 }
