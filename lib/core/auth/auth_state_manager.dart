@@ -930,9 +930,24 @@ class AuthStateManager extends _$AuthStateManager {
           authType == 'token' ||
           authType == 'sso' ||
           authType == 'ldap') {
-        // This is a saved JWT token (manual entry, SSO, or LDAP-obtained)
+        // This is a saved JWT token (manual entry, SSO, or LDAP-obtained).
+        // If the stored token is malformed, clear credentials and force
+        // explicit sign-in instead of showing a connection issue screen.
+        if (!_isValidTokenFormat(password)) {
+          await storage.deleteSavedCredentials();
+          _update(
+            (current) => current.copyWith(
+              status: AuthStatus.credentialError,
+              error: 'Saved token is invalid. Please sign in again.',
+              isLoading: false,
+              clearToken: true,
+            ),
+          );
+          return false;
+        }
+
         // For LDAP, we store the JWT token returned by the server, not the
-        // original password, for security reasons
+        // original password, for security reasons.
         return await loginWithApiKey(
           password, // This is the JWT token
           rememberCredentials: false,
@@ -952,19 +967,25 @@ class AuthStateManager extends _$AuthStateManager {
 
       String errorMessage = e.toString();
 
-      // Don't clear credentials on connection errors - only clear on actual auth failures
-      // Check if this is a genuine auth failure vs network issue
+      // Don't clear credentials on connection errors - only clear on actual auth failures.
+      // Check if this is a genuine auth failure vs network issue.
+      final normalizedError = e.toString().toLowerCase();
       final isNetworkError =
-          e.toString().contains('SocketException') ||
-          e.toString().contains('Connection') ||
-          e.toString().contains('timeout') ||
-          e.toString().contains('NetworkImage');
+          normalizedError.contains('socketexception') ||
+          normalizedError.contains('connection') ||
+          normalizedError.contains('timeout') ||
+          normalizedError.contains('networkimage');
+      final isAuthFailure =
+          normalizedError.contains('401') ||
+          normalizedError.contains('403') ||
+          normalizedError.contains('authentication') ||
+          normalizedError.contains('unauthorized') ||
+          normalizedError.contains('invalid token') ||
+          normalizedError.contains('token format') ||
+          normalizedError.contains('token cannot be empty') ||
+          normalizedError.contains('apikeynotsupported');
 
-      if (!isNetworkError &&
-          (e.toString().contains('401') ||
-              e.toString().contains('403') ||
-              e.toString().contains('authentication') ||
-              e.toString().contains('unauthorized'))) {
+      if (!isNetworkError && isAuthFailure) {
         // Only clear credentials if this is a real auth failure, not a network issue
         final storage = ref.read(optimizedStorageServiceProvider);
         try {
