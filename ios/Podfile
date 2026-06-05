@@ -66,6 +66,15 @@ post_install do |installer|
       # symbols when Xcode attempts a universal simulator link.
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = IOS_DEPLOYMENT_TARGET
+
+      # flutter_callkit_incoming 3.1.x emits both an ObjC plugin header and a
+      # Swift-generated header for FlutterCallkitIncomingPlugin, which can
+      # trigger a duplicate-definition module error in GeneratedPluginRegistrant.
+      # Disabling installation of the Swift ObjC compatibility header for this
+      # pod avoids the conflicting flutter_callkit_incoming.Swift module.
+      if target.name == 'flutter_callkit_incoming'
+        config.build_settings['SWIFT_INSTALL_OBJC_HEADER'] = 'NO'
+      end
     end
   end
 
@@ -79,7 +88,7 @@ post_install do |installer|
           config.build_settings['ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES'] = 'NO'
           config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
           config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = IOS_DEPLOYMENT_TARGET
-           
+
           # Add -ObjC and -lc++ flags for native extensions support
           other_ldflags = config.build_settings['OTHER_LDFLAGS'] || ['$(inherited)']
           other_ldflags = [other_ldflags] if other_ldflags.is_a?(String)
