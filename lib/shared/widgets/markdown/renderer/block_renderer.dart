@@ -13,6 +13,7 @@ import 'details_group_widget.dart';
 import 'inline_renderer.dart';
 import 'latex_preprocessor.dart';
 import 'markdown_style.dart';
+import 'pdf_inline_view.dart';
 
 /// Signature for a builder that creates image widgets.
 typedef ImageBuilder = Widget Function(String src, String? alt, String? title);
@@ -24,6 +25,9 @@ enum MarkdownHeavyBlockPolicy {
   /// Avoid hydrating heavy previews and render lightweight code fallback only.
   defer,
 }
+
+final RegExp _leadingSoftBreakPattern = RegExp(r'^[ \t]*\n[ \t]*');
+final RegExp _trailingSoftBreakPattern = RegExp(r'[ \t]*\n[ \t]*$');
 
 /// Renders markdown AST block-level nodes as Flutter
 /// widgets.
@@ -301,9 +305,26 @@ class BlockRenderer {
       );
     }
 
+    final singlePdfLink = _extractSinglePdfLink(element);
+    if (singlePdfLink != null &&
+        heavyBlockPolicy == MarkdownHeavyBlockPolicy.eager) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: style.paragraphSpacing),
+        child: _renderPdfLink(singlePdfLink),
+      );
+    }
+
     final children = element.children;
     if (children.isEmpty) {
       return const SizedBox.shrink();
+    }
+
+    final mixedImageParagraph = _renderParagraphWithStandaloneImages(element);
+    if (mixedImageParagraph != null) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: style.paragraphSpacing),
+        child: mixedImageParagraph,
+      );
     }
 
     return Padding(
@@ -326,6 +347,263 @@ class BlockRenderer {
       return child;
     }
     return null;
+  }
+
+  CompiledMarkdownElement? _extractSinglePdfLink(
+    CompiledMarkdownElement paragraph,
+  ) {
+    final children = paragraph.children;
+    if (children.length != 1) {
+      return null;
+    }
+    final child = children.first;
+    if (child is CompiledMarkdownElement &&
+        child.tag == 'a' &&
+        PdfInlineView.isPdfLink(child.attributes['href'] ?? '')) {
+      return child;
+    }
+    return null;
+  }
+
+  Widget _renderPdfLink(CompiledMarkdownElement element) {
+    return PdfInlineView(
+      url: element.attributes['href'] ?? '',
+      label: element.textContent,
+    );
+  }
+
+  Widget? _renderParagraphWithStandaloneImages(
+    CompiledMarkdownElement paragraph,
+  ) {
+    final children = paragraph.children;
+    if (!_hasStandaloneImageChild(children)) {
+      return null;
+    }
+
+    final flowWidgets = <Widget>[];
+    final inlineRun = <CompiledMarkdownNode>[];
+    var trimLeadingSoftBreak = false;
+
+    void flushInlineRun({required bool trimTrailingSoftBreak}) {
+      if (inlineRun.isEmpty) {
+        return;
+      }
+
+      final renderRun = trimTrailingSoftBreak
+          ? _trimInlineRunTrailingSoftBreak(inlineRun)
+          : List<CompiledMarkdownNode>.of(inlineRun);
+      inlineRun.clear();
+      if (renderRun.isEmpty) {
+        return;
+      }
+
+      flowWidgets.add(Text.rich(inlineRenderer.render(renderRun)));
+    }
+
+    for (var index = 0; index < children.length; index += 1) {
+      final child = children[index];
+      if (_isStandaloneImageChild(children, index)) {
+        flushInlineRun(trimTrailingSoftBreak: true);
+        final image = _renderBlockImage(child as CompiledMarkdownElement);
+        if (image != null) {
+          flowWidgets.add(image);
+        }
+        trimLeadingSoftBreak = true;
+        continue;
+      }
+
+      var inlineChild = child;
+      if (trimLeadingSoftBreak) {
+        if (_isLineBreakNode(child)) {
+          continue;
+        }
+        final trimmedChild = _trimInlineNodeLeadingSoftBreak(child);
+        if (trimmedChild == null) {
+          continue;
+        }
+        trimLeadingSoftBreak = false;
+        inlineChild = trimmedChild;
+      }
+      inlineRun.add(inlineChild);
+    }
+
+    flushInlineRun(trimTrailingSoftBreak: false);
+    if (flowWidgets.isEmpty) {
+      return null;
+    }
+    if (flowWidgets.length == 1) {
+      return flowWidgets.single;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: _withParagraphFlowSpacing(flowWidgets),
+    );
+  }
+
+  bool _hasStandaloneImageChild(List<CompiledMarkdownNode> children) {
+    for (var index = 0; index < children.length; index += 1) {
+      if (_isStandaloneImageChild(children, index)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _isStandaloneImageChild(List<CompiledMarkdownNode> children, int index) {
+    final child = children[index];
+    return child is CompiledMarkdownElement &&
+        child.tag == 'img' &&
+        _hasSoftLineBoundaryBefore(children, index) &&
+        _hasSoftLineBoundaryAfter(children, index);
+  }
+
+  bool _hasSoftLineBoundaryBefore(
+    List<CompiledMarkdownNode> children,
+    int index,
+  ) {
+    for (var childIndex = index - 1; childIndex >= 0; childIndex -= 1) {
+      final child = children[childIndex];
+      if (_isLineBreakNode(child)) {
+        return true;
+      }
+      if (child is! CompiledMarkdownText) {
+        return false;
+      }
+      final text = child.text;
+      if (text.isEmpty) {
+        continue;
+      }
+      if (text.trim().isEmpty) {
+        if (text.contains('\n')) {
+          return true;
+        }
+        continue;
+      }
+      return _trailingSoftBreakPattern.hasMatch(text);
+    }
+    return true;
+  }
+
+  bool _hasSoftLineBoundaryAfter(
+    List<CompiledMarkdownNode> children,
+    int index,
+  ) {
+    for (
+      var childIndex = index + 1;
+      childIndex < children.length;
+      childIndex += 1
+    ) {
+      final child = children[childIndex];
+      if (_isLineBreakNode(child)) {
+        return true;
+      }
+      if (child is! CompiledMarkdownText) {
+        return false;
+      }
+      final text = child.text;
+      if (text.isEmpty) {
+        continue;
+      }
+      if (text.trim().isEmpty) {
+        if (text.contains('\n')) {
+          return true;
+        }
+        continue;
+      }
+      return _leadingSoftBreakPattern.hasMatch(text);
+    }
+    return true;
+  }
+
+  List<CompiledMarkdownNode> _trimInlineRunTrailingSoftBreak(
+    List<CompiledMarkdownNode> nodes,
+  ) {
+    final trimmed = List<CompiledMarkdownNode>.of(nodes);
+    while (trimmed.isNotEmpty) {
+      final last = trimmed.last;
+      if (_isLineBreakNode(last)) {
+        trimmed.removeLast();
+        continue;
+      }
+      if (last is! CompiledMarkdownText) {
+        return trimmed;
+      }
+      final trimmedLast = _trimTextNodeTrailingSoftBreak(last);
+      if (trimmedLast == null) {
+        trimmed.removeLast();
+        continue;
+      }
+      if (trimmedLast.text.trim().isEmpty) {
+        trimmed.removeLast();
+        continue;
+      }
+      trimmed[trimmed.length - 1] = trimmedLast;
+      return trimmed;
+    }
+    return const <CompiledMarkdownNode>[];
+  }
+
+  CompiledMarkdownNode? _trimInlineNodeLeadingSoftBreak(
+    CompiledMarkdownNode node,
+  ) {
+    if (_isLineBreakNode(node)) {
+      return null;
+    }
+    if (node is! CompiledMarkdownText) {
+      return node;
+    }
+    final text = node.text.replaceFirst(_leadingSoftBreakPattern, '');
+    if (text.trim().isEmpty) {
+      return null;
+    }
+    if (text == node.text) {
+      return node;
+    }
+    return _copyTextNodeWithText(node, text);
+  }
+
+  CompiledMarkdownText? _trimTextNodeTrailingSoftBreak(
+    CompiledMarkdownText node,
+  ) {
+    final text = node.text.replaceFirst(_trailingSoftBreakPattern, '');
+    if (text.isEmpty) {
+      return null;
+    }
+    if (text == node.text) {
+      return node;
+    }
+    return _copyTextNodeWithText(node, text);
+  }
+
+  CompiledMarkdownText _copyTextNodeWithText(
+    CompiledMarkdownText node,
+    String text,
+  ) {
+    return CompiledMarkdownText(
+      text,
+      nodeId: node.nodeId,
+      containsLatexPlaceholders: latexPreprocessor.containsPlaceholder(text),
+      containsCitations: node.containsCitations,
+    );
+  }
+
+  bool _isLineBreakNode(CompiledMarkdownNode node) =>
+      node is CompiledMarkdownElement && node.tag == 'br';
+
+  List<Widget> _withParagraphFlowSpacing(List<Widget> widgets) {
+    if (widgets.length < 2) {
+      return widgets;
+    }
+
+    final spaced = <Widget>[];
+    for (var index = 0; index < widgets.length; index += 1) {
+      if (index > 0) {
+        spaced.add(SizedBox(height: style.paragraphSpacing));
+      }
+      spaced.add(widgets[index]);
+    }
+    return spaced;
   }
 
   // -- Heading --

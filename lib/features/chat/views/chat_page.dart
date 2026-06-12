@@ -41,6 +41,8 @@ import '../widgets/server_file_picker_sheet.dart';
 import '../services/file_attachment_service.dart';
 import '../services/chat_transport_dispatch.dart';
 import '../services/historical_message_regeneration.dart';
+import '../voice_mode/chat_voice_mode_controller.dart';
+import '../voice_mode/chat_voice_mode_overlay.dart';
 import '../voice_call/presentation/voice_call_launcher.dart';
 import '../../../shared/services/tasks/task_queue.dart';
 import '../../tools/providers/tools_providers.dart';
@@ -49,6 +51,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/folder.dart';
 import '../../../core/models/model.dart';
 import '../providers/context_attachments_provider.dart';
+import '../../../shared/utils/adaptive_glass.dart';
 import '../../../shared/widgets/conduit_loading.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../../shared/widgets/themed_sheets.dart';
@@ -583,10 +586,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final attachments = await fileService.pickFiles();
       if (attachments.isEmpty) return;
 
-      // Validate file sizes
+      // Keep the 20 MB guardrail for images; non-image uploads can be larger.
       for (final attachment in attachments) {
         final fileSize = await attachment.file.length();
-        if (!validateFileSize(fileSize, 20)) {
+        if (attachment.isImage && !validateFileSize(fileSize, 20)) {
           if (!mounted) return;
           return;
         }
@@ -1169,7 +1172,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     return contentScrollExtent > _scrollButtonShowThreshold;
   }
 
-  double _messageListBottomPadding() => Spacing.lg + _inputHeight;
+  double _messageListBottomPadding() {
+    final voice = ref.read(chatVoiceModeControllerProvider);
+    final voiceOverlayHeight = voice.isActive
+        ? (voice.isCollapsed ? 72.0 : 180.0)
+        : 0.0;
+    return Spacing.lg + _inputHeight + voiceOverlayHeight;
+  }
 
   double _pinToTopPhantomScrollExtent() {
     if (!_wantsPinToTop) {
@@ -1657,14 +1666,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     const buttonSize = 40.0;
     const iconSize = IconSize.medium;
     final theme = context.conduitTheme;
-    final style = Platform.isAndroid
+    final usesOpaqueFallback = conduitUsesOpaqueGlassFallback();
+    final style = usesOpaqueFallback
         ? AdaptiveButtonStyle.filled
         : AdaptiveButtonStyle.glass;
 
     return AdaptiveButton.child(
       onPressed: _userScrollToBottom,
       style: style,
-      color: Platform.isAndroid
+      color: usesOpaqueFallback
           ? theme.surfaceContainerHighest.withValues(alpha: 0.95)
           : null,
       size: AdaptiveButtonSize.medium,
@@ -2451,6 +2461,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final selectedModel = ref.watch(
       selectedModelProvider.select((model) => model),
     );
+    ref.watch(
+      chatVoiceModeControllerProvider.select(
+        (voice) => (voice.isActive, voice.isCollapsed),
+      ),
+    );
     final isLoadingConversation = ref.watch(isLoadingConversationProvider);
     final formattedModelName = selectedModel != null
         ? _formatModelDisplayName(selectedModel.name)
@@ -2629,6 +2644,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 bottom: 0,
                 child: _buildComposerSection(context),
               ),
+              ChatVoiceModeOverlay(bottomOffset: _inputHeight),
             ],
           ),
         ),
@@ -2707,6 +2723,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       pillWidth: maxModelWidth,
       leadingGap: leadingGap,
     );
+    final overlayStyle = Theme.of(context).appBarTheme.systemOverlayStyle;
 
     return AdaptiveAppBar(
       useNativeToolbar: false,
@@ -2715,6 +2732,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         automaticallyImplyLeading: false,
         border: null,
         backgroundColor: Colors.transparent,
+        automaticBackgroundVisibility: false,
+        brightness: Theme.of(context).brightness,
         enableBackgroundFilterBlur: false,
         leading: leading,
         trailing: Row(mainAxisSize: MainAxisSize.min, children: actions),
@@ -2727,6 +2746,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         elevation: Elevation.none,
         scrolledUnderElevation: Elevation.none,
         toolbarHeight: kTextTabBarHeight,
+        systemOverlayStyle: overlayStyle,
         centerTitle: false,
         titleSpacing: Spacing.sm,
         leadingWidth: leadingWidth,

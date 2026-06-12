@@ -4,6 +4,7 @@ import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
 import 'package:flutter_driver/driver_extension.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:pdfrx/pdfrx.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/widgets/error_boundary.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -16,6 +17,7 @@ import 'core/router/app_router.dart';
 import 'core/services/native_sheet_bridge.dart';
 import 'core/services/native_sheet_hydration_service.dart';
 import 'core/services/performance_profiler.dart';
+import 'core/services/carplay_service.dart';
 import 'core/services/settings_service.dart';
 import 'features/auth/providers/unified_auth_providers.dart';
 import 'features/chat/providers/text_to_speech_provider.dart';
@@ -69,6 +71,19 @@ void main() {
   runZonedGuarded(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      unawaited(
+        pdfrxFlutterInitialize().catchError((
+          Object error,
+          StackTrace stackTrace,
+        ) {
+          DebugLogger.error(
+            'pdf-engine-warmup',
+            scope: 'app/startup',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }),
+      );
       PerformanceProfiler.instance.attachFrameTimings();
 
       // Global error handlers
@@ -157,12 +172,19 @@ void main() {
         _startupTimeline = null;
       });
 
+      final providerContainer = ProviderContainer(
+        overrides: [
+          secureStorageProvider.overrideWithValue(secureStorage),
+          hiveBoxesProvider.overrideWithValue(hiveBoxes),
+        ],
+      );
+      // CarPlay can cold-launch Conduit without a visible Flutter scene, so
+      // install its method-channel handler before frame-scheduled startup work.
+      providerContainer.read(carPlayCoordinatorProvider);
+
       runApp(
-        ProviderScope(
-          overrides: [
-            secureStorageProvider.overrideWithValue(secureStorage),
-            hiveBoxesProvider.overrideWithValue(hiveBoxes),
-          ],
+        UncontrolledProviderScope(
+          container: providerContainer,
           child: const ConduitApp(),
         ),
       );
@@ -384,18 +406,40 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
             await ref
                 .read(appSettingsProvider.notifier)
                 .setSttPreference(SttPreference.serverOnly);
+            await _refreshNativeVoiceDetail();
           } else if (value == SttPreference.deviceOnly.name) {
             await ref
                 .read(appSettingsProvider.notifier)
                 .setSttPreference(SttPreference.deviceOnly);
+            await _refreshNativeVoiceDetail();
+          }
+        case 'stt-language-code':
+          if (value is String) {
+            final normalized = SettingsService.normalizeSttLanguageCode(value);
+            if (normalized != null ||
+                SettingsService.isSttLanguageAutoInput(value)) {
+              await ref
+                  .read(appSettingsProvider.notifier)
+                  .setSttLanguageCode(normalized);
+              await _refreshNativeVoiceDetail();
+            } else {
+              DebugLogger.validation(
+                'Ignoring invalid native STT language code',
+                scope: 'native-sheet',
+                data: {'value': value},
+              );
+              await _refreshNativeVoiceDetail();
+            }
           }
         case 'tts-engine':
           final notifier = ref.read(appSettingsProvider.notifier);
           if (value == TtsEngine.server.name) {
             await notifier.setTtsVoice(null);
             await notifier.setTtsEngine(TtsEngine.server);
+            await _refreshNativeVoiceDetail();
           } else if (value == TtsEngine.device.name) {
             await notifier.setTtsEngine(TtsEngine.device);
+            await _refreshNativeVoiceDetail();
           }
         case 'theme-light':
           switch (value) {
@@ -475,6 +519,12 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
   String? _normalizeOptionalNativeText(String? value) {
     final trimmed = value?.trim();
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
+  }
+
+  Future<void> _refreshNativeVoiceDetail() {
+    return ref
+        .read(nativeSheetHydrationServiceProvider)
+        .hydrateDetail(NativeSheetRoutes.voice);
   }
 
   Future<void> _saveNativePasswordDraft(String id, Object? value) async {

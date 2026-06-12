@@ -7,8 +7,6 @@
     <string>Ask EOchat</string>
     <key>AppGroupId</key>
     <string>$(APP_GROUP_ID)</string>
-    <key>AppURLScheme</key>
-    <string>$(APP_URL_SCHEME)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>NSExtension</key>

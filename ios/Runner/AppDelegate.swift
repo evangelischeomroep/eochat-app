@@ -9,6 +9,12 @@ private func appLocalized(_ key: String, _ fallback: String) -> String {
     NSLocalizedString(key, tableName: nil, bundle: .main, value: fallback, comment: "")
 }
 
+private let conduitShareChannelName = "conduit/share_receiver_text"
+private let conduitShareUserDefaultsKey = "SharingKey"
+private let conduitShareMessageKey = "SharingMessageKey"
+private let conduitShareImportStatusKey = "ShareImportStatusKey"
+private let conduitShareAppGroupIdKey = "AppGroupId"
+
 /// Manages AVAudioSession for voice calls in the background.
 ///
 /// IMPORTANT: This manager is ONLY used for server-side STT (speech-to-text).
@@ -876,6 +882,11 @@ struct AppShortcuts: AppShortcutsProvider {
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private var backgroundStreamingHandler: BackgroundStreamingHandler?
+  private var sharedFlutterEngine: FlutterEngine?
+  private weak var sharedFlutterWindowScene: UIWindowScene?
+  private var didConfigureSharedFlutterEngine = false
+  private var cookieChannel: FlutterMethodChannel?
+  private var shareImportChannel: FlutterMethodChannel?
 
   /// Checks if a cookie matches a given URL based on domain.
   private func cookieMatchesUrl(cookie: HTTPCookie, url: URL) -> Bool {
@@ -889,72 +900,235 @@ struct AppShortcuts: AppShortcutsProvider {
     return host == cleanDomain || host.hasSuffix(".\(cleanDomain)")
   }
 
+  private func shareUserDefaults() -> UserDefaults? {
+    let appGroupId = Bundle.main.object(
+      forInfoDictionaryKey: conduitShareAppGroupIdKey
+    ) as? String
+    let defaultGroupId = Bundle.main.bundleIdentifier.map { "group.\($0)" }
+    guard let groupId = appGroupId ?? defaultGroupId else { return nil }
+    return UserDefaults(suiteName: groupId)
+  }
+
+  private func pendingShareImportStatus() -> [String: Any]? {
+    guard let data = shareUserDefaults()?.data(
+      forKey: conduitShareImportStatusKey
+    ) else {
+      return nil
+    }
+
+    return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+  }
+
+  private func clearShareImportStatus(id: String?) {
+    guard let defaults = shareUserDefaults() else { return }
+    if let id,
+       let current = pendingShareImportStatus(),
+       let currentId = current["id"] as? String,
+       !currentId.isEmpty,
+       currentId != id {
+      return
+    }
+
+    defaults.removeObject(forKey: conduitShareImportStatusKey)
+    defaults.synchronize()
+  }
+
+  private func takePendingShareImportPayload() -> [String: Any]? {
+    guard let defaults = shareUserDefaults(),
+          let data = defaults.data(forKey: conduitShareUserDefaultsKey),
+          let rawItems = (try? JSONSerialization.jsonObject(with: data)) as? [[String: Any]]
+    else {
+      return nil
+    }
+
+    let status = pendingShareImportStatus()
+    let payloadId = status?["id"] as? String ?? UUID().uuidString
+    let message = defaults.string(forKey: conduitShareMessageKey)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    var textParts: [String] = []
+    var seenText = Set<String>()
+    var filePaths: [String] = []
+    var seenFilePaths = Set<String>()
+
+    func addText(_ value: String?) {
+      let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard let trimmed, !trimmed.isEmpty, seenText.insert(trimmed).inserted else {
+        return
+      }
+      textParts.append(trimmed)
+    }
+
+    func addFilePath(_ value: String?) {
+      guard var path = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !path.isEmpty else {
+        return
+      }
+      if path.hasPrefix("file://"),
+         let url = URL(string: path) {
+        path = url.path
+      }
+      guard seenFilePaths.insert(path).inserted else { return }
+      filePaths.append(path)
+    }
+
+    addText(message)
+    for item in rawItems {
+      let type = item["type"]
+      let path = item["path"] as? String ?? item["value"] as? String
+      if isSharedTextType(type) {
+        addText(path)
+      } else {
+        addFilePath(path)
+      }
+    }
+
+    defaults.removeObject(forKey: conduitShareUserDefaultsKey)
+    defaults.removeObject(forKey: conduitShareMessageKey)
+    defaults.synchronize()
+
+    if textParts.isEmpty && filePaths.isEmpty {
+      return nil
+    }
+
+    var payload: [String: Any] = [
+      "id": payloadId,
+      "filePaths": filePaths,
+    ]
+    if !textParts.isEmpty {
+      payload["text"] = textParts.joined(separator: "\n")
+    }
+    return payload
+  }
+
+  private func isSharedTextType(_ type: Any?) -> Bool {
+    if let type = type as? String {
+      return type == "text" || type == "url"
+    }
+    if let type = type as? Int {
+      return type == 0 || type == 1 || type == 5
+    }
+    if let type = type as? NSNumber {
+      let value = type.intValue
+      return value == 0 || value == 1 || value == 5
+    }
+    return false
+  }
+
+  func notifyShareImportEvent() {
+    shareImportChannel?.invokeMethod("stagedSharePayloadReady", arguments: nil)
+  }
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     backgroundStreamingHandler = BackgroundStreamingHandler()
     backgroundStreamingHandler?.registerBackgroundTasks()
-    NativeShareReceiverBridge.shared.captureLaunchOptions(launchOptions)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  override func application(
-    _ application: UIApplication,
-    open url: URL,
-    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
-  ) -> Bool {
-    if NativeShareReceiverBridge.shared.handleOpenUrl(url) {
-      return true
-    }
-
-    return super.application(application, open: url, options: options)
   }
 
   func didInitializeImplicitFlutterEngine(
     _ engineBridge: FlutterImplicitEngineBridge
   ) {
+    guard sharedFlutterEngine == nil else { return }
+
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-
-    // Setup App Intents method channel for native -> Flutter communication
-    let appIntentRegistrar = engineBridge.applicationRegistrar
-    AppIntentBridge.shared = AppIntentBridge(
-      messenger: appIntentRegistrar.messenger()
+    configureApplicationFlutterChannels(
+      messenger: engineBridge.applicationRegistrar.messenger()
     )
+  }
 
-    let pasteRegistrar = engineBridge.applicationRegistrar
-    NativePasteBridge.shared.configure(messenger: pasteRegistrar.messenger())
+  @discardableResult
+  func ensureCarPlayFlutterEngine() -> Bool {
+    return ensureSharedFlutterEngine() != nil
+  }
 
-    let keyboardAttachmentRegistrar = engineBridge.applicationRegistrar
-    NativeKeyboardAttachmentBridge.shared.configure(
-      messenger: keyboardAttachmentRegistrar.messenger()
+  @discardableResult
+  func ensureSharedFlutterEngine() -> FlutterEngine? {
+    if let engine = sharedFlutterEngine {
+      configureSharedFlutterEngineIfNeeded(engine)
+      return engine
+    }
+
+    let engine = FlutterEngine(
+      name: "conduit.shared",
+      project: nil,
+      allowHeadlessExecution: true
     )
+    guard engine.run() else {
+      print("AppDelegate: failed to start shared Flutter engine")
+      return nil
+    }
 
-    let nativeSheetRegistrar = engineBridge.applicationRegistrar
-    NativeSheetBridge.shared.configure(
-      messenger: nativeSheetRegistrar.messenger()
+    sharedFlutterEngine = engine
+    configureSharedFlutterEngineIfNeeded(engine)
+    return engine
+  }
+
+  func claimSharedFlutterWindowScene(_ windowScene: UIWindowScene) -> Bool {
+    if let currentScene = sharedFlutterWindowScene, currentScene !== windowScene {
+      return false
+    }
+
+    sharedFlutterWindowScene = windowScene
+    return true
+  }
+
+  func releaseSharedFlutterWindowScene(_ windowScene: UIWindowScene) {
+    if sharedFlutterWindowScene === windowScene {
+      sharedFlutterWindowScene = nil
+    }
+  }
+
+  private func configureSharedFlutterEngineIfNeeded(_ engine: FlutterEngine) {
+    guard !didConfigureSharedFlutterEngine else { return }
+
+    GeneratedPluginRegistrant.register(with: engine)
+    configureApplicationFlutterChannels(messenger: engine.binaryMessenger)
+    didConfigureSharedFlutterEngine = true
+  }
+
+  private func configureApplicationFlutterChannels(
+    messenger: FlutterBinaryMessenger
+  ) {
+    AppIntentBridge.shared = AppIntentBridge(messenger: messenger)
+    ConduitCarPlayBridge.shared.configure(messenger: messenger)
+    NativePasteBridge.shared.configure(messenger: messenger)
+    NativeKeyboardAttachmentBridge.shared.configure(messenger: messenger)
+    NativeSheetBridge.shared.configure(messenger: messenger)
+    NativeDropdownBridge.shared.configure(messenger: messenger)
+    backgroundStreamingHandler?.setup(messenger: messenger)
+
+    let shareImportChannel = FlutterMethodChannel(
+      name: conduitShareChannelName,
+      binaryMessenger: messenger
     )
+    self.shareImportChannel = shareImportChannel
+    shareImportChannel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else {
+        result(nil)
+        return
+      }
 
-    let nativeDropdownRegistrar = engineBridge.applicationRegistrar
-    NativeDropdownBridge.shared.configure(
-      messenger: nativeDropdownRegistrar.messenger()
-    )
+      switch call.method {
+      case "pendingShareImportStatus":
+        result(self.pendingShareImportStatus())
+      case "takePendingShareImportPayload":
+        result(self.takePendingShareImportPayload())
+      case "clearShareImportStatus":
+        let arguments = call.arguments as? [String: Any]
+        self.clearShareImportStatus(id: arguments?["id"] as? String)
+        result(nil)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
 
-    let shareReceiverRegistrar = engineBridge.applicationRegistrar
-    NativeShareReceiverBridge.shared.configure(
-      messenger: shareReceiverRegistrar.messenger()
-    )
-
-	    // Setup background streaming handler
-	    let bgRegistrar = engineBridge.applicationRegistrar
-	    backgroundStreamingHandler?.setup(messenger: bgRegistrar.messenger())
-
-    // Setup cookie manager channel for WebView cookie access
-    let cookieRegistrar = engineBridge.applicationRegistrar
     let cookieChannel = FlutterMethodChannel(
       name: "com.conduit.app/cookies",
-      binaryMessenger: cookieRegistrar.messenger()
+      binaryMessenger: messenger
     )
+    self.cookieChannel = cookieChannel
 
     cookieChannel.setMethodCallHandler { [weak self] (call, result) in
       if call.method == "getCookies" {

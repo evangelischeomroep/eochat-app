@@ -138,6 +138,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
       pillWidth: maxModelWidth,
       leadingGap: leadingGap,
     );
+    final overlayStyle = Theme.of(context).appBarTheme.systemOverlayStyle;
 
     return AdaptiveAppBar(
       useNativeToolbar: false,
@@ -146,6 +147,8 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         automaticallyImplyLeading: false,
         border: null,
         backgroundColor: Colors.transparent,
+        automaticBackgroundVisibility: false,
+        brightness: Theme.of(context).brightness,
         enableBackgroundFilterBlur: false,
         leading: leading,
         trailing: Row(mainAxisSize: MainAxisSize.min, children: actions),
@@ -158,6 +161,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         elevation: Elevation.none,
         scrolledUnderElevation: Elevation.none,
         toolbarHeight: kTextTabBarHeight,
+        systemOverlayStyle: overlayStyle,
         centerTitle: false,
         titleSpacing: Spacing.sm,
         leadingWidth: leadingWidth,
@@ -488,7 +492,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
 
       for (final attachment in attachments) {
         final fileSize = await attachment.file.length();
-        if (!chat.validateFileSize(fileSize, 20)) {
+        if (attachment.isImage && !chat.validateFileSize(fileSize, 20)) {
           return;
         }
       }
