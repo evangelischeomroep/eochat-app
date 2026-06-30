@@ -62,18 +62,23 @@ if content =~ /\b70\s*=>/
   exit 0
 end
 
-# Show context around the 63 entry for debugging
-if (m = content.match(/.{0,80}\b63\s*=>.{0,80}/m))
-  puts "Context: #{m[0].inspect}"
-end
-
-patched = content.gsub(/(\b63\s*=>\s*'[^']*')(\s*\}\.freeze)/) do
-  "#{$1},\n    70 => 'Xcode 26.0'#{$2}"
+# The hash has entries in descending order (77, 63, 60, 56...).
+# Insert 70 after the highest existing entry (77 => 'Xcode 16.0').
+# This is safe regardless of how many entries follow.
+patched = content.gsub(/(\b77\s*=>\s*'[^']*')/) do
+  "#{$1},\n    70 => 'Xcode 26.0'"
 end
 
 if patched == content
-  warn "ERROR: Regex did not match. Printing lines containing '63':"
-  content.each_line { |l| puts l.chomp if l =~ /\b63\b/ }
+  # Fallback: insert before the closing }.freeze of the hash
+  patched = content.gsub(/(COMPATIBILITY_VERSION_BY_OBJECT_VERSION\s*=\s*\{[^}]+?)(\s*\}\.freeze)/) do
+    "#{$1},\n    70 => 'Xcode 26.0'#{$2}"
+  end
+end
+
+if patched == content
+  warn "ERROR: Could not patch constants.rb. Printing lines with version numbers:"
+  content.each_line { |l| puts l.chomp if l =~ /=>\s*'Xcode/ }
   exit 1
 end
 
