@@ -24,7 +24,7 @@ dart run build_runner build --delete-conflicting-outputs
 echo "=== Update xcodeproj gem (Xcode 26 object version 70 fix) ==="
 # xcodeproj 1.27.0 (bundled with CocoaPods 1.16.2) doesn't recognise Xcode 26's
 # project object version 70. Installing the latest xcodeproj fixes this.
-sudo gem install xcodeproj
+gem install xcodeproj
 
 echo "=== pod install ==="
 cd "$CI_PRIMARY_REPOSITORY_PATH/ios"
