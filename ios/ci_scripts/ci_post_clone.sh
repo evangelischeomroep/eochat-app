@@ -86,6 +86,9 @@ File.write(target_file, patched)
 puts "Successfully patched #{target_file}"
 RUBY_PATCH
 
+echo "=== flutter precache --ios ==="
+flutter precache --ios
+
 echo "=== pod install ==="
 cd "$CI_PRIMARY_REPOSITORY_PATH/ios"
 pod install
