@@ -22,44 +22,63 @@ echo "=== dart run build_runner build ==="
 dart run build_runner build --delete-conflicting-outputs
 
 echo "=== Patch xcodeproj for Xcode 26 object version 70 ==="
-# CocoaPods bundles xcodeproj and hardcodes a load path to a specific version
-# (e.g. xcodeproj-1.27.0), so `gem install xcodeproj` is bypassed at runtime.
-# The only reliable fix is to patch the bundled project.rb in place to add
-# version 70 (Xcode 26) to the OBJECT_VERSION_TO_COMPATIBILITY_VERSION hash.
-XCODEPROJ_PROJECT_RB=$(find /usr/local/Cellar/cocoapods -name "project.rb" \
-  -path "*/xcodeproj-*/lib/xcodeproj/project.rb" 2>/dev/null | head -1)
+# CocoaPods bundles xcodeproj with a hardcoded load path, so gem install is
+# bypassed. We patch the version compatibility hash in place.
+# The hash may live in project.rb or constants.rb depending on xcodeproj version.
+XCODEPROJ_GEM_DIR=$(find /usr/local/Cellar/cocoapods \
+  -type d -name "xcodeproj-*" -path "*/gems/*" 2>/dev/null | head -1)
 
-if [ -z "$XCODEPROJ_PROJECT_RB" ]; then
-  echo "ERROR: xcodeproj project.rb not found under /usr/local/Cellar/cocoapods"
+if [ -z "$XCODEPROJ_GEM_DIR" ]; then
+  echo "ERROR: xcodeproj gem dir not found under /usr/local/Cellar/cocoapods"
   exit 1
 fi
 
-echo "Found xcodeproj project.rb at: $XCODEPROJ_PROJECT_RB"
+echo "xcodeproj gem dir: $XCODEPROJ_GEM_DIR"
 
-ruby - "$XCODEPROJ_PROJECT_RB" << 'RUBY_PATCH'
-path = ARGV[0]
-content = File.read(path)
+ruby - "$XCODEPROJ_GEM_DIR" << 'RUBY_PATCH'
+gem_dir = ARGV[0]
 
-# Print a snippet around version 63 to aid future debugging
-if (m = content.match(/.{0,60}63\s*=>.{0,60}/))
-  puts "Found near version 63: #{m[0].inspect}"
+# Search all .rb files for whichever one has the integer version hash
+target_file = nil
+Dir.glob("#{gem_dir}/lib/**/*.rb").sort.each do |f|
+  content = File.read(f) rescue next
+  if content =~ /\b63\s*=>/
+    puts "Found version hash in: #{f}"
+    target_file = f
+    break
+  end
 end
+
+if target_file.nil?
+  warn "Could not find '63 =>' in any .rb file under #{gem_dir}/lib — listing files:"
+  Dir.glob("#{gem_dir}/lib/**/*.rb").sort.each { |f| puts "  #{f}" }
+  exit 1
+end
+
+content = File.read(target_file)
 
 if content =~ /\b70\s*=>/
-  puts "xcodeproj already has version 70 support, skipping patch"
-else
-  # Integer keys: `63 => 'Xcode 15.x'` followed by }.freeze
-  # Inserts 70 => 'Xcode 26.0' before the closing brace
-  patched = content.gsub(/(\b63\s*=>\s*'[^']*')(\s*\}\.freeze)/) do
-    "#{$1},\n    70 => 'Xcode 26.0'#{$2}"
-  end
-  if patched == content
-    warn "ERROR: Could not patch #{path} — dump the constants block and update this script"
-    exit 1
-  end
-  File.write(path, patched)
-  puts "Patched #{path}"
+  puts "Already has version 70 support, skipping"
+  exit 0
 end
+
+# Show context around the 63 entry for debugging
+if (m = content.match(/.{0,80}\b63\s*=>.{0,80}/m))
+  puts "Context: #{m[0].inspect}"
+end
+
+patched = content.gsub(/(\b63\s*=>\s*'[^']*')(\s*\}\.freeze)/) do
+  "#{$1},\n    70 => 'Xcode 26.0'#{$2}"
+end
+
+if patched == content
+  warn "ERROR: Regex did not match. Printing lines containing '63':"
+  content.each_line { |l| puts l.chomp if l =~ /\b63\b/ }
+  exit 1
+end
+
+File.write(target_file, patched)
+puts "Successfully patched #{target_file}"
 RUBY_PATCH
 
 echo "=== pod install ==="
