@@ -1,0 +1,10 @@
+targets:
+  $default:
+      builders:
+            json_serializable:
+                    generate_for:
+                              exclude:
+                                          # Drift database files use @DriftDatabase/@DriftAccessor annotations
+                                                      # that json_serializable cannot resolve. Drift has its own builder
+                                                                  # (drift_dev) that handles these files.
+                                                                              - "lib/core/database/**"
