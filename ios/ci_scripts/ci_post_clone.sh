@@ -21,25 +21,38 @@ flutter pub get
 echo "=== dart run build_runner build ==="
 dart run build_runner build --delete-conflicting-outputs
 
-echo "=== Update xcodeproj gem (Xcode 26 object version 70 fix) ==="
-# xcodeproj 1.27.0 (bundled with CocoaPods 1.16.2) doesn't recognise Xcode 26's
-# project object version 70. We upgrade xcodeproj inside CocoaPods' own bundled
-# gem environment so no root/sudo is needed.
-#
-# Homebrew installs CocoaPods' gems under $(brew --prefix cocoapods)/libexec/,
-# not directly under $(dirname $(which pod))/../libexec/.
-POD_PATH=$(which pod)
-echo "pod is at: $POD_PATH"
-COCOAPODS_PREFIX=$(brew --prefix cocoapods 2>/dev/null || echo "")
-echo "CocoaPods Homebrew prefix: $COCOAPODS_PREFIX"
-if [ -n "$COCOAPODS_PREFIX" ] && [ -f "$COCOAPODS_PREFIX/libexec/bin/gem" ]; then
-  echo "Using CocoaPods bundled gem: $COCOAPODS_PREFIX/libexec/bin/gem"
-  "$COCOAPODS_PREFIX/libexec/bin/gem" install xcodeproj
-else
-  echo "CocoaPods bundled gem not found via brew; falling back to user gem install"
-  gem install --user-install xcodeproj
-  export PATH="$(ruby -e 'puts Gem.user_bin_dir'):$PATH"
+echo "=== Patch xcodeproj for Xcode 26 object version 70 ==="
+# CocoaPods bundles xcodeproj and hardcodes a load path to a specific version
+# (e.g. xcodeproj-1.27.0), so `gem install xcodeproj` is bypassed at runtime.
+# The only reliable fix is to patch the bundled project.rb in place to add
+# version 70 (Xcode 26) to the OBJECT_VERSION_TO_COMPATIBILITY_VERSION hash.
+XCODEPROJ_PROJECT_RB=$(find /usr/local/Cellar/cocoapods -name "project.rb" \
+  -path "*/xcodeproj-*/lib/xcodeproj/project.rb" 2>/dev/null | head -1)
+
+if [ -z "$XCODEPROJ_PROJECT_RB" ]; then
+  echo "ERROR: xcodeproj project.rb not found under /usr/local/Cellar/cocoapods"
+  exit 1
 fi
+
+echo "Found xcodeproj project.rb at: $XCODEPROJ_PROJECT_RB"
+
+ruby - "$XCODEPROJ_PROJECT_RB" << 'RUBY_PATCH'
+path = ARGV[0]
+content = File.read(path)
+if content.include?("'70'") || content.include?('"70"')
+  puts "xcodeproj already has version 70 support, skipping patch"
+else
+  patched = content
+    .gsub("'63' => 'Xcode 15.0'", "'63' => 'Xcode 15.0', '70' => 'Xcode 26.0'")
+    .gsub('"63" => "Xcode 15.0"', '"63" => "Xcode 15.0", "70" => "Xcode 26.0"')
+  if patched == content
+    warn "ERROR: Could not find version 63 entry to patch in #{path} — xcodeproj format may have changed"
+    exit 1
+  end
+  File.write(path, patched)
+  puts "Patched #{path}"
+end
+RUBY_PATCH
 
 echo "=== pod install ==="
 cd "$CI_PRIMARY_REPOSITORY_PATH/ios"
