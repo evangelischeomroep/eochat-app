@@ -16,7 +16,17 @@ flutter --version
 
 echo "=== flutter pub get ==="
 cd "$CI_PRIMARY_REPOSITORY_PATH"
-flutter pub get
+# Retry up to 3 times — git dependencies (super_sliver_list) can hit transient
+# GitHub 502s in Xcode Cloud's network environment.
+for attempt in 1 2 3; do
+  flutter pub get && break
+  if [ "$attempt" -eq 3 ]; then
+    echo "flutter pub get failed after 3 attempts"
+    exit 1
+  fi
+  echo "flutter pub get failed (attempt $attempt), retrying in 10s..."
+  sleep 10
+done
 
 echo "=== dart run build_runner build ==="
 dart run build_runner build --delete-conflicting-outputs
