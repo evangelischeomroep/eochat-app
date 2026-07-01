@@ -1,6 +1,6 @@
 {
   "@@locale": "ru",
-  "appTitle": "EOchat",,
+  "appTitle": "EOchat",
   "serverIncompatibleTitle": "Сервер не поддерживается",
   "serverIncompatibleMessage": "На этом сервере установлена версия Open WebUI {serverVersion}, которая новее, чем поддерживает это приложение (до {maxVersion}).",
   "serverIncompatibleResolution": "Чтобы продолжить, понизьте версию сервера до {maxVersion} или более ранней либо дождитесь обновления приложения с поддержкой новой версии.",
