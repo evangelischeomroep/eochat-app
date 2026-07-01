@@ -240,6 +240,11 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
               sfSymbol: 'wand.and.stars',
             ),
             NativeSheetItemConfig(
+              id: NativeSheetRoutes.notificationSettings,
+              title: l10n.notificationsTitle,
+              sfSymbol: 'bell',
+            ),
+            NativeSheetItemConfig(
               id: NativeSheetRoutes.dataConnection,
               title: dataConnectionTitle,
               sfSymbol: 'network',
@@ -368,6 +373,12 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
           l10n: l10n,
           id: NativeSheetRoutes.aiMemory,
           title: aiMemoryTitle,
+          subtitle: l10n.loadingShort,
+        ),
+        buildNativeLoadingDetail(
+          l10n: l10n,
+          id: NativeSheetRoutes.notificationSettings,
+          title: l10n.notificationsTitle,
           subtitle: l10n.loadingShort,
         ),
         buildNativeLoadingDetail(

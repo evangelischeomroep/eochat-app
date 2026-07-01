@@ -6,6 +6,7 @@ import '../models/server_memory.dart';
 import '../models/socket_health.dart';
 import '../services/native_sheet_bridge.dart';
 import '../services/settings_service.dart';
+import 'tts_voice_utils.dart';
 
 String nativeQuickActionsTitle(AppLocalizations l10n) {
   return l10n.quickActionsDescription;
@@ -93,8 +94,9 @@ class NativeAudioSheetParts {
 
 NativeAudioSheetParts buildNativeAudioSheetParts(
   AppLocalizations l10n,
-  AppSettings appSettings,
-) {
+  AppSettings appSettings, {
+  List<Map<String, dynamic>> ttsVoices = const <Map<String, dynamic>>[],
+}) {
   final sttSegment = NativeSheetItemConfig(
     id: 'stt-engine',
     title: l10n.sttSettings,
@@ -152,11 +154,33 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
     ],
   );
 
+  final voiceOptions = buildTtsVoiceOptions(
+    l10n,
+    appSettings.ttsEngine,
+    ttsVoices,
+  );
+  final selectedVoiceId = selectedTtsVoiceOptionId(appSettings, ttsVoices);
+
   final voicePickerNav = NativeSheetItemConfig(
     id: 'tts-voice-picker',
     title: l10n.ttsVoice,
     subtitle: _nativeVoiceSubtitle(l10n, appSettings),
     sfSymbol: 'person.wave.2',
+    kind: NativeSheetItemKind.searchablePicker,
+    value: selectedVoiceId,
+    options: [
+      NativeSheetOptionConfig(
+        id: ttsSystemDefaultVoiceId,
+        label: l10n.ttsSystemDefault,
+      ),
+      for (final option in voiceOptions)
+        NativeSheetOptionConfig(
+          id: option.id,
+          label: option.label,
+          subtitle: option.subtitle,
+          sfSymbol: 'person.wave.2',
+        ),
+    ],
   );
 
   final speechRateSlider = NativeSheetItemConfig(
@@ -198,14 +222,7 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
     id: 'tts-voice-picker',
     title: l10n.ttsSelectVoice,
     subtitle: l10n.ttsVoice,
-    items: [
-      NativeSheetItemConfig(
-        id: 'tts-voice-pick:${Uri.encodeComponent('__default__')}',
-        title: l10n.ttsSystemDefault,
-        sfSymbol: 'sparkles',
-        value: '',
-      ),
-    ],
+    items: const [],
   );
 
   return NativeAudioSheetParts(
@@ -216,11 +233,15 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
 
 String _nativeVoiceSubtitle(AppLocalizations l10n, AppSettings settings) {
   if (settings.ttsEngine == TtsEngine.server) {
-    return settings.ttsServerVoiceName ??
+    final voice =
+        settings.ttsServerVoiceName ??
         settings.ttsServerVoiceId ??
         l10n.ttsSystemDefault;
+    return formatTtsVoiceDisplayName(voice);
   }
-  return settings.ttsVoice ?? l10n.ttsSystemDefault;
+  final voice =
+      settings.ttsVoiceName ?? settings.ttsVoice ?? l10n.ttsSystemDefault;
+  return formatTtsVoiceDisplayName(voice);
 }
 
 NativeSheetDetailConfig buildNativePasswordDetail(
