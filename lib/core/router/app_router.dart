@@ -9,6 +9,8 @@ import '../auth/auth_state_manager.dart';
 import '../config/fork_overrides.dart';
 import '../config/fork_startup_watchdog.dart';
 import '../providers/app_providers.dart';
+import '../services/connectivity_service.dart';
+import '../../features/chat/providers/chat_providers.dart';
 import '../services/navigation_service.dart';
 import '../services/performance_profiler.dart';
 import '../utils/debug_logger.dart';
