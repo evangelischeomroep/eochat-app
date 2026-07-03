@@ -1,0 +1,112 @@
+name: Debug Build Log
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fetch-log:
+    name: Fetch Xcode Cloud build log
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore ASC key
+        env:
+          ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
+        run: |
+          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_8S2MXC2RH7.p8
+          chmod 600 scripts/AuthKey_8S2MXC2RH7.p8
+
+      - name: Fetch and print latest failed build log
+        run: |
+          python3 - << 'PYEOF'
+          import sys
+          sys.path.insert(0, 'scripts')
+          # Inline the JWT/request helpers from asc_testflight.py
+          import base64, json, subprocess, time
+          from pathlib import Path
+          from urllib import request as urllib_request, error as urllib_error
+
+          APP_ID        = "6763726069"
+          KEY_ID        = "8S2MXC2RH7"
+          ISSUER_ID     = "69a6de79-b43b-47e3-e053-5b8c7c11a4d1"
+          P8_PATH       = Path("scripts/AuthKey_8S2MXC2RH7.p8")
+          BASE_URL      = "https://api.appstoreconnect.apple.com/v1"
+          CI_PRODUCT_ID = "60947880-F680-490A-BA80-9230D5768E95"
+
+          def _b64url(data):
+              return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+          def _der_to_raw64(der):
+              assert der[0] == 0x30
+              idx = 2
+              assert der[idx] == 0x02
+              r = der[idx+2: idx+2+der[idx+1]]
+              idx += 2 + der[idx+1]
+              assert der[idx] == 0x02
+              s = der[idx+2: idx+2+der[idx+1]]
+              return r.lstrip(b"\x00").rjust(32, b"\x00") + s.lstrip(b"\x00").rjust(32, b"\x00")
+
+          def make_token():
+              now = int(time.time())
+              hdr = _b64url(json.dumps({"alg":"ES256","kid":KEY_ID,"typ":"JWT"},separators=(",",":")).encode())
+              pay = _b64url(json.dumps({"iss":ISSUER_ID,"iat":now,"exp":now+1200,"aud":"appstoreconnect-v1"},separators=(",",":")).encode())
+              res = subprocess.run(["openssl","dgst","-sha256","-sign",str(P8_PATH)],
+                                   input=f"{hdr}.{pay}".encode(), capture_output=True, check=True)
+              return f"{hdr}.{pay}.{_b64url(_der_to_raw64(res.stdout))}"
+
+          def get(path):
+              url = path if path.startswith("http") else f"{BASE_URL}{path}"
+              req = urllib_request.Request(url, headers={"Authorization":f"Bearer {make_token()}"})
+              with urllib_request.urlopen(req) as r:
+                  return json.loads(r.read())
+
+          def download_bytes(url):
+              req = urllib_request.Request(url, headers={"Authorization":f"Bearer {make_token()}"})
+              with urllib_request.urlopen(req) as r:
+                  return r.read()
+
+          # Get latest build run
+          runs = get(f"/ciProducts/{CI_PRODUCT_ID}/buildRuns?sort=-number&limit=1")
+          run = runs["data"][0]
+          run_id = run["id"]
+          attrs = run["attributes"]
+          print(f"Build run: {run_id}")
+          print(f"Status: {attrs.get('executionProgress')} / {attrs.get('completionStatus')}")
+          print(f"Started: {attrs.get('startedDate')}")
+
+          # Get actions
+          actions = get(f"/ciBuildRuns/{run_id}/actions")
+          for action in actions.get("data", []):
+              a = action["attributes"]
+              action_id = action["id"]
+              print(f"\nAction: {a.get('name')} — {a.get('completionStatus')}")
+
+              if a.get("completionStatus") in ("FAILED","ERRORED"):
+                  # Get artifacts for this action
+                  arts = get(f"/ciBuildActions/{action_id}/artifacts")
+                  for art in arts.get("data", []):
+                      aa = art["attributes"]
+                      print(f"  Artifact: {aa.get('fileName')} ({aa.get('fileSize')} bytes)")
+                      if "log" in aa.get("fileName","").lower() or "log" in str(aa.get("assetType","")).lower():
+                          dl_url = aa.get("downloadUrl")
+                          if dl_url:
+                              print(f"  Downloading log from {dl_url[:60]}...")
+                              import zipfile, io
+                              raw = download_bytes(dl_url)
+                              try:
+                                  zf = zipfile.ZipFile(io.BytesIO(raw))
+                                  for name in zf.namelist():
+                                      print(f"    Zip entry: {name}")
+                                      content = zf.read(name).decode("utf-8", errors="replace")
+                                      # Print lines with error keywords
+                                      for line in content.splitlines():
+                                          lower = line.lower()
+                                          if any(k in lower for k in ["error:", "failed", "phasescript", "exit code", "command /bin/sh"]):
+                                              print(f"    >>> {line.strip()[:200]}")
+                              except Exception as e:
+                                  print(f"    Not a zip: {e} — printing raw (truncated)")
+                                  print(raw[:2000].decode("utf-8", errors="replace"))
+          PYEOF
