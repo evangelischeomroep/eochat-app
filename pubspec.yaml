@@ -3,6 +3,14 @@ description: Open-source mobile client for Open-WebUI
 version: 3.4.2+134
 publish_to: 'none'
 
+
+# Configure sqlite3 build hook to use system SQLite on iOS/macOS instead of downloading
+# a pre-compiled binary from GitHub (which Xcode Cloud's network sandbox blocks).
+hooks:
+  user_defines:
+    sqlite3:
+      source: system
+
 environment:
   sdk: ">=3.8.0 <4.0.0"
 
