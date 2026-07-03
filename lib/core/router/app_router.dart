@@ -148,7 +148,6 @@ class RouterNotifier extends ChangeNotifier {
 
     final authState = ref.read(authNavigationStateProvider);
     final startupAuthStuck = ref.read(startupAuthStuckProvider);
-    final connectivityService = ref.read(connectivityServiceProvider);
 
     // Allow staying on server connection page
     if (location == Routes.serverConnection) {
