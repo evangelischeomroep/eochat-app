@@ -44,7 +44,6 @@ import '../services/historical_message_regeneration.dart';
 import '../voice_mode/chat_voice_mode_controller.dart';
 import '../voice_mode/chat_voice_mode_overlay.dart';
 import '../voice_call/presentation/voice_call_launcher.dart';
-import '../../../shared/services/tasks/task_queue.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
