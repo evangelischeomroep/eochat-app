@@ -14,14 +14,22 @@ void main() {
       }
     });
 
-    test('newer patch / minor / major versions are unsupported', () {
-      for (final v in ['0.10.3', '0.11.0', '0.20.0', '1.0.0', '2.5.3']) {
+    test('patch-only bumps beyond max are still supported', () {
+      // Patch releases are backwards-compatible — do not gate on them.
+      for (final v in ['0.10.3', '0.10.10', '0.10.99']) {
+        check(because: v, ServerVersionCompat.isSupported(v)).isTrue();
+      }
+    });
+
+    test('newer minor / major versions are unsupported', () {
+      for (final v in ['0.11.0', '0.11.1', '0.20.0', '1.0.0', '2.5.3']) {
         check(because: v, ServerVersionCompat.isSupported(v)).isFalse();
       }
     });
 
     test('tolerates a leading v prefix', () {
       check(ServerVersionCompat.isSupported('v0.10.2')).isTrue();
+      check(ServerVersionCompat.isSupported('v0.10.5')).isTrue(); // patch ok
       check(ServerVersionCompat.isSupported('v0.11.0')).isFalse();
     });
 
@@ -29,7 +37,9 @@ void main() {
       // A pre-release of the max version is treated as the max version.
       check(ServerVersionCompat.isSupported('0.10.2-dev')).isTrue();
       check(ServerVersionCompat.isSupported('0.10.2+build.7')).isTrue();
-      // Metadata on a newer core still gates.
+      // Patch pre-release beyond max is still fine.
+      check(ServerVersionCompat.isSupported('0.10.5-rc1')).isTrue();
+      // Metadata on a newer minor still gates.
       check(ServerVersionCompat.isSupported('0.11.0-rc1')).isFalse();
     });
 
@@ -52,6 +62,7 @@ void main() {
     test('isUnsupported is the inverse of isSupported', () {
       check(ServerVersionCompat.isUnsupported('0.11.0')).isTrue();
       check(ServerVersionCompat.isUnsupported('0.10.2')).isFalse();
+      check(ServerVersionCompat.isUnsupported('0.10.5')).isFalse(); // patch ok
       check(ServerVersionCompat.isUnsupported(null)).isFalse();
     });
 
