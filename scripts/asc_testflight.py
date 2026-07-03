@@ -32,7 +32,7 @@ from urllib import request as urllib_request, error as urllib_error
 APP_ID          = "6763726069"
 KEY_ID          = "8S2MXC2RH7"
 ISSUER_ID       = "69a6de79-b43b-47e3-e053-5b8c7c11a4d1"
-P8_PATH         = Path.home() / ".appstoreconnect" / "private_keys" / f"AuthKey_{KEY_ID}.p8"
+P8_PATH         = Path(__file__).parent / f"AuthKey_{KEY_ID}.p8"
 BASE_URL        = "https://api.appstoreconnect.apple.com/v1"
 GROUP_NAME      = "AI-team"
 CI_PRODUCT_ID   = "60947880-F680-490A-BA80-9230D5768E95"
@@ -122,17 +122,24 @@ def get_ai_team_group_id() -> str:
 
 
 def get_latest_build_run(ci_product_id: str, version: str) -> dict | None:
-    """Return the most recent build run whose sourceTag or version matches."""
-    data = get(f"/ciProducts/{ci_product_id}/buildRuns?sort=-createdDate&limit=10")
-    for run in data["data"]:
-        attrs = run["attributes"]
-        tag = (attrs.get("sourceTag") or {}).get("name", "")
-        if tag == f"v{version}" or attrs.get("number") is not None:
-            return run
-    # Fall back: return the most recent run regardless (sync just pushed, it'll be first)
+    """Return the most recent build run (sort=-number is the valid ASC sort field)."""
+    data = get(f"/ciProducts/{ci_product_id}/buildRuns?sort=-number&limit=10")
     if data["data"]:
         return data["data"][0]
     return None
+
+
+def get_build_run_failure_reason(build_run_id: str) -> str:
+    """Fetch the first failed action's issue summary for a failed build run."""
+    try:
+        actions = get(f"/ciBuildRuns/{build_run_id}/actions")
+        for action in actions.get("data", []):
+            a = action["attributes"]
+            if a.get("completionStatus") in ("FAILED", "ERRORED"):
+                return f"Action '{a.get('name','?')}' failed: {a.get('issueSummaries', '')}"
+        return "No failed actions found in run."
+    except Exception as e:
+        return f"Could not fetch actions: {e}"
 
 
 def wait_for_build_run(ci_product_id: str, version: str) -> dict:
@@ -164,7 +171,8 @@ def wait_for_build_run(ci_product_id: str, version: str) -> dict:
             print(f"  ✅ Build run succeeded.")
             return run
         elif completed in ("FAILED", "ERRORED", "CANCELED"):
-            raise RuntimeError(f"Xcode Cloud build {run_id} ended with status: {completed}")
+            reason = get_build_run_failure_reason(run_id)
+            raise RuntimeError(f"Xcode Cloud build {run_id} ended with {completed}.\n  {reason}")
 
         time.sleep(POLL_INTERVAL)
 
@@ -286,7 +294,8 @@ def cmd_add_to_testflight(version: str, wait: bool):
 def main():
     parser = argparse.ArgumentParser(description="App Store Connect / TestFlight helper")
     parser.add_argument("--discover", action="store_true", help="Verify setup and print IDs")
-    parser.add_argument("--list-builds", action="store_true", help="List recent builds (diagnostic)")
+    parser.add_argument("--list-builds", action="store_true", help="List recent App Store builds (diagnostic)")
+    parser.add_argument("--check-last-build", action="store_true", help="Show status and failure reason of most recent Xcode Cloud run")
     parser.add_argument("--version", help="App version string to add to TestFlight (e.g. 3.4.2)")
     parser.add_argument("--no-wait", action="store_true", help="Skip polling; add immediately")
     args = parser.parse_args()
@@ -295,6 +304,16 @@ def main():
         cmd_discover()
     elif args.list_builds:
         cmd_list_builds()
+    elif args.check_last_build:
+        run = get_latest_build_run(CI_PRODUCT_ID, "")
+        if not run:
+            print("No build runs found.")
+        else:
+            a = run["attributes"]
+            print(f"Run #{a.get('number')}  status={a.get('executionProgress')}  completion={a.get('completionStatus')}")
+            print(f"Started: {a.get('startedDate','?')}")
+            if a.get("completionStatus") in ("FAILED", "ERRORED"):
+                print(get_build_run_failure_reason(run["id"]))
     elif args.version:
         cmd_add_to_testflight(args.version, wait=not args.no_wait)
     else:

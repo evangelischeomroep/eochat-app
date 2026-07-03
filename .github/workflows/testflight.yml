@@ -1,0 +1,43 @@
+name: TestFlight
+
+# Triggered on every push to main (each push also triggers Xcode Cloud).
+# Waits for the Xcode Cloud build to succeed, then adds it to the AI-team
+# TestFlight group — no laptop needed.
+#
+# One-time setup required:
+#   Go to GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Name: ASC_P8_KEY
+#   Value: base64-encoded content of scripts/AuthKey_8S2MXC2RH7.p8
+#     macOS:  base64 -i scripts/AuthKey_8S2MXC2RH7.p8 | pbcopy
+#     Linux:  base64 -w0 scripts/AuthKey_8S2MXC2RH7.p8
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  testflight:
+    name: Add to TestFlight (AI-team)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore ASC key
+        env:
+          ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
+        run: |
+          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_8S2MXC2RH7.p8
+          chmod 600 scripts/AuthKey_8S2MXC2RH7.p8
+
+      - name: Read app version
+        id: ver
+        run: |
+          VERSION=$(cat .conduit-sync-version | sed 's/^v//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Targeting version $VERSION"
+
+      - name: Wait for Xcode Cloud build and add to TestFlight
+        run: python3 scripts/asc_testflight.py --version ${{ steps.ver.outputs.version }}

@@ -117,9 +117,6 @@ lib/l10n/app_localizations_*.dart
 google-services.json
 GoogleService-Info.plist
 
-# Local workspace metadata
-.paseo/
-
 # Keystore files
 *.keystore
 *.jks
@@ -152,3 +149,4 @@ GoogleService-Info.plist
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+scripts/AuthKey_*.p8
