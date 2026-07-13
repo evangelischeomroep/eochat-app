@@ -14,35 +14,24 @@ class ServerVersionCompat {
 
   /// The newest Open WebUI server version this app build is known to support.
   ///
-  /// Servers reporting a `/api/config` `version` with a higher **minor** (or
-  /// major) component than this are gated off. Patch-only differences are
-  /// intentionally ignored — a server on `0.10.3` is treated as compatible
-  /// with a max of `0.10.2` because patch releases are expected to be
-  /// backwards-compatible. Bump this (and re-verify against `openwebui-src/`)
-  /// whenever a newer minor or major server release is validated.
+  /// Servers reporting a `/api/config` `version` strictly greater than this are
+  /// shown a compatibility warning. Bump this (and re-verify against
+  /// `openwebui-src/`) whenever a newer server release is validated.
   static const String maxSupportedVersion = '0.10.2';
 
   /// Parsed [maxSupportedVersion] components: `[major, minor, patch]`.
   static const List<int> _maxSupported = [0, 10, 2];
 
-  /// Whether [rawVersion] is within the supported range.
-  ///
-  /// Compatibility is checked at the **minor** version level only — patch
-  /// differences are ignored. A server on `0.10.3` is treated as supported
-  /// when the max is `0.10.2`; a server on `0.11.0` is not.
+  /// Whether [rawVersion] is within the supported range (<= [maxSupportedVersion]).
   ///
   /// Fails open: a `null`, empty, or unparseable version is treated as
-  /// supported so the gate never locks users out of a server whose version
-  /// string we simply don't understand. The gate only triggers when we can
-  /// confidently determine the server is a newer minor or major release.
+  /// supported so no warning is shown for a server whose version string we
+  /// simply don't understand. A warning is only shown when we can confidently
+  /// determine the server is newer than we support.
   static bool isSupported(String? rawVersion) {
     final parsed = _parse(rawVersion);
     if (parsed == null) return true; // fail open on unknown versions
-    // Compare only major + minor; ignore patch to avoid false alarms on
-    // backwards-compatible server patch releases.
-    final serverMajorMinor = [parsed[0], parsed.length > 1 ? parsed[1] : 0];
-    final maxMajorMinor = [_maxSupported[0], _maxSupported[1]];
-    return _comparePartial(serverMajorMinor, maxMajorMinor) <= 0;
+    return _compare(parsed, _maxSupported) <= 0;
   }
 
   /// Convenience inverse of [isSupported] for readable call sites.
@@ -74,11 +63,12 @@ class ServerVersionCompat {
     return [major, minor, patch];
   }
 
-  /// Compares two numeric component lists of equal length, returning -1/0/1.
-  static int _comparePartial(List<int> a, List<int> b) {
-    final len = a.length < b.length ? a.length : b.length;
-    for (var i = 0; i < len; i++) {
-      if (a[i] != b[i]) return a[i] < b[i] ? -1 : 1;
+  /// Compares two `[major, minor, patch]` triples, returning -1/0/1.
+  static int _compare(List<int> a, List<int> b) {
+    for (var i = 0; i < 3; i++) {
+      final av = i < a.length ? a[i] : 0;
+      final bv = i < b.length ? b[i] : 0;
+      if (av != bv) return av < bv ? -1 : 1;
     }
     return 0;
   }
