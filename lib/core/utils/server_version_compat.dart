@@ -4,8 +4,8 @@
 /// submodule. When the upstream server jumps ahead of what this build has been
 /// validated against, endpoints and payloads can drift in ways that silently
 /// break the app. Rather than fail in confusing ways deep in a feature, the app
-/// refuses to operate against servers newer than [maxSupportedVersion] and
-/// surfaces a clear "downgrade or wait for an update" message.
+/// surfaces a clear compatibility warning for servers newer than
+/// [maxSupportedVersion] while still allowing the user to continue.
 ///
 /// This is a pure leaf utility with no Flutter dependencies so it can be unit
 /// tested in isolation and reused from models, providers, and views alike.
