@@ -44,7 +44,7 @@ from urllib import request as urllib_request, error as urllib_error
 # Config — all non-secret; the only secret is the .p8 file on disk
 # ---------------------------------------------------------------------------
 APP_ID          = "6763726069"
-KEY_ID          = "8S2MXC2RH7"
+KEY_ID          = "SNL4WUUBST"
 ISSUER_ID       = "69a6de79-b43b-47e3-e053-5b8c7c11a4d1"
 P8_PATH         = Path(__file__).parent / f"AuthKey_{KEY_ID}.p8"
 BASE_URL        = "https://api.appstoreconnect.apple.com/v1"

@@ -11,8 +11,8 @@ name: App Store Submit
 # One-time setup:
 #   GitHub → Settings → Secrets and variables → Actions → New repository secret
 #   Name:  ASC_P8_KEY
-#   Value: base64 -i scripts/AuthKey_8S2MXC2RH7.p8 | pbcopy   (macOS)
-#          base64 -w0 scripts/AuthKey_8S2MXC2RH7.p8            (Linux)
+#   Value: base64 -i scripts/AuthKey_SNL4WUUBST.p8 | pbcopy   (macOS)
+#          base64 -w0 scripts/AuthKey_SNL4WUUBST.p8            (Linux)
 #
 # What this does:
 #   1. Creates a new App Store version entry (e.g. "1.2")
@@ -61,8 +61,8 @@ jobs:
         env:
           ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
         run: |
-          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_8S2MXC2RH7.p8
-          chmod 600 scripts/AuthKey_8S2MXC2RH7.p8
+          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_SNL4WUUBST.p8
+          chmod 600 scripts/AuthKey_SNL4WUUBST.p8
 
       - name: Resolve build lookup flag
         id: flags
