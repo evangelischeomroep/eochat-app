@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-asc_testflight.py — App Store Connect API: poll Xcode Cloud builds, add to TestFlight group.
+asc_testflight.py — App Store Connect API: poll Xcode Cloud builds, add to TestFlight group,
+                    and submit new App Store versions for review.
 
 Usage:
   # Discover CI product ID and AI-team group ID (run once to verify setup):
@@ -11,6 +12,19 @@ Usage:
 
   # Add to AI-team without waiting (build must already exist):
   python3 scripts/asc_testflight.py --version 3.4.2 --no-wait
+
+  # Submit a new App Store version for review (fully via CLI, no browser needed):
+  python3 scripts/asc_testflight.py --submit-for-review \\
+      --app-store-version 1.2 \\
+      --build-version 3.4.2 \\
+      --whats-new "Bug fixes and performance improvements." \\
+      --locale nl-NL
+
+  # Same but specifying the build ID directly (from --list-builds):
+  python3 scripts/asc_testflight.py --submit-for-review \\
+      --app-store-version 1.2 \\
+      --build-id <build-uuid> \\
+      --whats-new "Bug fixes and performance improvements."
 
 Requirements:
   None — uses only Python stdlib + the openssl binary (always present on macOS)
@@ -100,6 +114,10 @@ def get(path: str) -> dict:
 
 def post(path: str, body: dict) -> dict:
     return _request("POST", path, body)
+
+
+def patch(path: str, body: dict) -> dict:
+    return _request("PATCH", path, body)
 
 
 # ---------------------------------------------------------------------------
@@ -242,6 +260,133 @@ def add_build_to_group(group_id: str, build_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# App Store submission helpers
+# ---------------------------------------------------------------------------
+def create_app_store_version(version_string: str) -> str:
+    """Create a new App Store version entry; return its ID."""
+    body = {
+        "data": {
+            "type": "appStoreVersions",
+            "attributes": {
+                "platform": "IOS",
+                "versionString": version_string,
+                "releaseType": "AFTER_APPROVAL",
+            },
+            "relationships": {
+                "app": {"data": {"type": "apps", "id": APP_ID}}
+            },
+        }
+    }
+    data = post("/appStoreVersions", body)
+    version_id = data["data"]["id"]
+    print(f"  Created App Store version {version_string} → id={version_id}")
+    return version_id
+
+
+def attach_build_to_asc_version(version_id: str, build_id: str) -> None:
+    """Attach an App Store build to an App Store version."""
+    body = {
+        "data": {
+            "type": "appStoreVersions",
+            "id": version_id,
+            "relationships": {
+                "build": {"data": {"type": "builds", "id": build_id}}
+            },
+        }
+    }
+    patch(f"/appStoreVersions/{version_id}", body)
+    print(f"  Attached build {build_id} to version {version_id}.")
+
+
+def upsert_localization(version_id: str, locale: str, whats_new: str) -> None:
+    """Set 'What's New' text for a given locale, creating the localization if needed."""
+    data = get(f"/appStoreVersions/{version_id}/appStoreVersionLocalizations")
+    existing = {r["attributes"]["locale"]: r["id"] for r in data.get("data", [])}
+
+    if locale in existing:
+        loc_id = existing[locale]
+        body = {
+            "data": {
+                "type": "appStoreVersionLocalizations",
+                "id": loc_id,
+                "attributes": {"whatsNew": whats_new},
+            }
+        }
+        patch(f"/appStoreVersionLocalizations/{loc_id}", body)
+        print(f"  Updated '{locale}' What's New text.")
+    else:
+        body = {
+            "data": {
+                "type": "appStoreVersionLocalizations",
+                "attributes": {"locale": locale, "whatsNew": whats_new},
+                "relationships": {
+                    "appStoreVersion": {
+                        "data": {"type": "appStoreVersions", "id": version_id}
+                    }
+                },
+            }
+        }
+        post("/appStoreVersionLocalizations", body)
+        print(f"  Created '{locale}' localization with What's New text.")
+
+
+def submit_version_for_review(version_id: str) -> None:
+    """Submit an App Store version for App Review."""
+    body = {
+        "data": {
+            "type": "appStoreVersionSubmissions",
+            "relationships": {
+                "appStoreVersion": {
+                    "data": {"type": "appStoreVersions", "id": version_id}
+                }
+            },
+        }
+    }
+    post("/appStoreVersionSubmissions", body)
+    print("  ✅ Submitted for App Review.")
+
+
+def cmd_submit_for_review(
+    app_store_version: str,
+    build_version: str | None,
+    build_id: str | None,
+    whats_new: str,
+    locale: str,
+) -> None:
+    """End-to-end: create version → attach build → set What's New → submit."""
+    if not P8_PATH.exists():
+        print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
+        sys.exit(1)
+
+    # Resolve build ID
+    if build_id:
+        resolved_build_id = build_id
+        print(f"Using supplied build ID: {resolved_build_id}")
+    elif build_version:
+        print(f"Looking up latest build for marketing version {build_version}…")
+        resolved_build_id = get_build_id_by_version(build_version)
+        print(f"Found build: {resolved_build_id}")
+    else:
+        print("❌ Provide --build-version or --build-id.", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"\nCreating App Store version {app_store_version}…")
+    version_id = create_app_store_version(app_store_version)
+
+    print(f"\nAttaching build…")
+    attach_build_to_asc_version(version_id, resolved_build_id)
+
+    print(f"\nSetting What's New ({locale})…")
+    upsert_localization(version_id, locale, whats_new)
+
+    print(f"\nSubmitting for review…")
+    submit_version_for_review(version_id)
+
+    print(f"\n✅ EOchat {app_store_version} submitted for App Store review.")
+    print(f"   Apple will email when review is complete (typically < 24 h).")
+
+
+# ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 def cmd_discover():
@@ -293,11 +438,29 @@ def cmd_add_to_testflight(version: str, wait: bool):
 # ---------------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser(description="App Store Connect / TestFlight helper")
+
+    # --- TestFlight / Xcode Cloud commands ---
     parser.add_argument("--discover", action="store_true", help="Verify setup and print IDs")
     parser.add_argument("--list-builds", action="store_true", help="List recent App Store builds (diagnostic)")
     parser.add_argument("--check-last-build", action="store_true", help="Show status and failure reason of most recent Xcode Cloud run")
     parser.add_argument("--version", help="App version string to add to TestFlight (e.g. 3.4.2)")
     parser.add_argument("--no-wait", action="store_true", help="Skip polling; add immediately")
+
+    # --- App Store submission command ---
+    parser.add_argument("--submit-for-review", action="store_true",
+                        help="Create a new App Store version and submit for review")
+    parser.add_argument("--app-store-version", metavar="VER",
+                        help="App Store version string (e.g. 1.2) — required with --submit-for-review")
+    parser.add_argument("--build-version", metavar="VER",
+                        help="Marketing version of the build to attach (e.g. 3.4.2); "
+                             "finds the latest matching build")
+    parser.add_argument("--build-id", metavar="UUID",
+                        help="App Store build UUID to attach (overrides --build-version)")
+    parser.add_argument("--whats-new", metavar="TEXT",
+                        help="Release notes for the App Store listing")
+    parser.add_argument("--locale", metavar="LOCALE", default="nl-NL",
+                        help="Locale for What's New text (default: nl-NL)")
+
     args = parser.parse_args()
 
     if args.discover:
@@ -314,6 +477,20 @@ def main():
             print(f"Started: {a.get('startedDate','?')}")
             if a.get("completionStatus") in ("FAILED", "ERRORED"):
                 print(get_build_run_failure_reason(run["id"]))
+    elif args.submit_for_review:
+        if not args.app_store_version:
+            parser.error("--submit-for-review requires --app-store-version")
+        if not args.whats_new:
+            parser.error("--submit-for-review requires --whats-new")
+        if not args.build_version and not args.build_id:
+            parser.error("--submit-for-review requires --build-version or --build-id")
+        cmd_submit_for_review(
+            app_store_version=args.app_store_version,
+            build_version=args.build_version,
+            build_id=args.build_id,
+            whats_new=args.whats_new,
+            locale=args.locale,
+        )
     elif args.version:
         cmd_add_to_testflight(args.version, wait=not args.no_wait)
     else:
