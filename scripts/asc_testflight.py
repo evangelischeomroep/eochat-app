@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-asc_testflight.py — App Store Connect API: poll Xcode Cloud builds, add to TestFlight group,
+asc_testflight.py â App Store Connect API: poll Xcode Cloud builds, add to TestFlight group,
                     and submit new App Store versions for review.
 
 Usage:
@@ -27,7 +27,7 @@ Usage:
       --whats-new "Bug fixes and performance improvements."
 
 Requirements:
-  None — uses only Python stdlib + the openssl binary (always present on macOS)
+  None â uses only Python stdlib + the openssl binary (always present on macOS)
 """
 
 import argparse
@@ -41,7 +41,7 @@ from pathlib import Path
 from urllib import request as urllib_request, error as urllib_error
 
 # ---------------------------------------------------------------------------
-# Config — all non-secret; the only secret is the .p8 file on disk
+# Config â all non-secret; the only secret is the .p8 file on disk
 # ---------------------------------------------------------------------------
 APP_ID          = "6763726069"
 KEY_ID          = "SNL4WUUBST"
@@ -162,14 +162,14 @@ def get_build_run_failure_reason(build_run_id: str) -> str:
 
 def wait_for_build_run(ci_product_id: str, version: str) -> dict:
     """Poll until a build run for the given version completes successfully."""
-    print(f"Waiting for Xcode Cloud build for v{version}…")
+    print(f"Waiting for Xcode Cloud build for v{version}â¦")
     deadline = time.time() + POLL_TIMEOUT
     seen_id = None
 
     while time.time() < deadline:
         run = get_latest_build_run(ci_product_id, version)
         if run is None:
-            print("  No build run found yet, waiting…")
+            print("  No build run found yet, waitingâ¦")
             time.sleep(POLL_INTERVAL)
             continue
 
@@ -186,7 +186,7 @@ def wait_for_build_run(ci_product_id: str, version: str) -> dict:
         print(f"  [{datetime.now(timezone.utc).strftime('%H:%M:%S')}] status={status} completion={completed}")
 
         if completed == "SUCCEEDED":
-            print(f"  ✅ Build run succeeded.")
+            print(f"  â Build run succeeded.")
             return run
         elif completed in ("FAILED", "ERRORED", "CANCELED"):
             reason = get_build_run_failure_reason(run_id)
@@ -229,7 +229,7 @@ def cmd_list_builds():
         f"&include=preReleaseVersion"
         f"&sort=-uploadedDate&limit=10"
     )
-    # Build a map from preReleaseVersion id → version string
+    # Build a map from preReleaseVersion id â version string
     prv_map = {
         r["id"]: r["attributes"]["version"]
         for r in data.get("included", [])
@@ -251,10 +251,10 @@ def add_build_to_group(group_id: str, build_id: str) -> None:
     body = {"data": [{"type": "builds", "id": build_id}]}
     try:
         post(f"/betaGroups/{group_id}/relationships/builds", body)
-        print(f"  ✅ Build {build_id} added to group {GROUP_NAME}.")
+        print(f"  â Build {build_id} added to group {GROUP_NAME}.")
     except urllib_error.HTTPError as e:
         if e.code == 409:
-            print(f"  ℹ️  Build {build_id} already in group {GROUP_NAME} (409 conflict — OK).")
+            print(f"  â¹ï¸  Build {build_id} already in group {GROUP_NAME} (409 conflict â OK).")
         else:
             raise
 
@@ -279,7 +279,7 @@ def create_app_store_version(version_string: str) -> str:
     }
     data = post("/appStoreVersions", body)
     version_id = data["data"]["id"]
-    print(f"  Created App Store version {version_string} → id={version_id}")
+    print(f"  Created App Store version {version_string} â id={version_id}")
     return version_id
 
 
@@ -343,7 +343,7 @@ def submit_version_for_review(version_id: str) -> None:
         }
     }
     post("/appStoreVersionSubmissions", body)
-    print("  ✅ Submitted for App Review.")
+    print("  â Submitted for App Review.")
 
 
 def cmd_submit_for_review(
@@ -353,9 +353,9 @@ def cmd_submit_for_review(
     whats_new: str,
     locale: str,
 ) -> None:
-    """End-to-end: create version → attach build → set What's New → submit."""
+    """End-to-end: create version â attach build â set What's New â submit."""
     if not P8_PATH.exists():
-        print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
+        print(f"â .p8 key not found at {P8_PATH}", file=sys.stderr)
         sys.exit(1)
 
     # Resolve build ID
@@ -363,26 +363,26 @@ def cmd_submit_for_review(
         resolved_build_id = build_id
         print(f"Using supplied build ID: {resolved_build_id}")
     elif build_version:
-        print(f"Looking up latest build for marketing version {build_version}…")
+        print(f"Looking up latest build for marketing version {build_version}â¦")
         resolved_build_id = get_build_id_by_version(build_version)
         print(f"Found build: {resolved_build_id}")
     else:
-        print("❌ Provide --build-version or --build-id.", file=sys.stderr)
+        print("â Provide --build-version or --build-id.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\nCreating App Store version {app_store_version}…")
+    print(f"\nCreating App Store version {app_store_version}â¦")
     version_id = create_app_store_version(app_store_version)
 
-    print(f"\nAttaching build…")
+    print(f"\nAttaching buildâ¦")
     attach_build_to_asc_version(version_id, resolved_build_id)
 
-    print(f"\nSetting What's New ({locale})…")
+    print(f"\nSetting What's New ({locale})â¦")
     upsert_localization(version_id, locale, whats_new)
 
-    print(f"\nSubmitting for review…")
+    print(f"\nSubmitting for reviewâ¦")
     submit_version_for_review(version_id)
 
-    print(f"\n✅ EOchat {app_store_version} submitted for App Store review.")
+    print(f"\nâ EOchat {app_store_version} submitted for App Store review.")
     print(f"   Apple will email when review is complete (typically < 24 h).")
 
 
@@ -390,27 +390,27 @@ def cmd_submit_for_review(
 # Commands
 # ---------------------------------------------------------------------------
 def cmd_discover():
-    print("Verifying App Store Connect API access…\n")
+    print("Verifying App Store Connect API accessâ¦\n")
     try:
         ci_id = get_ci_product_id()
         print(f"CI Product ID : {ci_id}")
     except Exception as e:
-        print(f"❌ Could not fetch CI product: {e}")
+        print(f"â Could not fetch CI product: {e}")
         sys.exit(1)
 
     try:
         group_id = get_ai_team_group_id()
         print(f"AI-team group ID: {group_id}")
     except Exception as e:
-        print(f"❌ Could not fetch beta groups: {e}")
+        print(f"â Could not fetch beta groups: {e}")
         sys.exit(1)
 
-    print("\n✅ Setup looks good.")
+    print("\nâ Setup looks good.")
 
 
 def cmd_add_to_testflight(version: str, wait: bool):
     if not P8_PATH.exists():
-        print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
+        print(f"â .p8 key not found at {P8_PATH}", file=sys.stderr)
         sys.exit(1)
 
     ci_product_id = CI_PRODUCT_ID
@@ -422,8 +422,8 @@ def cmd_add_to_testflight(version: str, wait: bool):
         try:
             build_id = get_app_store_build_from_run(build_run["id"])
         except RuntimeError:
-            # CI run exists but build link not yet propagated — fall back to version lookup
-            print("  Build not linked to CI run yet, falling back to version lookup…")
+            # CI run exists but build link not yet propagated â fall back to version lookup
+            print("  Build not linked to CI run yet, falling back to version lookupâ¦")
             time.sleep(30)
             build_id = get_build_id_by_version(version)
     else:
@@ -450,7 +450,7 @@ def main():
     parser.add_argument("--submit-for-review", action="store_true",
                         help="Create a new App Store version and submit for review")
     parser.add_argument("--app-store-version", metavar="VER",
-                        help="App Store version string (e.g. 1.2) — required with --submit-for-review")
+                        help="App Store version string (e.g. 1.2) â required with --submit-for-review")
     parser.add_argument("--build-version", metavar="VER",
                         help="Marketing version of the build to attach (e.g. 3.4.2); "
                              "finds the latest matching build")
