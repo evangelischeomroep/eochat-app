@@ -1,0 +1,83 @@
+name: App Store Submit
+
+# Manual trigger — run this from GitHub Actions UI or via GitHub CLI:
+#
+#   gh workflow run app-store-submit.yml \
+#     -f app_store_version=1.2 \
+#     -f build_version=3.4.2 \
+#     -f whats_new="Bug fixes and performance improvements." \
+#     -f locale=nl-NL
+#
+# One-time setup:
+#   GitHub → Settings → Secrets and variables → Actions → New repository secret
+#   Name:  ASC_P8_KEY
+#   Value: base64 -i scripts/AuthKey_8S2MXC2RH7.p8 | pbcopy   (macOS)
+#          base64 -w0 scripts/AuthKey_8S2MXC2RH7.p8            (Linux)
+#
+# What this does:
+#   1. Creates a new App Store version entry (e.g. "1.2")
+#   2. Attaches the specified build (looked up by marketing version)
+#   3. Sets the "What's New" release notes
+#   4. Submits for App Review — no browser required
+#
+# Apple reviews typically take < 24 hours; you'll get an email when done.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_store_version:
+        description: 'App Store version string (e.g. 1.2) — shown in the App Store'
+        required: true
+        type: string
+      build_version:
+        description: 'Marketing version of build to attach (e.g. 3.4.2) — matches pubspec version'
+        required: false
+        type: string
+      build_id:
+        description: 'Build UUID to attach directly (overrides build_version; get from --list-builds)'
+        required: false
+        type: string
+      whats_new:
+        description: "What's New release notes (shown on App Store listing)"
+        required: true
+        type: string
+      locale:
+        description: 'Locale for release notes'
+        required: false
+        default: 'nl-NL'
+        type: string
+
+jobs:
+  submit:
+    name: Submit to App Store Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore ASC key
+        env:
+          ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
+        run: |
+          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_8S2MXC2RH7.p8
+          chmod 600 scripts/AuthKey_8S2MXC2RH7.p8
+
+      - name: Resolve build lookup flag
+        id: flags
+        run: |
+          if [ -n "${{ inputs.build_id }}" ]; then
+            echo "extra=--build-id ${{ inputs.build_id }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "extra=--build-version ${{ inputs.build_version }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Submit for App Store review
+        run: |
+          python3 scripts/asc_testflight.py \
+            --submit-for-review \
+            --app-store-version "${{ inputs.app_store_version }}" \
+            ${{ steps.flags.outputs.extra }} \
+            --whats-new "${{ inputs.whats_new }}" \
+            --locale "${{ inputs.locale }}"
