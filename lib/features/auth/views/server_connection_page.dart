@@ -21,6 +21,7 @@ import '../../../core/models/server_config.dart';
 import '../../../core/models/user.dart';
 import '../../../core/network/conduit_user_agent.dart';
 import '../../../core/providers/app_providers.dart';
+import '../../../core/providers/storage_providers.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/services/worker_manager.dart';
 import '../../../core/services/input_validation_service.dart';
@@ -473,6 +474,26 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
           _isConnecting = false;
         });
       }
+    }
+  }
+
+  /// Saves server config (extracted from authentication_page.dart)
+  Future<void> _saveServerConfig(
+    ServerConfig config, {
+    BackendConfig? backendConfig,
+  }) async {
+    final storage = ref.read(optimizedStorageServiceProvider);
+    await storage.saveServerConfigs([config]);
+    await storage.setActiveServerId(config.id);
+    ref.invalidate(serverConfigsProvider);
+    ref.invalidate(activeServerProvider);
+
+    if (backendConfig != null) {
+      await ref.read(activeServerProvider.future);
+      await ref.read(backendConfigProvider.future);
+      await ref
+          .read(backendConfigProvider.notifier)
+          .cacheForServer(backendConfig, config.id);
     }
   }
 

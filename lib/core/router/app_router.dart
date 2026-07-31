@@ -329,7 +329,6 @@ class RouterNotifier extends ChangeNotifier {
       return Routes.backendChooser;
     }
 
-    final authState = ref.read(authNavigationStateProvider);
     final startupAuthStuck = ref.read(startupAuthStuckProvider);
 
     // Allow staying on server connection page

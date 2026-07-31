@@ -379,27 +379,6 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
           actionId: NativeSheetRoutes.hermes,
           actionValue: true,
         ),
-        if (ForkOverrides.showDonationLinks)
-          NativeSheetSectionConfig(
-            title: l10n.supportConduit,
-            footer: l10n.supportConduitSubtitle,
-            items: [
-              NativeSheetItemConfig(
-                id: 'buy-me-a-coffee',
-                title: l10n.buyMeACoffeeTitle,
-                subtitle: 'buymeacoffee.com/cogwheel0',
-                sfSymbol: 'gift',
-                url: 'https://www.buymeacoffee.com/cogwheel0',
-              ),
-              NativeSheetItemConfig(
-                id: 'github-sponsors',
-                title: l10n.githubSponsorsTitle,
-                subtitle: 'github.com/sponsors/cogwheel0',
-                sfSymbol: 'heart',
-                url: 'https://github.com/sponsors/cogwheel0',
-              ),
-            ],
-          ),
         buildDirectConnectionsNativeSheetItem(
           title: l10n.directConnectionsTitle,
           subtitle: l10n.directConnectionsSubtitle,
@@ -454,24 +433,28 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
             destructive: true,
           ),
       ],
-      supportTitle: l10n.supportConduit,
-      supportSubtitle: l10n.supportConduitSubtitle,
-      supportItems: [
-        NativeSheetItemConfig(
-          id: 'buy-me-a-coffee',
-          title: l10n.buyMeACoffeeTitle,
-          subtitle: 'buymeacoffee.com/cogwheel0',
-          sfSymbol: 'gift',
-          url: 'https://www.buymeacoffee.com/cogwheel0',
-        ),
-        NativeSheetItemConfig(
-          id: 'github-sponsors',
-          title: l10n.githubSponsorsTitle,
-          subtitle: 'github.com/sponsors/cogwheel0',
-          sfSymbol: 'heart',
-          url: 'https://github.com/sponsors/cogwheel0',
-        ),
-      ],
+      supportTitle: ForkOverrides.showDonationLinks ? l10n.supportConduit : null,
+      supportSubtitle: ForkOverrides.showDonationLinks
+          ? l10n.supportConduitSubtitle
+          : null,
+      supportItems: ForkOverrides.showDonationLinks
+          ? [
+              NativeSheetItemConfig(
+                id: 'buy-me-a-coffee',
+                title: l10n.buyMeACoffeeTitle,
+                subtitle: 'buymeacoffee.com/cogwheel0',
+                sfSymbol: 'gift',
+                url: 'https://www.buymeacoffee.com/cogwheel0',
+              ),
+              NativeSheetItemConfig(
+                id: 'github-sponsors',
+                title: l10n.githubSponsorsTitle,
+                subtitle: 'github.com/sponsors/cogwheel0',
+                sfSymbol: 'heart',
+                url: 'https://github.com/sponsors/cogwheel0',
+              ),
+            ]
+          : const [],
       detailSheets: [
         if (user != null)
           NativeSheetDetailConfig(
