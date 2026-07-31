@@ -16,6 +16,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:xterm/xterm.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../../core/services/raster_media_policy.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/adaptive_glass.dart';
 import '../../../shared/utils/platform_page_route.dart';
@@ -394,6 +395,7 @@ class _TerminalTabState extends ConsumerState<TerminalTab>
       }
       final channel = ref.read(terminalChannelConnectorProvider)(
         service.buildWebSocketUri(server, session.sessionId),
+        kind: server.kind,
       );
       await channel.ready;
 
@@ -747,11 +749,23 @@ class _TerminalTabState extends ConsumerState<TerminalTab>
     }
 
     if (preview.isImage && preview.bytes != null) {
+      final decodeTarget = RasterMediaPolicy.forBox(
+        context,
+        profile: RasterDecodeProfile.inline,
+        logicalWidth: 520,
+        logicalHeight: 360,
+      );
       return SizedBox(
         width: 520,
         height: 360,
         child: InteractiveViewer(
-          child: Image.memory(preview.bytes!, fit: BoxFit.contain),
+          child: Image(
+            image: RasterMediaPolicy.resizeProvider(
+              MemoryImage(preview.bytes!),
+              decodeTarget,
+            ),
+            fit: BoxFit.contain,
+          ),
         ),
       );
     }
@@ -1663,6 +1677,7 @@ class _TerminalTabState extends ConsumerState<TerminalTab>
       AdaptivePopupMenuItem<String>(
         value: 'delete',
         label: l10n.delete,
+        isDestructive: true,
         icon: conduitAdaptivePopupMenuIcon(
           iosSymbol: 'trash',
           materialIcon: Icons.delete_outline,

@@ -39,18 +39,19 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.invalidate(personalizationSettingsProvider);
-      ref.invalidate(userMemoriesProvider);
+      if (ref.read(openWebUiAccountAvailableProvider)) {
+        ref.invalidate(personalizationSettingsProvider);
+        ref.invalidate(userMemoriesProvider);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final settingsAsync = ref.watch(personalizationSettingsProvider);
     final appSettings = ref.watch(appSettingsProvider);
-    final memoriesAsync = ref.watch(userMemoriesProvider);
     final modelsAsync = ref.watch(modelsProvider);
+    final hasOpenWebUiAccount = ref.watch(openWebUiAccountAvailableProvider);
 
     return SettingsPageScaffold(
       title: l10n.personalization,
@@ -60,13 +61,31 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
           ref,
           currentDefaultModelId: appSettings.defaultModel,
           modelsAsync: modelsAsync,
+          hasOpenWebUiAccount: hasOpenWebUiAccount,
         ),
-        settingsSectionGap,
-        _buildSystemPromptSection(context, ref, settingsAsync),
-        settingsSectionGap,
-        _buildMemorySection(context, ref, settingsAsync, memoriesAsync),
-        settingsSectionGap,
-        _buildAdvancedPromptTile(context),
+        _buildOpenRouterImageGenerationModelSection(
+          context,
+          ref,
+          currentModelId: appSettings.openRouterImageGenerationModel,
+          modelsAsync: modelsAsync,
+        ),
+        if (hasOpenWebUiAccount) ...[
+          settingsSectionGap,
+          _buildSystemPromptSection(
+            context,
+            ref,
+            ref.watch(personalizationSettingsProvider),
+          ),
+          settingsSectionGap,
+          _buildMemorySection(
+            context,
+            ref,
+            ref.watch(personalizationSettingsProvider),
+            ref.watch(userMemoriesProvider),
+          ),
+          settingsSectionGap,
+          _buildAdvancedPromptTile(context),
+        ],
       ],
     );
   }
@@ -76,6 +95,7 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
     WidgetRef ref, {
     required String? currentDefaultModelId,
     required AsyncValue<List<Model>> modelsAsync,
+    required bool hasOpenWebUiAccount,
   }) {
     final l10n = AppLocalizations.of(context)!;
 
@@ -99,7 +119,11 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
                 color: context.conduitTheme.buttonPrimary,
               ),
               title: l10n.defaultModel,
-              subtitle: resolvedName ?? l10n.autoSelectDescription,
+              subtitle:
+                  resolvedName ??
+                  (hasOpenWebUiAccount
+                      ? l10n.autoSelectDescription
+                      : l10n.autoSelect),
               onTap: () => _showDefaultModelPicker(
                 context,
                 ref,
@@ -116,6 +140,62 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildOpenRouterImageGenerationModelSection(
+    BuildContext context,
+    WidgetRef ref, {
+    required String? currentModelId,
+    required AsyncValue<List<Model>> modelsAsync,
+  }) {
+    final l10n = AppLocalizations.of(context)!;
+
+    return modelsAsync.maybeWhen(
+      data: (models) {
+        final hasOpenRouterImageTool = models.any(
+          (model) =>
+              model.capabilities?['openrouter'] == true &&
+              model.capabilities?['image_generation'] == true,
+        );
+        if (!hasOpenRouterImageTool) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            settingsSectionGap,
+            SettingsSectionHeader(title: l10n.defaultImageGenerationModel),
+            const SizedBox(height: Spacing.sm),
+            CustomizationTile(
+              leading: SettingsIconBadge(
+                icon: UiUtils.platformIcon(
+                  ios: CupertinoIcons.photo_on_rectangle,
+                  android: Icons.image_outlined,
+                ),
+                color: context.conduitTheme.buttonPrimary,
+              ),
+              title: l10n.defaultImageGenerationModel,
+              subtitle:
+                  currentModelId ?? l10n.openRouterDefaultImageGenerationModel,
+              onTap: () => _showTextEditorSheet(
+                context,
+                title: l10n.defaultImageGenerationModel,
+                description: l10n.defaultImageGenerationModelDescription,
+                initialValue: currentModelId ?? '',
+                hintText: 'openai/gpt-5-image',
+                onSave: (value) async {
+                  await ref
+                      .read(appSettingsProvider.notifier)
+                      .setOpenRouterImageGenerationModel(value);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
     );
   }
 
@@ -383,7 +463,7 @@ class _PersonalizationPageState extends ConsumerState<PersonalizationPage> {
       ),
       title: l10n.advancedPromptOverrides,
       subtitle: l10n.advancedPromptOverridesDescription,
-      onTap: () => context.pushNamed(RouteNames.appCustomization),
+      onTap: () => context.pushNamed(RouteNames.chatSettings),
     );
   }
 

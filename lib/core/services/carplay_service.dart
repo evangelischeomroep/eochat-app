@@ -91,7 +91,7 @@ final class CarPlayCoordinator {
       return _failure('CarPlay disconnected.');
     }
     if (authState != AuthNavigationState.authenticated) {
-      return _failure('Please sign in to Conduit on iPhone first.');
+      return _failure('Please sign in to EOchat on iPhone first.');
     }
 
     await _ensureModelSelected();
@@ -99,7 +99,7 @@ final class CarPlayCoordinator {
       return _failure('CarPlay disconnected.');
     }
     if (_ref.read(selectedModelProvider) == null) {
-      return _failure('Please select a model in Conduit on iPhone first.');
+      return _failure('Please select a model in EOchat on iPhone first.');
     }
 
     _startedByCarPlay = true;
@@ -119,12 +119,12 @@ final class CarPlayCoordinator {
     if (next.phase == ChatVoiceModePhase.error) {
       _startedByCarPlay = false;
       return _failure(
-        next.errorMessage ?? 'Unable to start Conduit voice conversation.',
+        next.errorMessage ?? 'Unable to start EOchat voice conversation.',
       );
     }
     if (!next.isActive) {
       _startedByCarPlay = false;
-      return _failure('Conduit voice conversation ended before it started.');
+      return _failure('EOchat voice conversation ended before it started.');
     }
 
     return _success(next);
@@ -147,7 +147,7 @@ final class CarPlayCoordinator {
   Future<Map<String, Object?>> _pauseVoiceConversation() async {
     final snapshot = _ref.read(chatVoiceModeControllerProvider);
     if (!snapshot.canPause) {
-      return _failure('Conduit is not currently listening.');
+      return _failure('EOchat is not currently listening.');
     }
 
     await _ref.read(chatVoiceModeControllerProvider.notifier).pause();
@@ -157,7 +157,7 @@ final class CarPlayCoordinator {
   Future<Map<String, Object?>> _resumeVoiceConversation() async {
     final snapshot = _ref.read(chatVoiceModeControllerProvider);
     if (!snapshot.canResume) {
-      return _failure('No paused Conduit voice conversation.');
+      return _failure('No paused EOchat voice conversation.');
     }
 
     await _ref.read(chatVoiceModeControllerProvider.notifier).resume();

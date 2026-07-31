@@ -1,7 +1,8 @@
+import 'package:checks/checks.dart';
 import 'package:conduit/core/models/chat_message.dart';
 import 'package:conduit/core/services/settings_service.dart';
 import 'package:conduit/features/chat/providers/queued_completion_provider.dart';
-import 'package:conduit/features/chat/widgets/five_rotating_dots.dart';
+import 'package:conduit/features/chat/widgets/conduit_streaming_orbit.dart';
 import 'package:conduit/features/chat/widgets/streaming_turn_footer.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
@@ -147,7 +148,9 @@ void main() {
     );
     await tester.pump();
 
-    final indicatorLeft = tester.getTopLeft(find.byType(FiveRotatingDots)).dx;
+    final indicatorLeft = tester
+        .getTopLeft(find.byType(ConduitStreamingOrbit))
+        .dx;
     expect(indicatorLeft, lessThan(48));
   });
 
@@ -251,8 +254,10 @@ void main() {
         queuedCompletionInfoForMessageProvider('assistant-queued').overrideWith(
           (ref) => Stream<QueuedCompletionInfo?>.value(
             const QueuedCompletionInfo(
+              databaseOwner: Object(),
               seq: 1,
               chatId: 'chat-1',
+              scopedChatId: 'chat-1',
               assistantMessageId: 'assistant-queued',
               phase: QueuedCompletionPhase.pending,
               isOffline: true,
@@ -276,7 +281,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(FiveRotatingDots), findsNothing);
+    expect(find.byType(ConduitStreamingOrbit), findsNothing);
     expect(find.byKey(const ValueKey('typing')), findsNothing);
   });
 
@@ -338,52 +343,53 @@ void main() {
     }
   });
 
-  testWidgets('does not fire the running haptic when suppressed on the footer', (
-    tester,
-  ) async {
-    final container = _buildHapticsContainer();
-    addTearDown(container.dispose);
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    final calls = <_RecordedPlatformCall>[];
-    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
-      calls.add(_RecordedPlatformCall(call.method, call.arguments));
-      return null;
-    });
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+  testWidgets(
+    'does not fire the running haptic when suppressed on the footer',
+    (tester) async {
+      final container = _buildHapticsContainer();
+      addTearDown(container.dispose);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final calls = <_RecordedPlatformCall>[];
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        calls.add(_RecordedPlatformCall(call.method, call.arguments));
+        return null;
+      });
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
 
-    try {
-      await tester.pumpWidget(
-        UncontrolledProviderScope(
-          container: container,
-          child: MaterialApp(
-            theme: AppTheme.light(TweakcnThemes.t3Chat),
-            home: MediaQuery(
-              data: const MediaQueryData(disableAnimations: true),
-              child: Scaffold(
-                body: StreamingTurnFooter(
-                  message: ChatMessage(
-                    id: 'assistant-1',
-                    role: 'assistant',
-                    content: '',
-                    timestamp: DateTime(2026),
-                    isStreaming: true,
+      try {
+        await tester.pumpWidget(
+          UncontrolledProviderScope(
+            container: container,
+            child: MaterialApp(
+              theme: AppTheme.light(TweakcnThemes.t3Chat),
+              home: MediaQuery(
+                data: const MediaQueryData(disableAnimations: true),
+                child: Scaffold(
+                  body: StreamingTurnFooter(
+                    message: ChatMessage(
+                      id: 'assistant-1',
+                      role: 'assistant',
+                      content: '',
+                      timestamp: DateTime(2026),
+                      isStreaming: true,
+                    ),
+                    suppressStreamingHaptics: true,
                   ),
-                  suppressStreamingHaptics: true,
                 ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      expect(_lightImpactCalls(calls), isEmpty);
-    } finally {
-      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
+        expect(_lightImpactCalls(calls), isEmpty);
+      } finally {
+        messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   testWidgets('does not fire the running haptic when haptics are disabled', (
     tester,
@@ -421,7 +427,9 @@ void main() {
     }
   });
 
-  testWidgets('hides the typing indicator once the turn settles', (tester) async {
+  testWidgets('hides the typing indicator once the turn settles', (
+    tester,
+  ) async {
     final container = _buildContainer();
     addTearDown(container.dispose);
     final running = ChatMessage(
@@ -453,7 +461,7 @@ void main() {
     );
   });
 
-  testWidgets('re-arms the running haptic after hiding and reshowing on the same id', (
+  testWidgets('does not replay the running haptic when the footer remounts', (
     tester,
   ) async {
     final container = _buildHapticsContainer();
@@ -480,28 +488,72 @@ void main() {
         _buildHarness(container: container, message: running),
       );
       await tester.pump();
-      expect(_lightImpactCalls(calls), hasLength(1));
+      check(_lightImpactCalls(calls)).length.equals(1);
 
-      // Settling (responseDone) hides the footer and re-arms the guard via
-      // _syncRunningHaptic(false) — without a message-id change.
-      await tester.pumpWidget(
-        _buildHarness(
-          container: container,
-          message: running.copyWith(metadata: const {'responseDone': true}),
-        ),
-      );
+      await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
-      expect(_lightImpactCalls(calls), hasLength(1));
-
-      // Back to running on the SAME id: the guard re-fires exactly once more.
       await tester.pumpWidget(
         _buildHarness(container: container, message: running),
       );
       await tester.pump();
-      expect(_lightImpactCalls(calls), hasLength(2));
+
+      check(_lightImpactCalls(calls)).length.equals(1);
     } finally {
       messenger.setMockMethodCallHandler(SystemChannels.platform, null);
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets(
+    're-arms the running haptic after hiding and reshowing on the same id',
+    (tester) async {
+      final container = _buildHapticsContainer();
+      addTearDown(container.dispose);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final calls = <_RecordedPlatformCall>[];
+      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+        calls.add(_RecordedPlatformCall(call.method, call.arguments));
+        return null;
+      });
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+
+      try {
+        final running = ChatMessage(
+          id: 'assistant-1',
+          role: 'assistant',
+          content: '',
+          timestamp: DateTime(2026),
+          isStreaming: true,
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(container: container, message: running),
+        );
+        await tester.pump();
+        expect(_lightImpactCalls(calls), hasLength(1));
+
+        // Settling (responseDone) hides the footer and re-arms the guard via
+        // _syncRunningHaptic(false) — without a message-id change.
+        await tester.pumpWidget(
+          _buildHarness(
+            container: container,
+            message: running.copyWith(metadata: const {'responseDone': true}),
+          ),
+        );
+        await tester.pump();
+        expect(_lightImpactCalls(calls), hasLength(1));
+
+        // Back to running on the SAME id: the guard re-fires exactly once more.
+        await tester.pumpWidget(
+          _buildHarness(container: container, message: running),
+        );
+        await tester.pump();
+        expect(_lightImpactCalls(calls), hasLength(2));
+      } finally {
+        messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 }

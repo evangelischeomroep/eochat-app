@@ -5,7 +5,6 @@ import '../../../core/providers/app_providers.dart'
     show
         activeChatIdsProvider,
         activeConversationProvider,
-        apiServiceProvider,
         conversationsProvider,
         isTemporaryChat,
         refreshConversationsCache;
@@ -29,21 +28,21 @@ import '../providers/chat_providers.dart';
 void writeTransportMetadata({
   required dynamic ref,
   required ChatCompletionSession session,
+  ChatMessagesNotifier? messageNotifier,
 }) {
   try {
-    ref.read(chatMessagesProvider.notifier).updateLastMessageWithFunction((
-      ChatMessage m,
-    ) {
-      final meta = Map<String, dynamic>.from(m.metadata ?? const {});
-      meta['transport'] = session.transport.name;
-      if (session.taskId != null && session.taskId!.isNotEmpty) {
-        meta['taskId'] = session.taskId;
-      }
-      if (session.abort != null) {
-        meta['hasActiveAbortHandle'] = true;
-      }
-      return m.copyWith(metadata: meta);
-    });
+    (messageNotifier ?? ref.read(chatMessagesProvider.notifier))
+        .updateLastMessageWithFunction((ChatMessage m) {
+          final meta = Map<String, dynamic>.from(m.metadata ?? const {});
+          meta['transport'] = session.transport.name;
+          if (session.taskId != null && session.taskId!.isNotEmpty) {
+            meta['taskId'] = session.taskId;
+          }
+          if (session.abort != null) {
+            meta['hasActiveAbortHandle'] = true;
+          }
+          return m.copyWith(metadata: meta);
+        });
   } catch (_) {
     // Non-critical — metadata is advisory.
   }
@@ -80,9 +79,12 @@ Future<void> bindTaskSocketIfNeeded({
   required SocketService? socketService,
   Duration timeout = const Duration(seconds: 10),
   bool isResume = false,
+  bool Function()? ownsActiveConversation,
 }) async {
+  bool ownsConversation() => ownsActiveConversation?.call() ?? true;
   if (session.transport != ChatCompletionTransport.taskSocket) return;
   if (socketService == null) return;
+  if (!ownsConversation()) return;
 
   // Resume reuses the live socket subscription; there is no "awaiting binding"
   // window to surface on the message (no fresh HTTP request was issued), so we
@@ -103,7 +105,7 @@ Future<void> bindTaskSocketIfNeeded({
       }
     }
   } finally {
-    if (!isResume) {
+    if (!isResume && ownsConversation()) {
       setAwaitingSocketBinding(ref: ref, value: false);
     }
   }
@@ -115,19 +117,19 @@ Future<void> bindTaskSocketIfNeeded({
 void configureRemoteTaskMonitoring({
   required dynamic ref,
   required ChatCompletionSession session,
+  ChatMessagesNotifier? messageNotifier,
 }) {
   if (session.taskId == null || session.taskId!.isEmpty) return;
   try {
-    ref.read(chatMessagesProvider.notifier).updateLastMessageWithFunction((
-      ChatMessage m,
-    ) {
-      final meta = Map<String, dynamic>.from(m.metadata ?? const {});
-      meta['taskId'] = session.taskId;
-      if (session.conversationId != null) {
-        meta['taskConversationId'] = session.conversationId;
-      }
-      return m.copyWith(metadata: meta);
-    });
+    (messageNotifier ?? ref.read(chatMessagesProvider.notifier))
+        .updateLastMessageWithFunction((ChatMessage m) {
+          final meta = Map<String, dynamic>.from(m.metadata ?? const {});
+          meta['taskId'] = session.taskId;
+          if (session.conversationId != null) {
+            meta['taskConversationId'] = session.conversationId;
+          }
+          return m.copyWith(metadata: meta);
+        });
   } catch (_) {}
 }
 
@@ -194,7 +196,7 @@ bool shouldOptimisticallyMarkChatActive({
 /// 2. Binds the socket if the session is taskSocket.
 /// 3. Calls [attachUnifiedChunkedStreaming] with the correct session.
 /// 4. Registers the resulting controller & subscriptions with the notifier.
-Future<void> dispatchChatTransport({
+Future<bool> dispatchChatTransport({
   required dynamic ref,
   required ChatCompletionSession session,
   required String assistantMessageId,
@@ -220,14 +222,39 @@ Future<void> dispatchChatTransport({
   /// written, and the socket session ID is forced to `null` so the streaming
   /// helper binds the server's (possibly foreign) `message_id` by `chat_id`.
   bool isResume = false,
+  bool Function()? ownsActiveConversation,
+  // Resume dispatch can originate from ChatMessagesNotifier itself. Supplying
+  // that instance avoids asking its Riverpod Ref to read its own provider,
+  // which Riverpod correctly rejects as a self-dependency.
+  ChatMessagesNotifier? messageNotifier,
+
+  /// Optional attempt-level admission guard for a newly-created placeholder.
+  /// It is checked before dispatch and after the socket-binding await, but not
+  /// after transport attachment: normal completion itself makes a placeholder
+  /// non-streaming, while the registered transport then owns cancellation.
+  bool Function()? ownsPendingPlaceholder,
 }) async {
+  bool ownsConversation() => ownsActiveConversation?.call() ?? true;
+  bool ownsPending() =>
+      ownsConversation() && (ownsPendingPlaceholder?.call() ?? true);
+  ChatMessagesNotifier messagesNotifier() =>
+      messageNotifier ?? ref.read(chatMessagesProvider.notifier);
+  if (!ownsPending()) return false;
+
+  // Freeze authorization before this dispatch first yields. The eventual
+  // `/api/chat/completed` callback must keep the account that authorized the
+  // stream instead of adopting a token selected while generation was active.
+  final chatCompletedAuthSnapshot = api.captureAuthSnapshot();
+
   // 1. Write transport + flow metadata onto assistant message
-  writeTransportMetadata(ref: ref, session: session);
+  writeTransportMetadata(
+    ref: ref,
+    session: session,
+    messageNotifier: messageNotifier,
+  );
 
   try {
-    ref.read(chatMessagesProvider.notifier).updateLastMessageWithFunction((
-      ChatMessage m,
-    ) {
+    messagesNotifier().updateLastMessageWithFunction((ChatMessage m) {
       final mergedMeta = {
         if (m.metadata != null) ...m.metadata!,
         'backgroundFlow': isBackgroundFlow,
@@ -244,10 +271,16 @@ Future<void> dispatchChatTransport({
     session: session,
     socketService: socketService,
     isResume: isResume,
+    ownsActiveConversation: ownsPending,
   );
+  if (!ownsPending()) return false;
 
   // 3. Configure remote task monitoring
-  configureRemoteTaskMonitoring(ref: ref, session: session);
+  configureRemoteTaskMonitoring(
+    ref: ref,
+    session: session,
+    messageNotifier: messageNotifier,
+  );
 
   // 3b. Optimistic generation-START for the sidebar indicator.
   //
@@ -289,33 +322,55 @@ Future<void> dispatchChatTransport({
     sessionId: effectiveSessionId,
     activeConversationId: activeConversationId,
     api: api,
+    chatCompletedAuthSnapshot: chatCompletedAuthSnapshot,
     socketService: socketService,
     workerManager: workerManager,
     filterIds: filterIds,
-    appendToLastMessage: (c) =>
-        ref.read(chatMessagesProvider.notifier).appendToLastMessage(c),
-    bufferLastMessageContent: (c) =>
-        ref.read(chatMessagesProvider.notifier).bufferLastMessageContent(c),
-    replaceLastMessageContent: (c) =>
-        ref.read(chatMessagesProvider.notifier).replaceLastMessageContent(c),
-    updateLastMessageWith: (updater) => ref
-        .read(chatMessagesProvider.notifier)
-        .updateLastMessageWithFunction(updater),
-    appendStatusUpdate: (messageId, update) => ref
-        .read(chatMessagesProvider.notifier)
-        .appendStatusUpdate(messageId, update),
-    upsertCodeExecution: (messageId, execution) => ref
-        .read(chatMessagesProvider.notifier)
-        .upsertCodeExecution(messageId, execution),
-    appendSourceReference: (messageId, reference) => ref
-        .read(chatMessagesProvider.notifier)
-        .appendSourceReference(messageId, reference),
-    updateMessageById: (messageId, updater) => ref
-        .read(chatMessagesProvider.notifier)
-        .updateMessageById(messageId, updater),
+    appendToLastMessage: (c) {
+      if (!ownsConversation()) return;
+      messagesNotifier().appendToLastMessage(c);
+    },
+    bufferLastMessageContent: (c) {
+      if (!ownsConversation()) return;
+      messagesNotifier().bufferLastMessageContent(c);
+    },
+    bufferProgressiveLastMessageContent: (c) {
+      if (!ownsConversation()) return;
+      messagesNotifier().bufferLastMessageContent(c, immediate: false);
+    },
+    bufferProgressiveLastMessageSnapshot: (snapshot) {
+      if (!ownsConversation()) return;
+      messagesNotifier().bufferLastMessageContentSnapshot(snapshot);
+    },
+    replaceLastMessageContent: (c) {
+      if (!ownsConversation()) return;
+      messagesNotifier().replaceLastMessageContent(c);
+    },
+    updateLastMessageWith: (updater) {
+      if (!ownsConversation()) return;
+      messagesNotifier().updateLastMessageWithFunction(updater);
+    },
+    appendStatusUpdate: (messageId, update) {
+      if (!ownsConversation()) return;
+      messagesNotifier().appendStatusUpdate(messageId, update);
+    },
+    upsertCodeExecution: (messageId, execution) {
+      if (!ownsConversation()) return;
+      messagesNotifier().upsertCodeExecution(messageId, execution);
+    },
+    appendSourceReference: (messageId, reference) {
+      if (!ownsConversation()) return;
+      messagesNotifier().appendSourceReference(messageId, reference);
+    },
+    updateMessageById: (messageId, updater) {
+      if (!ownsConversation()) return;
+      messagesNotifier().updateMessageById(messageId, updater);
+    },
     modelUsesReasoning: modelUsesReasoning,
     toolsEnabled: toolsEnabled,
+    ownsStreamContext: ownsConversation,
     onChatTitleUpdated: (newTitle) {
+      if (!ownsConversation()) return;
       final active = ref.read(activeConversationProvider);
       if (active == null || isTemporaryChat(active.id)) return;
       ref
@@ -333,41 +388,41 @@ Future<void> dispatchChatTransport({
       refreshConversationsCache(ref);
     },
     onChatTagsUpdated: () {
+      if (!ownsConversation()) return;
       final active = ref.read(activeConversationProvider);
       if (active == null || isTemporaryChat(active.id)) return;
       refreshConversationsCache(ref);
-      final apiRef = ref.read(apiServiceProvider);
-      if (apiRef != null) {
-        Future.microtask(() async {
-          try {
-            final refreshed = await apiRef.getConversation(active.id);
-            ref.read(activeConversationProvider.notifier).set(refreshed);
-            ref
-                .read(conversationsProvider.notifier)
-                .upsertConversation(
-                  refreshed.copyWith(messages: const []),
-                  trustFolderConversation:
-                      refreshed.folderId != null &&
-                      refreshed.folderId!.isNotEmpty,
-                );
-          } catch (_) {}
-        });
-      }
+      Future.microtask(() async {
+        if (!ownsConversation()) return;
+        try {
+          final refreshed = await api.getConversation(active.id);
+          if (!ownsConversation()) return;
+          ref.read(activeConversationProvider.notifier).set(refreshed);
+          ref
+              .read(conversationsProvider.notifier)
+              .upsertConversation(
+                refreshed.copyWith(messages: const []),
+                trustFolderConversation:
+                    refreshed.folderId != null &&
+                    refreshed.folderId!.isNotEmpty,
+              );
+        } catch (_) {}
+      });
     },
     onRemoteMessageBound: (remoteMessageId) {
+      if (!ownsConversation()) return;
       // Record the foreign server id bound to this assistant so the poll
       // fallback can still resolve server content if the socket later dies.
-      ref
-          .read(chatMessagesProvider.notifier)
-          .recordResumeBoundRemoteMessageId(
-            assistantMessageId,
-            remoteMessageId,
-          );
+      messagesNotifier().recordResumeBoundRemoteMessageId(
+        assistantMessageId,
+        remoteMessageId,
+      );
     },
     onChatActiveChanged: (chatId, active) {
       if (chatId == null || chatId.isEmpty) return;
       final notifier = ref.read(activeChatIdsProvider.notifier);
       if (active) {
+        if (!ownsConversation()) return;
         notifier.setActive(chatId);
         return;
       }
@@ -376,17 +431,12 @@ Future<void> dispatchChatTransport({
       // aware too, or an overlapping multi-model / branched generation would
       // drop the sidebar spinner while another stream is still running. Only
       // clear once the task registry reports no remaining tasks for the chat.
-      final apiRef = ref.read(apiServiceProvider);
-      if (apiRef == null) {
-        notifier.setInactive(chatId);
-        return;
-      }
       // Capture the activation token now so a stream that starts for this chat
       // during the async lookup is not clobbered by this stale clear.
       final token = notifier.activationToken(chatId);
       unawaited(() async {
         try {
-          final ids = await apiRef.getTaskIdsByChat(chatId);
+          final ids = await api.getTaskIdsByChat(chatId);
           if (ids.isEmpty) {
             notifier.setInactiveIfUnchanged(chatId, token);
           }
@@ -397,24 +447,35 @@ Future<void> dispatchChatTransport({
         }
       }());
     },
-    completeStreamingUi: () =>
-        ref.read(chatMessagesProvider.notifier).completeStreamingUi(),
-    finishStreaming: () =>
-        ref.read(chatMessagesProvider.notifier).finishStreaming(),
-    getMessages: () => ref.read(chatMessagesProvider),
-    getVisibleStreamingContent: () => ref.read(streamingContentProvider),
-    flushStreamingBuffer: () =>
-        ref.read(chatMessagesProvider.notifier).syncStreamingBuffer(),
+    completeStreamingUi: () {
+      if (!ownsConversation()) return;
+      messagesNotifier().completeStreamingUi();
+    },
+    finishStreaming: () {
+      if (!ownsConversation()) return;
+      messagesNotifier().finishStreaming();
+    },
+    getMessages: () => ownsConversation()
+        ? (messageNotifier?.messagesSnapshot ?? ref.read(chatMessagesProvider))
+        : const <ChatMessage>[],
+    getVisibleStreamingContent: () =>
+        ownsConversation() ? ref.read(streamingContentProvider) : null,
+    flushStreamingBuffer: () {
+      if (!ownsConversation()) return;
+      messagesNotifier().syncStreamingBuffer();
+    },
     onObsoleteStreamRetired: () {
-      ref
-          .read(chatMessagesProvider.notifier)
-          .retireObsoleteStreamingTransport(assistantMessageId);
+      if (!ownsConversation()) return;
+      messagesNotifier().retireObsoleteStreamingTransport(assistantMessageId);
     },
     pullChatSnapshot: (chatId) async {
+      if (!ownsConversation()) return null;
       // CDT-RFC-001 Phase 1 (E2): the post-stream snapshot refresh persists
       // through the sync engine (upsertServerChat under the chat lock).
       try {
-        return await ref.read(syncEngineProvider.notifier).pullChatNow(chatId);
+        final syncEngine = ref.read(syncEngineProvider.notifier);
+        final pulled = await syncEngine.pullChatNow(chatId);
+        return ownsConversation() ? pulled : null;
       } catch (error, stackTrace) {
         // Engine unavailable (no database / reviewer mode): the helper falls
         // back to the direct fetch.
@@ -430,11 +491,24 @@ Future<void> dispatchChatTransport({
     },
   );
 
+  if (!ownsConversation()) {
+    activeStream.disposeWatchdog();
+    return false;
+  }
+
+  // SocketService replays buffered events synchronously while the helper is
+  // attaching its handlers. A terminal replay can therefore finish the
+  // message and dispose every local streaming resource before attach returns.
+  // Do not resurrect that completed transport in the notifier.
+  if (activeStream.isDisposed()) {
+    return true;
+  }
+
   // 6. Register controller + socket subscriptions with the notifier.
   //    ActiveChatStream.controller may be null for httpStream / jsonCompletion
   //    (those transports complete via their own stream, not a
   //    StreamingResponseController).
-  final notifier = ref.read(chatMessagesProvider.notifier);
+  final notifier = messagesNotifier();
   if (activeStream.controller != null) {
     notifier.setMessageStream(assistantMessageId, activeStream.controller!);
   }
@@ -443,4 +517,5 @@ Future<void> dispatchChatTransport({
     activeStream.socketSubscriptions,
     onDispose: activeStream.disposeWatchdog,
   );
+  return true;
 }

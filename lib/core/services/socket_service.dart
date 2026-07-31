@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:collection';
+import 'dart:math' as math;
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../models/server_config.dart';
 import '../models/socket_health.dart';
+import '../network/conduit_user_agent.dart';
 import '../utils/debug_logger.dart';
 import 'socket_tls_override.dart';
 
@@ -20,6 +25,16 @@ typedef SocketChannelEventHandler =
       void Function(dynamic response)? ack,
     );
 
+enum SocketReplayGapReason {
+  eventLimit,
+  byteLimit,
+  eventTooLarge,
+  expired,
+  scopeEvicted,
+}
+
+typedef SocketReplayGapCallback = void Function(SocketReplayGapReason reason);
+
 typedef SocketFactory =
     io.Socket Function(
       String base,
@@ -33,13 +48,19 @@ class SocketService with WidgetsBindingObserver {
   final bool allowWebsocketUpgrade;
   final SocketFactory _socketFactory;
   final Duration _resumeReconnectWatchdogTimeout;
+  final DateTime Function() _now;
   io.Socket? _socket;
   String? _authToken;
   bool _isConnecting = false;
+  Completer<void>? _pendingForcedConnect;
+  bool _disposed = false;
   bool _isAppForeground = true;
   bool _wasBackgrounded = false;
   bool _resumeReconnectInFlight = false;
   bool _signalReconnectOnConnect = false;
+  bool _hasNetwork = true;
+  int _backgroundActivityLeases = 0;
+  final Set<String> _backgroundLeaseHandlerIds = <String>{};
   Timer? _heartbeatTimer;
   Timer? _resumeReconnectWatchdogTimer;
   bool _forcePollingFallback = false;
@@ -114,7 +135,19 @@ class SocketService with WidgetsBindingObserver {
   // especially important for early `request:chat:completion` events that may
   // target a session before the handler attaches.
 
+  static const int maxBufferedEventsPerScope = 256;
+  static const int maxBufferedBytesPerScope = 2 * 1024 * 1024;
+  static const int maxBufferedEventBytes = 512 * 1024;
+  static const int maxBufferedScopes = 8;
+  static const int maxReplayGapTombstones = 16;
+  static const Duration bufferedEventExpiry = Duration(seconds: 30);
+
   final Map<String, _BufferedChatEventScope> _eventBuffer = {};
+  final LinkedHashSet<_BufferedChatEventScope> _bufferScopes =
+      LinkedHashSet<_BufferedChatEventScope>.identity();
+  final Map<String, _SocketReplayGapTombstone> _replayGapByAlias = {};
+  final LinkedHashSet<_SocketReplayGapTombstone> _replayGapTombstones =
+      LinkedHashSet<_SocketReplayGapTombstone>.identity();
 
   String _conversationBufferAlias(String conversationId) =>
       'chat:$conversationId';
@@ -143,6 +176,7 @@ class SocketService with WidgetsBindingObserver {
     String? sessionId,
     String? messageId,
   }) {
+    _expireBufferScopes();
     for (final alias in _bufferAliases(
       conversationId: conversationId,
       sessionId: sessionId,
@@ -157,6 +191,7 @@ class SocketService with WidgetsBindingObserver {
   }
 
   void _removeBufferScope(_BufferedChatEventScope scope) {
+    _bufferScopes.remove(scope);
     for (final alias in scope.aliases) {
       if (identical(_eventBuffer[alias], scope)) {
         _eventBuffer.remove(alias);
@@ -174,20 +209,137 @@ class SocketService with WidgetsBindingObserver {
     }
     for (final scope in scopes) {
       _removeBufferScope(scope);
+      scope.events.clear();
+      scope.estimatedBytes = 0;
+    }
+  }
+
+  void _removeReplayGap(_SocketReplayGapTombstone tombstone) {
+    _replayGapTombstones.remove(tombstone);
+    for (final alias in tombstone.aliases) {
+      if (identical(_replayGapByAlias[alias], tombstone)) {
+        _replayGapByAlias.remove(alias);
+      }
+    }
+  }
+
+  void _removeReplayGapsForAliases(Set<String> aliases) {
+    final tombstones = <_SocketReplayGapTombstone>{};
+    for (final alias in aliases) {
+      final tombstone = _replayGapByAlias[alias];
+      if (tombstone != null) tombstones.add(tombstone);
+    }
+    for (final tombstone in tombstones) {
+      _removeReplayGap(tombstone);
+    }
+  }
+
+  _SocketReplayGapTombstone? _takeReplayGap(Set<String> aliases) {
+    for (final alias in aliases) {
+      final tombstone = _replayGapByAlias[alias];
+      if (tombstone != null) {
+        _removeReplayGap(tombstone);
+        return tombstone;
+      }
+    }
+    return null;
+  }
+
+  void _recordReplayGap(
+    _BufferedChatEventScope scope,
+    SocketReplayGapReason reason, {
+    required int eventCount,
+    required int estimatedBytes,
+  }) {
+    final tombstone = _SocketReplayGapTombstone(
+      aliases: Set<String>.unmodifiable(scope.aliases),
+      reason: reason,
+    );
+    _removeReplayGapsForAliases(scope.aliases);
+    _replayGapTombstones.add(tombstone);
+    for (final alias in tombstone.aliases) {
+      _replayGapByAlias[alias] = tombstone;
+    }
+    while (_replayGapTombstones.length > maxReplayGapTombstones) {
+      _removeReplayGap(_replayGapTombstones.first);
+    }
+    DebugLogger.log(
+      'pre-handler replay gap',
+      scope: 'socket/buffer',
+      data: {
+        'scopeIds': scope.aliases.join(','),
+        'events': eventCount,
+        'estimatedBytes': estimatedBytes,
+        'reason': reason.name,
+      },
+    );
+  }
+
+  void _dropBufferScope(
+    _BufferedChatEventScope scope,
+    SocketReplayGapReason reason, {
+    int? eventCount,
+    int? estimatedBytes,
+  }) {
+    final retainedEventCount = eventCount ?? scope.events.length;
+    final retainedBytes = estimatedBytes ?? scope.estimatedBytes;
+    _removeBufferScope(scope);
+    scope.events.clear();
+    scope.estimatedBytes = 0;
+    _recordReplayGap(
+      scope,
+      reason,
+      eventCount: retainedEventCount,
+      estimatedBytes: retainedBytes,
+    );
+  }
+
+  void _expireBufferScopes() {
+    if (_bufferScopes.isEmpty) return;
+    final now = _now();
+    for (final scope in _bufferScopes.toList(growable: false)) {
+      if (now.difference(scope.createdAt) >= bufferedEventExpiry) {
+        _dropBufferScope(scope, SocketReplayGapReason.expired);
+      }
+    }
+  }
+
+  void _clearBufferedReplayState() {
+    for (final scope in _bufferScopes) {
+      scope.events.clear();
+      scope.estimatedBytes = 0;
+    }
+    _bufferScopes.clear();
+    _eventBuffer.clear();
+    _replayGapTombstones.clear();
+    _replayGapByAlias.clear();
+  }
+
+  void _dropBufferedScopesForReplayGap(SocketReplayGapReason reason) {
+    for (final scope in _bufferScopes.toList(growable: false)) {
+      _dropBufferScope(scope, reason);
     }
   }
 
   /// Start buffering events for a pending send before the streaming handler
   /// is attached.
   void startBuffering(String chatId, {String? sessionId, String? messageId}) {
+    _expireBufferScopes();
     final aliases = _bufferAliases(
       conversationId: chatId,
       sessionId: sessionId,
       messageId: messageId,
     );
+    if (aliases.isEmpty) return;
     _removeBufferScopesForAliases(aliases);
+    _removeReplayGapsForAliases(aliases);
 
-    final scope = _BufferedChatEventScope();
+    while (_bufferScopes.length >= maxBufferedScopes) {
+      _dropBufferScope(_bufferScopes.first, SocketReplayGapReason.scopeEvicted);
+    }
+
+    final scope = _BufferedChatEventScope(createdAt: _now());
+    _bufferScopes.add(scope);
     for (final alias in aliases) {
       scope.aliases.add(alias);
       _eventBuffer[alias] = scope;
@@ -197,6 +349,7 @@ class SocketService with WidgetsBindingObserver {
   /// Stop buffering and discard any remaining buffered events for a pending
   /// send scope.
   void stopBuffering(String chatId, {String? sessionId, String? messageId}) {
+    _expireBufferScopes();
     _removeBufferScopesForAliases(
       _bufferAliases(
         conversationId: chatId,
@@ -221,9 +374,52 @@ class SocketService with WidgetsBindingObserver {
       return null;
     }
     _removeBufferScope(scope);
-    return List<(Map<String, dynamic>, void Function(dynamic)?)>.from(
+    final events = List<(Map<String, dynamic>, void Function(dynamic)?)>.from(
       scope.events,
     );
+    scope.events.clear();
+    scope.estimatedBytes = 0;
+    return events;
+  }
+
+  _BufferedChatReplay _takeBufferedReplay({
+    String? conversationId,
+    String? sessionId,
+    String? messageId,
+    required bool consumeReplayGap,
+  }) {
+    _expireBufferScopes();
+    final aliases = _bufferAliases(
+      conversationId: conversationId,
+      sessionId: sessionId,
+      messageId: messageId,
+    );
+    final scope = _findBufferScope(
+      conversationId: conversationId,
+      sessionId: sessionId,
+      messageId: messageId,
+    );
+    if (scope != null) {
+      _removeBufferScope(scope);
+      final events = List<(Map<String, dynamic>, void Function(dynamic)?)>.from(
+        scope.events,
+      );
+      scope.events.clear();
+      scope.estimatedBytes = 0;
+      return _BufferedChatReplay(events: events);
+    }
+    final tombstone = consumeReplayGap
+        ? _takeReplayGap(aliases)
+        : _findReplayGap(aliases);
+    return _BufferedChatReplay(gapReason: tombstone?.reason);
+  }
+
+  _SocketReplayGapTombstone? _findReplayGap(Set<String> aliases) {
+    for (final alias in aliases) {
+      final tombstone = _replayGapByAlias[alias];
+      if (tombstone != null) return tombstone;
+    }
+    return null;
   }
 
   /// Stream controller that emits when a socket reconnection occurs.
@@ -239,9 +435,11 @@ class SocketService with WidgetsBindingObserver {
     this.websocketOnly = false,
     this.allowWebsocketUpgrade = true,
     SocketFactory? socketFactory,
+    DateTime Function()? now,
     Duration resumeReconnectWatchdogTimeout =
         _defaultResumeReconnectWatchdogTimeout,
   }) : _authToken = authToken,
+       _now = now ?? DateTime.now,
        _resumeReconnectWatchdogTimeout = resumeReconnectWatchdogTimeout,
        _socketFactory =
            socketFactory ?? createSocketWithOptionalBadCertOverride {
@@ -260,15 +458,26 @@ class SocketService with WidgetsBindingObserver {
       case AppLifecycleState.detached:
         _isAppForeground = false;
         _wasBackgrounded = true;
+        _applyTransportActivityPolicy();
         break;
       case AppLifecycleState.inactive:
         _isAppForeground = true;
         break;
       case AppLifecycleState.resumed:
         _isAppForeground = true;
-        if (_wasBackgrounded) {
+        final resumedFromBackground = _wasBackgrounded;
+        if (resumedFromBackground) {
           _wasBackgrounded = false;
-          unawaited(_reconnectAfterResume());
+          // Arm reconciliation even when reachability is currently false.
+          // The next successful foreground connection must still prompt
+          // consumers to refresh state missed while backgrounded.
+          _signalReconnectOnConnect = true;
+        }
+        _applyTransportActivityPolicy();
+        if (resumedFromBackground) {
+          if (_mayMaintainTransport) {
+            unawaited(_reconnectAfterResume());
+          }
         }
         break;
     }
@@ -283,10 +492,17 @@ class SocketService with WidgetsBindingObserver {
       state == AppLifecycleState.detached;
 
   Future<void> _reconnectAfterResume() async {
+    // A background activity lease can legitimately keep the existing
+    // transport connected while the app is paused. Resuming that transport
+    // still requires consumer reconciliation, but replacing it would add a
+    // needless handshake and could interrupt the leased stream.
+    if (isConnected) {
+      _publishPendingResumeReconciliation();
+      return;
+    }
     if (_resumeReconnectInFlight) return;
 
     _resumeReconnectInFlight = true;
-    _signalReconnectOnConnect = true;
     _resumeReconnectWatchdogTimer?.cancel();
     _resumeReconnectWatchdogTimer = Timer(
       _resumeReconnectWatchdogTimeout,
@@ -295,7 +511,10 @@ class SocketService with WidgetsBindingObserver {
     try {
       await connect(force: true);
     } catch (_) {
-      _clearPendingResumeReconnect();
+      // Keep the reconciliation intent. A later explicit/network-triggered
+      // connection can still succeed after a transient factory/transport
+      // failure and must notify consumers exactly once.
+      _releaseResumeReconnectAttempt();
     }
   }
 
@@ -305,9 +524,27 @@ class SocketService with WidgetsBindingObserver {
     _resumeReconnectInFlight = false;
   }
 
+  void _publishPendingResumeReconciliation() {
+    final shouldSignalReconnect = _signalReconnectOnConnect;
+    _releaseResumeReconnectAttempt();
+    if (!shouldSignalReconnect) return;
+
+    _signalReconnectOnConnect = false;
+    if (!_reconnectController.isClosed) {
+      _reconnectController.add(null);
+    }
+  }
+
   void _clearPendingResumeReconnect() {
     _releaseResumeReconnectAttempt();
     _signalReconnectOnConnect = false;
+  }
+
+  void _deferOrClearPendingResumeReconnect() {
+    _releaseResumeReconnectAttempt();
+    if (!_isAppForeground || _disposed) {
+      _signalReconnectOnConnect = false;
+    }
   }
 
   String? get sessionId => _socket?.id;
@@ -316,10 +553,149 @@ class SocketService with WidgetsBindingObserver {
 
   bool get isConnected => _socket?.connected == true;
   bool get isAppForeground => _isAppForeground;
+  int get backgroundActivityLeaseCount => _backgroundActivityLeases;
+
+  /// Keeps an already-owned Socket.IO transport alive while one admitted unit
+  /// of work still needs it in the background. Session-level listeners must
+  /// not hold this lease permanently; acquire it only for the active operation
+  /// and dispose it on every terminal path.
+  SocketBackgroundActivityLease acquireBackgroundActivityLease() {
+    if (_disposed) return SocketBackgroundActivityLease._(() {});
+    _acquireBackgroundActivityLease();
+    return SocketBackgroundActivityLease._(_releaseBackgroundActivityLease);
+  }
+
+  bool get _mayMaintainTransport =>
+      _hasNetwork && (_isAppForeground || _backgroundActivityLeases > 0);
+
+  /// Starts a connection that has no caller awaiting its result while still
+  /// observing every asynchronous failure. Lifecycle/provider kicks are
+  /// intentionally best-effort, but an ignored error Future would otherwise
+  /// escape to the root zone.
+  void connectBestEffort({bool force = false, required String reason}) {
+    _runBestEffort(() => connect(force: force), reason: reason);
+  }
+
+  void _runBestEffort(
+    Future<void> Function() operation, {
+    required String reason,
+  }) {
+    unawaited(
+      Future<void>.sync(operation).then<void>(
+        (_) {},
+        onError: (Object error, StackTrace _) {
+          DebugLogger.warning(
+            'Best-effort socket operation failed',
+            scope: 'socket/connect',
+            data: {'reason': reason, 'errorType': error.runtimeType.toString()},
+          );
+        },
+      ),
+    );
+  }
+
+  void _runPendingForcedConnectBestEffort({
+    bool forceEvenWithoutWaiter = false,
+    required String reason,
+  }) {
+    _runBestEffort(
+      () => _runPendingForcedConnect(
+        forceEvenWithoutWaiter: forceEvenWithoutWaiter,
+      ),
+      reason: reason,
+    );
+  }
+
+  /// Applies interface reachability to Socket.IO itself, preventing its
+  /// internal unlimited reconnect loop from waking the radio while the device
+  /// is known to be offline.
+  void updateNetworkAvailability(bool available) {
+    if (_hasNetwork == available) return;
+    _hasNetwork = available;
+    _applyTransportActivityPolicy();
+    if (_mayMaintainTransport && !isConnected) {
+      connectBestEffort(force: true, reason: 'network-available');
+    }
+  }
+
+  void _acquireBackgroundActivityLease() {
+    _backgroundActivityLeases++;
+    _applyTransportActivityPolicy();
+    // The manager owns initial transport creation. A handler lease may revive
+    // a transport that this service already owns, but registering a handler on
+    // a detached/test service must not start an unsolicited network request.
+    if (_mayMaintainTransport && _socket != null && !isConnected) {
+      connectBestEffort(reason: 'background-activity-lease');
+    }
+  }
+
+  void _releaseBackgroundActivityLease() {
+    if (_backgroundActivityLeases > 0) _backgroundActivityLeases--;
+    _applyTransportActivityPolicy();
+  }
+
+  void _applyTransportActivityPolicy() {
+    if (_mayMaintainTransport) {
+      _setAutomaticReconnection(true);
+      if (isConnected) _startHeartbeat();
+      return;
+    }
+    _stopHeartbeat();
+    _setAutomaticReconnection(false);
+    final interruptedConnect = _isConnecting;
+    if (interruptedConnect) {
+      // Socket.IO does not consistently emit `disconnect` when disconnecting
+      // an as-yet-unconnected socket. Retire our negotiation state explicitly
+      // so foreground/network recovery can create a fresh transport.
+      _isConnecting = false;
+      _deferOrClearPendingResumeReconnect();
+    }
+    final socket = _socket;
+    try {
+      socket?.disconnect();
+    } catch (_) {
+      // A late Socket.IO `connect` callback can arrive after the manager was
+      // already destroyed while negotiating. In that state Socket.disconnect
+      // may throw while trying to write its namespace DISCONNECT packet. Close
+      // the manager transport directly, then retire the public session state so
+      // no caller can observe the stale connection as usable.
+      try {
+        socket?.io.disconnect();
+      } catch (_) {}
+      socket?.connected = false;
+      socket?.id = null;
+    }
+    if (socket?.connected == true) {
+      // Defensive fallback for platform/client implementations whose
+      // disconnect call returns without synchronously retiring session state.
+      try {
+        socket?.io.disconnect();
+      } catch (_) {}
+      socket?.connected = false;
+      socket?.id = null;
+    }
+    if (interruptedConnect) {
+      _runPendingForcedConnectBestEffort(reason: 'transport-interrupted');
+    }
+  }
+
+  void _setAutomaticReconnection(bool enabled) {
+    try {
+      _socket?.io.reconnection = enabled;
+    } catch (_) {}
+  }
 
   Future<void> connect({bool force = false}) async {
+    if (_disposed) return;
+    if (!_mayMaintainTransport) return;
     if (_socket != null && _socket!.connected && !force) return;
-    if (_isConnecting && !force) return;
+    if (_isConnecting) {
+      if (!force) return;
+      // A forced lifecycle/network refresh must not dispose an attempt that is
+      // still negotiating. Coalesce all force requests and start exactly one
+      // fresh attempt after the current socket reports a terminal event.
+      return (_pendingForcedConnect ??= Completer<void>()).future;
+    }
 
     _isConnecting = true;
 
@@ -373,18 +749,21 @@ class SocketService with WidgetsBindingObserver {
         .setRememberUpgrade(!effectiveWebsocketOnly && allowWebsocketUpgrade)
         .setUpgrade(!effectiveWebsocketOnly && allowWebsocketUpgrade)
         // Tune reconnect/backoff and timeouts
-        // Note: In socket_io_client, pass a very large number for "unlimited" attempts.
-        // Using double.maxFinite.toInt() ensures unlimited reconnection attempts.
+        // Keep eventual recovery, but let a persistently unavailable Socket.IO
+        // endpoint cool down. Foreground and connectivity transitions still
+        // force an immediate reconnect through the lifecycle policy above.
         .setReconnectionAttempts(double.maxFinite.toInt())
         .setReconnectionDelay(1000)
-        .setReconnectionDelayMax(5000)
+        .setReconnectionDelayMax(60000)
         .setRandomizationFactor(0.5)
         .setTimeout(20000)
         .setPath(path);
 
     // Merge Authorization (if any) with user-defined custom headers for the
     // Socket.IO handshake. Avoid overriding reserved headers.
-    final Map<String, String> extraHeaders = {};
+    final Map<String, String> extraHeaders = {
+      ConduitUserAgent.headerName: ConduitUserAgent.value,
+    };
     if (_authToken != null && _authToken!.isNotEmpty) {
       extraHeaders['Authorization'] = 'Bearer $_authToken';
       builder.setAuth({'token': _authToken});
@@ -403,6 +782,7 @@ class SocketService with WidgetsBindingObserver {
         'sec-websocket-version',
         'sec-websocket-extensions',
         'sec-websocket-protocol',
+        'user-agent',
       };
       serverConfig.customHeaders.forEach((key, value) {
         final lower = key.toLowerCase();
@@ -424,15 +804,51 @@ class SocketService with WidgetsBindingObserver {
       _socket = _socketFactory(base, builder, serverConfig);
       _bindCoreSocketHandlers();
       _bindDynamicSocketHandlers(_socket);
+      _setAutomaticReconnection(_mayMaintainTransport);
     } catch (_) {
       _isConnecting = false;
+      _runPendingForcedConnectBestEffort(reason: 'socket-factory-failure');
       rethrow;
+    }
+  }
+
+  Future<void> _runPendingForcedConnect({
+    bool forceEvenWithoutWaiter = false,
+  }) async {
+    final pending = _pendingForcedConnect;
+    if (pending == null && !forceEvenWithoutWaiter) return;
+    _pendingForcedConnect = null;
+
+    if (_disposed || !_mayMaintainTransport) {
+      if (pending != null && !pending.isCompleted) pending.complete();
+      return;
+    }
+
+    try {
+      await connect(force: true);
+      if (pending != null && !pending.isCompleted) pending.complete();
+    } catch (error, stackTrace) {
+      if (pending != null && !pending.isCompleted) {
+        pending.completeError(error, stackTrace);
+      } else {
+        // The best-effort wrapper observes this future. Without a waiter there
+        // is no completer to carry the failure, so swallowing here would make
+        // a failed forced fallback invisible even to structured diagnostics.
+        Error.throwWithStackTrace(error, stackTrace);
+      }
     }
   }
 
   /// Update the auth token used by the socket service.
   /// If connected, emits a best-effort rejoin with the new token.
   void updateAuthToken(String? token) {
+    if (_authToken != token) {
+      // Token refresh can happen while a send is between dispatch and handler
+      // attachment. The old buffered deltas cannot be trusted under the new
+      // credential, but silently clearing them would leave the eventual
+      // handler unaware that it needs an authoritative snapshot.
+      _dropBufferedScopesForReplayGap(SocketReplayGapReason.scopeEvicted);
+    }
     _authToken = token;
     if (_socket?.connected == true &&
         _authToken != null &&
@@ -450,9 +866,13 @@ class SocketService with WidgetsBindingObserver {
     String? sessionId,
     String? messageId,
     bool requireFocus = true,
+    bool keepsAliveInBackground = false,
+    SocketReplayGapCallback? onReplayGap,
     required SocketChatEventHandler handler,
   }) {
+    if (keepsAliveInBackground) _acquireBackgroundActivityLease();
     final id = _nextHandlerId();
+    if (keepsAliveInBackground) _backgroundLeaseHandlerIds.add(id);
     _chatEventHandlers[id] = _ChatEventRegistration(
       id: id,
       conversationId: conversationId,
@@ -464,12 +884,26 @@ class SocketService with WidgetsBindingObserver {
 
     // Replay buffered events for this scope. This handles the timing race
     // where the backend emits events before the handler is registered.
-    final buffered = drainBuffer(
+    final replay = _takeBufferedReplay(
       conversationId: conversationId,
       sessionId: sessionId,
       messageId: messageId,
+      consumeReplayGap: onReplayGap != null,
     );
-    if (buffered != null) {
+    final gapReason = replay.gapReason;
+    if (gapReason != null) {
+      try {
+        onReplayGap?.call(gapReason);
+      } catch (error, stackTrace) {
+        DebugLogger.error(
+          'socket replay gap callback threw',
+          error: error,
+          stackTrace: stackTrace,
+          scope: 'socket/dispatch',
+        );
+      }
+    } else {
+      final buffered = replay.events;
       if (buffered.isNotEmpty) {
         DebugLogger.log(
           'Replaying ${buffered.length} buffered events '
@@ -493,10 +927,12 @@ class SocketService with WidgetsBindingObserver {
       }
     }
 
-    return SocketEventSubscription(
-      () => _chatEventHandlers.remove(id),
-      handlerId: id,
-    );
+    return SocketEventSubscription(() {
+      _chatEventHandlers.remove(id);
+      if (_backgroundLeaseHandlerIds.remove(id)) {
+        _releaseBackgroundActivityLease();
+      }
+    }, handlerId: id);
   }
 
   SocketEventSubscription addChannelEventHandler({
@@ -521,6 +957,12 @@ class SocketService with WidgetsBindingObserver {
 
   void clearChatEventHandlers() {
     _chatEventHandlers.clear();
+    if (_backgroundLeaseHandlerIds.isNotEmpty) {
+      _backgroundActivityLeases -= _backgroundLeaseHandlerIds.length;
+      if (_backgroundActivityLeases < 0) _backgroundActivityLeases = 0;
+      _backgroundLeaseHandlerIds.clear();
+      _applyTransportActivityPolicy();
+    }
   }
 
   void clearChannelEventHandlers() {
@@ -594,6 +1036,25 @@ class SocketService with WidgetsBindingObserver {
     _socket?.emit(event, data);
   }
 
+  /// Emits only through the exact connected Socket.IO session that authorized
+  /// a session-scoped RPC.
+  ///
+  /// Socket IDs change on reconnect. Checking and emitting synchronously keeps
+  /// an in-flight direct-provider relay from leaking data into a replacement
+  /// account/server session.
+  bool emitForSession(String expectedSessionId, String event, dynamic data) {
+    final socket = _socket;
+    if (expectedSessionId.isEmpty ||
+        event.isEmpty ||
+        socket == null ||
+        socket.connected != true ||
+        socket.id != expectedSessionId) {
+      return false;
+    }
+    socket.emit(event, data);
+    return true;
+  }
+
   // Subscribe to an arbitrary socket.io event (used for dynamic tool channels)
   void onEvent(String eventName, void Function(dynamic data) handler) {
     _dynamicEventHandlers
@@ -617,6 +1078,8 @@ class SocketService with WidgetsBindingObserver {
   }
 
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _stopHeartbeat();
     _clearPendingResumeReconnect();
     try {
@@ -629,13 +1092,24 @@ class SocketService with WidgetsBindingObserver {
     } catch (_) {}
     _socket = null;
     WidgetsBinding.instance.removeObserver(this);
+    _clearBufferedReplayState();
     _chatEventHandlers.clear();
     _channelEventHandlers.clear();
     _dynamicEventHandlers.clear();
+    _backgroundActivityLeases = 0;
+    _backgroundLeaseHandlerIds.clear();
     _reconnectController.close();
     _healthController.close();
     _connectionCompleter?.completeError(StateError('Service disposed'));
     _connectionCompleter = null;
+    final pendingForcedConnect = _pendingForcedConnect;
+    _pendingForcedConnect = null;
+    if (pendingForcedConnect != null && !pendingForcedConnect.isCompleted) {
+      // Forced reconnects are best-effort lifecycle work. Complete queued
+      // callers normally during teardown to avoid an unhandled async error.
+      pendingForcedConnect.complete();
+    }
+    _isConnecting = false;
   }
 
   /// Ensures there is an active connection and waits for it.
@@ -730,6 +1204,30 @@ class SocketService with WidgetsBindingObserver {
     // WebSocket-only mode after conditions improve (fixes permanent fallback)
     _forcePollingFallback = false;
 
+    // The handshake can report success after a lifecycle or reachability gate
+    // retired it. Re-check policy before authenticating, completing waiters, or
+    // publishing the resume-reconnect signal; none of those consumers may
+    // observe a transport that is no longer allowed to remain active.
+    if (!_mayMaintainTransport) {
+      _applyTransportActivityPolicy();
+      _connectionCompleter?.complete();
+      _connectionCompleter = null;
+      _deferOrClearPendingResumeReconnect();
+      _emitHealthUpdate();
+      _runPendingForcedConnectBestEffort(reason: 'late-connect-policy-gate');
+      return;
+    }
+
+    // A force request queued during this handshake owns the next observable
+    // session. Replace the transient socket before authenticating it,
+    // completing waiters, or publishing reconciliation/health to consumers.
+    if (_pendingForcedConnect != null) {
+      _runPendingForcedConnectBestEffort(
+        reason: 'connect-superseded-before-publish',
+      );
+      return;
+    }
+
     DebugLogger.log(
       'Socket connected',
       scope: 'socket',
@@ -742,8 +1240,13 @@ class SocketService with WidgetsBindingObserver {
       });
     }
 
-    // Start heartbeat timer to keep connection alive
-    _startHeartbeat();
+    // Start the required OpenWebUI heartbeat only while this transport has a
+    // foreground or active-stream reason to stay alive.
+    if (_mayMaintainTransport) {
+      _startHeartbeat();
+    } else {
+      _applyTransportActivityPolicy();
+    }
 
     // Complete any pending connection waiters
     _connectionCompleter?.complete();
@@ -752,17 +1255,14 @@ class SocketService with WidgetsBindingObserver {
     // Emit health update
     _emitHealthUpdate();
 
-    final shouldSignalReconnect = _signalReconnectOnConnect;
-    _releaseResumeReconnectAttempt();
-    if (shouldSignalReconnect) {
-      _signalReconnectOnConnect = false;
-      if (!_reconnectController.isClosed) {
-        _reconnectController.add(null);
-      }
-    }
+    _publishPendingResumeReconciliation();
   }
 
   void _handleReconnectAttempt(dynamic attempt) {
+    if (!_mayMaintainTransport) {
+      _applyTransportActivityPolicy();
+      return;
+    }
     _isConnecting = true;
     DebugLogger.log(
       'Socket reconnection attempt',
@@ -789,13 +1289,33 @@ class SocketService with WidgetsBindingObserver {
       },
     );
 
+    // Socket.IO can report a successful reconnect after the app moved to the
+    // background or the network gate closed. Re-apply the current policy before
+    // joining/authenticating or publishing a reconnect that consumers could
+    // mistake for a usable transport.
+    if (!_mayMaintainTransport) {
+      _applyTransportActivityPolicy();
+      _connectionCompleter?.complete();
+      _connectionCompleter = null;
+      _deferOrClearPendingResumeReconnect();
+      _emitHealthUpdate();
+      _runPendingForcedConnectBestEffort(reason: 'late-reconnect-policy-gate');
+      return;
+    }
+
+    if (_pendingForcedConnect != null) {
+      _runPendingForcedConnectBestEffort(
+        reason: 'reconnect-superseded-before-publish',
+      );
+      return;
+    }
+
     if (_authToken != null && _authToken!.isNotEmpty) {
       _socket?.emit('user-join', {
         'auth': {'token': _authToken},
       });
     }
 
-    // Restart heartbeat after reconnection
     _startHeartbeat();
 
     // Complete any pending connection waiters
@@ -830,18 +1350,24 @@ class SocketService with WidgetsBindingObserver {
         scope: 'socket',
         data: {'reason': err?.toString()},
       );
-      unawaited(connect(force: true));
+      _runPendingForcedConnectBestEffort(
+        forceEvenWithoutWaiter: true,
+        reason: 'websocket-polling-fallback',
+      );
+      return;
     }
+    _runPendingForcedConnectBestEffort(reason: 'connect-error');
   }
 
   void _handleReconnectFailed(dynamic _) {
     _isConnecting = false;
-    _clearPendingResumeReconnect();
+    _deferOrClearPendingResumeReconnect();
     DebugLogger.error(
       'Socket reconnection failed after all attempts',
-      scope: 'socket',
+      scope: 'socket/reconnect',
       data: {'serverUrl': serverConfig.url},
     );
+    _runPendingForcedConnectBestEffort(reason: 'reconnect-failed');
   }
 
   void _handleDisconnect(dynamic reason) {
@@ -866,42 +1392,24 @@ class SocketService with WidgetsBindingObserver {
 
     // Emit health update
     _emitHealthUpdate();
+    _runPendingForcedConnectBestEffort(reason: 'disconnected');
   }
 
   /// Starts the heartbeat timer to keep the connection alive.
   /// Sends a heartbeat event every 30 seconds matching OpenWebUI's behavior.
-  /// Tracks round-trip latency for connection health monitoring.
   void _startHeartbeat() {
     _stopHeartbeat();
+    if (!_mayMaintainTransport || _socket?.connected != true) return;
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      if (_socket?.connected != true) return;
+      if (!_mayMaintainTransport || _socket?.connected != true) return;
 
-      final start = DateTime.now();
-
-      // Track pending heartbeat for latency measurement
-      _pendingHeartbeatStart = start;
-
-      // Emit heartbeat - OpenWebUI server may or may not acknowledge
+      // Upstream intentionally does not acknowledge this event. Keep latency
+      // unknown rather than reporting a local delayed callback as network RTT.
       _socket?.emit('heartbeat', <String, dynamic>{});
-
-      // Update latency based on successful emission (approximation)
-      // For true RTT, we'd need server to echo back, but most Socket.IO
-      // servers don't ack heartbeat events explicitly
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_pendingHeartbeatStart == start && _socket?.connected == true) {
-          // If still connected after 100ms, consider heartbeat successful
-          _lastHeartbeatLatencyMs = DateTime.now()
-              .difference(start)
-              .inMilliseconds;
-          _lastSuccessfulHeartbeat = DateTime.now();
-          _pendingHeartbeatStart = null;
-          _emitHealthUpdate();
-        }
-      });
+      _lastHeartbeatLatencyMs = -1;
+      _emitHealthUpdate();
     });
   }
-
-  DateTime? _pendingHeartbeatStart;
 
   /// Stops the heartbeat timer.
   void _stopHeartbeat() {
@@ -970,9 +1478,131 @@ class SocketService with WidgetsBindingObserver {
       messageId: messageId,
     );
     if (bufferScope != null) {
-      bufferScope.events.add((Map<String, dynamic>.from(map), ackFn));
+      _bufferChatEvent(bufferScope, map, ackFn);
     }
   }
+
+  void _bufferChatEvent(
+    _BufferedChatEventScope scope,
+    Map<String, dynamic> event,
+    void Function(dynamic)? ack,
+  ) {
+    final remainingScopeBytes = math.max(
+      0,
+      maxBufferedBytesPerScope - scope.estimatedBytes,
+    );
+    final estimatedBytes = _estimateRetainedPayloadBytes(
+      event,
+      // Measure far enough to classify the independent per-event and
+      // per-scope bounds correctly even if their constants change relative to
+      // one another.
+      stopAfter: math.max(maxBufferedEventBytes, remainingScopeBytes),
+    );
+    if (estimatedBytes > maxBufferedEventBytes) {
+      _dropBufferScope(
+        scope,
+        SocketReplayGapReason.eventTooLarge,
+        eventCount: scope.events.length + 1,
+        estimatedBytes: scope.estimatedBytes + estimatedBytes,
+      );
+      return;
+    }
+    if (scope.events.length >= maxBufferedEventsPerScope) {
+      _dropBufferScope(
+        scope,
+        SocketReplayGapReason.eventLimit,
+        eventCount: scope.events.length + 1,
+        estimatedBytes: scope.estimatedBytes + estimatedBytes,
+      );
+      return;
+    }
+    if (scope.estimatedBytes + estimatedBytes > maxBufferedBytesPerScope) {
+      _dropBufferScope(
+        scope,
+        SocketReplayGapReason.byteLimit,
+        eventCount: scope.events.length + 1,
+        estimatedBytes: scope.estimatedBytes + estimatedBytes,
+      );
+      return;
+    }
+    scope.events.add((Map<String, dynamic>.from(event), ack));
+    scope.estimatedBytes += estimatedBytes;
+  }
+
+  int _estimateRetainedPayloadBytes(Object? value, {required int stopAfter}) {
+    var total = 0;
+    var visitedNodes = 0;
+    final visited = HashSet<Object>.identity();
+
+    void add(int bytes) {
+      if (total > stopAfter) return;
+      total += bytes;
+    }
+
+    void visit(Object? current, int depth) {
+      if (total > stopAfter) return;
+      visitedNodes += 1;
+      if (visitedNodes > 100000 || depth > 64) {
+        total = stopAfter + 1;
+        return;
+      }
+      if (current == null) {
+        add(4);
+        return;
+      }
+      if (current is bool || current is num) {
+        add(8);
+        return;
+      }
+      if (current is String) {
+        add(16 + current.length * 2);
+        return;
+      }
+      if (current is Uint8List) {
+        add(24 + current.lengthInBytes);
+        return;
+      }
+      if (current is ByteBuffer) {
+        add(24 + current.lengthInBytes);
+        return;
+      }
+      if (current is Map) {
+        if (!visited.add(current)) return;
+        add(48 + current.length * 16);
+        for (final entry in current.entries) {
+          visit(entry.key, depth + 1);
+          visit(entry.value, depth + 1);
+          if (total > stopAfter) return;
+        }
+        return;
+      }
+      if (current is Iterable) {
+        if (!visited.add(current)) return;
+        add(32);
+        for (final item in current) {
+          add(8);
+          visit(item, depth + 1);
+          if (total > stopAfter) return;
+        }
+        return;
+      }
+      add(64);
+    }
+
+    visit(value, 0);
+    return total;
+  }
+
+  @visibleForTesting
+  void debugHandleChatEvent(dynamic data, [dynamic ack]) {
+    _handleChatEvent(data, ack);
+  }
+
+  @visibleForTesting
+  int get debugBufferedScopeCount => _bufferScopes.length;
+
+  @visibleForTesting
+  int get debugReplayGapCount => _replayGapTombstones.length;
 
   void _handleChannelEvent(dynamic data, [dynamic ack]) {
     // Same List/ack extraction as _handleChatEvent
@@ -1249,6 +1879,20 @@ class SocketEventSubscription {
   }
 }
 
+class SocketBackgroundActivityLease {
+  SocketBackgroundActivityLease._(this._release);
+  SocketBackgroundActivityLease.forTesting(this._release);
+
+  final VoidCallback _release;
+  bool _isReleased = false;
+
+  void dispose() {
+    if (_isReleased) return;
+    _isReleased = true;
+    _release();
+  }
+}
+
 class _ChatEventRegistration {
   _ChatEventRegistration({
     required this.id,
@@ -1284,6 +1928,27 @@ class _ChannelEventRegistration {
 }
 
 final class _BufferedChatEventScope {
+  _BufferedChatEventScope({required this.createdAt});
+
+  final DateTime createdAt;
   final aliases = <String>{};
   final events = <(Map<String, dynamic>, void Function(dynamic)?)>[];
+  int estimatedBytes = 0;
+}
+
+final class _SocketReplayGapTombstone {
+  const _SocketReplayGapTombstone({
+    required this.aliases,
+    required this.reason,
+  });
+
+  final Set<String> aliases;
+  final SocketReplayGapReason reason;
+}
+
+final class _BufferedChatReplay {
+  const _BufferedChatReplay({this.events = const [], this.gapReason});
+
+  final List<(Map<String, dynamic>, void Function(dynamic)?)> events;
+  final SocketReplayGapReason? gapReason;
 }

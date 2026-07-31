@@ -16,14 +16,14 @@ String nativeSettingsTitle(AppLocalizations l10n) => l10n.settingsTitle;
 
 String nativeProfileTitle(AppLocalizations l10n) => l10n.profileTitle;
 
-String nativeAppearanceTitle(AppLocalizations l10n) => l10n.appearanceTitle;
+String nativeAppearanceTitle(AppLocalizations l10n) => l10n.settingsAppearance;
 
 String nativeChatsTitle(AppLocalizations l10n) => l10n.chatsTitle;
 
 String nativeAiMemoryTitle(AppLocalizations l10n) => l10n.aiAndMemoryTitle;
 
 String nativeDataConnectionTitle(AppLocalizations l10n) =>
-    l10n.dataAndConnectionTitle;
+    l10n.settingsDataAndConnection;
 
 String? resolveNativeSheetModelName(List<Model> models, String? modelId) {
   if (modelId == null || modelId.isEmpty) return null;
@@ -323,6 +323,48 @@ NativeSheetDetailConfig buildNativeDefaultModelDetail(
         kind: NativeSheetItemKind.dropdown,
         value: selectedModelId ?? 'auto-select',
         options: buildNativeDefaultModelOptions(l10n, models),
+      ),
+    ],
+  );
+}
+
+NativeSheetItemConfig? buildNativeOpenRouterImageGenerationModelItem(
+  AppLocalizations l10n, {
+  required List<Model> models,
+  required String? selectedModelId,
+}) {
+  final isAvailable = models.any(
+    (model) =>
+        model.capabilities?['openrouter'] == true &&
+        model.capabilities?['image_generation'] == true,
+  );
+  if (!isAvailable) return null;
+
+  return NativeSheetItemConfig(
+    id: 'default-image-generation-model',
+    title: l10n.defaultImageGenerationModel,
+    subtitle: selectedModelId ?? l10n.openRouterDefaultImageGenerationModel,
+    sfSymbol: 'photo.on.rectangle',
+  );
+}
+
+NativeSheetDetailConfig buildNativeOpenRouterImageGenerationModelDetail(
+  AppLocalizations l10n, {
+  required String value,
+}) {
+  return NativeSheetDetailConfig(
+    id: 'default-image-generation-model',
+    title: l10n.defaultImageGenerationModel,
+    subtitle: l10n.defaultImageGenerationModelDescription,
+    items: [
+      NativeSheetItemConfig(
+        id: 'default-image-generation-model',
+        title: l10n.defaultImageGenerationModel,
+        subtitle: l10n.defaultImageGenerationModelDescription,
+        sfSymbol: 'photo.on.rectangle',
+        kind: NativeSheetItemKind.textField,
+        value: value,
+        placeholder: 'openai/gpt-5-image',
       ),
     ],
   );

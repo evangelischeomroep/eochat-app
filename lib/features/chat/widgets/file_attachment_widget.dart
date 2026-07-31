@@ -9,6 +9,7 @@ import 'package:conduit/l10n/app_localizations.dart';
 import '../services/file_attachment_service.dart';
 import '../../../core/services/share_receiver_service.dart';
 import '../../../core/services/media_upload_controller.dart';
+import '../../../core/services/raster_media_policy.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../shared/widgets/conduit_loading.dart';
 
@@ -20,6 +21,13 @@ const Set<String> _previewableImageExtensions = <String>{
   '.webp',
   '.bmp',
 };
+
+const double _fileAttachmentCardWidth = 140;
+const double _fileAttachmentPreviewAspectRatio = 4 / 3;
+const double _fileAttachmentPreviewWidth =
+    _fileAttachmentCardWidth - (Spacing.sm * 2);
+const double _fileAttachmentPreviewHeight =
+    _fileAttachmentPreviewWidth / _fileAttachmentPreviewAspectRatio;
 
 class FileAttachmentWidget extends ConsumerWidget {
   const FileAttachmentWidget({super.key});
@@ -85,7 +93,7 @@ class _FileAttachmentCard extends ConsumerWidget {
     final Widget removeButton = _buildRemoveButton(context, ref);
 
     return Container(
-      width: 140,
+      width: _fileAttachmentCardWidth,
       padding: const EdgeInsets.all(Spacing.sm),
       decoration: BoxDecoration(
         color: context.conduitTheme.cardBackground,
@@ -224,25 +232,24 @@ class _FileAttachmentCard extends ConsumerWidget {
   }
 
   void _removeAttachment(WidgetRef ref) {
-    ref.read(attachedFilesProvider.notifier).removeFile(fileState.file.path);
-    if (!fileState.isRemote) {
-      // Controller cancels any in-flight upload AND performs the share-staging
-      // cleanup the legacy task_queue did on attachment removal.
-      unawaited(
-        ref
-            .read(mediaUploadControllerProvider)
-            .cancelUploadsForFile(fileState.file.path)
-            .catchError((Object error, StackTrace stackTrace) {
-              DebugLogger.error(
-                'cancel-upload-failed',
-                scope: 'chat/attachment',
-                error: error,
-                stackTrace: stackTrace,
-                data: {'path': fileState.file.path},
-              );
-            }),
-      );
-    }
+    // Controller removes the UI state synchronously, then retires any local
+    // queue/staging owner behind its durable and same-path generation fences.
+    unawaited(
+      ref
+          .read(mediaUploadControllerProvider)
+          .removeAttachment(fileState.file.path)
+          .catchError((Object error, StackTrace stackTrace) {
+            DebugLogger.error(
+              'cancel-upload-failed',
+              scope: 'chat/attachment',
+              stackTrace: stackTrace,
+              data: {
+                'fileName': fileState.fileName,
+                'errorType': error.runtimeType.toString(),
+              },
+            );
+          }),
+    );
   }
 
   Widget _buildProgressBar(BuildContext context) {
@@ -287,8 +294,14 @@ class _FileAttachmentCard extends ConsumerWidget {
 
   Widget _buildImagePreview(BuildContext context, Widget removeButton) {
     final File file = fileState.file;
-    final Widget basePreview = Image.file(
-      file,
+    final decodeTarget = RasterMediaPolicy.forBox(
+      context,
+      profile: RasterDecodeProfile.thumbnail,
+      logicalWidth: _fileAttachmentPreviewWidth,
+      logicalHeight: _fileAttachmentPreviewHeight,
+    );
+    final Widget basePreview = Image(
+      image: RasterMediaPolicy.resizeProvider(FileImage(file), decodeTarget),
       fit: BoxFit.cover,
       filterQuality: FilterQuality.medium,
       errorBuilder: (context, error, stackTrace) =>
@@ -306,7 +319,7 @@ class _FileAttachmentCard extends ConsumerWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppBorderRadius.xs),
         child: AspectRatio(
-          aspectRatio: 4 / 3,
+          aspectRatio: _fileAttachmentPreviewAspectRatio,
           child: Stack(
             children: [
               Positioned.fill(child: basePreview),
@@ -363,7 +376,7 @@ class _FileAttachmentSkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 140,
+      width: _fileAttachmentCardWidth,
       padding: const EdgeInsets.all(Spacing.sm),
       decoration: BoxDecoration(
         color: context.conduitTheme.cardBackground,
@@ -377,7 +390,7 @@ class _FileAttachmentSkeletonCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AspectRatio(
-            aspectRatio: 4 / 3,
+            aspectRatio: _fileAttachmentPreviewAspectRatio,
             child: ConduitLoading.skeleton(
               borderRadius: BorderRadius.circular(AppBorderRadius.xs),
             ),
