@@ -49,15 +49,45 @@ echo "=== Patch xcodeproj for Xcode 26 object version 70 ==="
 # CocoaPods bundles xcodeproj with a hardcoded load path, so gem install is
 # bypassed. We patch the version compatibility hash in place.
 # The hash may live in project.rb or constants.rb depending on xcodeproj version.
-XCODEPROJ_GEM_DIR=$(find /usr/local/Cellar/cocoapods \
-  -type d -name "xcodeproj-*" -path "*/gems/*" 2>/dev/null | head -1)
+#
+# Where CocoaPods' bundled xcodeproj gem lives varies by Xcode Cloud image —
+# it has moved between /usr/local/Cellar (Intel Homebrew prefix) and
+# /opt/homebrew/Cellar (Apple Silicon Homebrew prefix) across image updates.
+# Ask `gem`/`bundle` directly first, then fall back to searching both
+# plausible Homebrew Cellar roots rather than hardcoding one.
+XCODEPROJ_GEM_DIR=""
 
-if [ -z "$XCODEPROJ_GEM_DIR" ]; then
-  echo "ERROR: xcodeproj gem dir not found under /usr/local/Cellar/cocoapods"
-  exit 1
+if command -v gem >/dev/null 2>&1; then
+  XCODEPROJ_GEM_DIR=$(gem list -d xcodeproj 2>/dev/null | grep -m1 -oE '/[^ ]*xcodeproj-[0-9][^ ]*' || true)
 fi
 
-echo "xcodeproj gem dir: $XCODEPROJ_GEM_DIR"
+if [ -z "$XCODEPROJ_GEM_DIR" ]; then
+  for CELLAR_ROOT in /opt/homebrew/Cellar /usr/local/Cellar; do
+    XCODEPROJ_GEM_DIR=$(find "$CELLAR_ROOT" \
+      -type d -name "xcodeproj-*" -path "*/gems/*" 2>/dev/null | head -1)
+    [ -n "$XCODEPROJ_GEM_DIR" ] && break
+  done
+fi
+
+if [ -z "$XCODEPROJ_GEM_DIR" ]; then
+  # Last resort: search more broadly for any Ruby gems directory.
+  XCODEPROJ_GEM_DIR=$(find / -type d -name "xcodeproj-*" -path "*/gems/*" 2>/dev/null | head -1)
+fi
+
+if [ -z "$XCODEPROJ_GEM_DIR" ]; then
+  # Don't hard-fail the whole build over this: newer Xcode Cloud images may
+  # ship a CocoaPods/xcodeproj version that already understands object
+  # version 70 natively, in which case there's nothing to patch and `pod
+  # install` further down will simply succeed without our intervention. If
+  # this patch really is still required, `pod install` will fail with a
+  # clear "Unknown object version" error instead, which is easier to diagnose
+  # than a generic missing-gem-dir failure here.
+  echo "WARNING: xcodeproj gem dir not found (checked gem list, /opt/homebrew/Cellar, /usr/local/Cellar, and a full filesystem search) — skipping the object-version-70 patch and proceeding. If 'pod install' fails below with an object-version error, this patch step needs updating for the current Xcode Cloud image."
+else
+  echo "xcodeproj gem dir: $XCODEPROJ_GEM_DIR"
+fi
+
+if [ -n "$XCODEPROJ_GEM_DIR" ]; then
 
 ruby - "$XCODEPROJ_GEM_DIR" << 'RUBY_PATCH'
 gem_dir = ARGV[0]
@@ -109,6 +139,7 @@ end
 File.write(target_file, patched)
 puts "Successfully patched #{target_file}"
 RUBY_PATCH
+fi
 
 echo "=== flutter precache --ios ==="
 flutter precache --ios
