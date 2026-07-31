@@ -7,9 +7,9 @@ name: TestFlight
 # One-time setup required:
 #   Go to GitHub → Settings → Secrets and variables → Actions → New repository secret
 #   Name: ASC_P8_KEY
-#   Value: base64-encoded content of scripts/AuthKey_8S2MXC2RH7.p8
-#     macOS:  base64 -i scripts/AuthKey_8S2MXC2RH7.p8 | pbcopy
-#     Linux:  base64 -w0 scripts/AuthKey_8S2MXC2RH7.p8
+#   Value: base64-encoded content of scripts/AuthKey_SNL4WUUBST.p8
+#     macOS:  base64 -i scripts/AuthKey_SNL4WUUBST.p8 | pbcopy
+#     Linux:  base64 -w0 scripts/AuthKey_SNL4WUUBST.p8
 
 on:
   push:
@@ -29,8 +29,20 @@ jobs:
         env:
           ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
         run: |
-          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_8S2MXC2RH7.p8
-          chmod 600 scripts/AuthKey_8S2MXC2RH7.p8
+          set -e
+          echo "Secret length (chars): ${#ASC_P8_KEY}"
+          if [ -z "$ASC_P8_KEY" ]; then
+            echo "::error::ASC_P8_KEY secret is empty or not set"
+            exit 1
+          fi
+          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_SNL4WUUBST.p8
+          chmod 600 scripts/AuthKey_SNL4WUUBST.p8
+          echo "Decoded key file size (bytes): $(wc -c < scripts/AuthKey_SNL4WUUBST.p8)"
+          if ! grep -q "BEGIN PRIVATE KEY" scripts/AuthKey_SNL4WUUBST.p8; then
+            echo "::error::Decoded file does not look like a PEM private key"
+            exit 1
+          fi
+          echo "Key file looks valid."
 
       - name: Read app version
         id: ver
