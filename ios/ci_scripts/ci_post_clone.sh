@@ -3,6 +3,14 @@
 # Installs Flutter (stable), fetches dependencies, generates code, and installs CocoaPods.
 set -e
 
+echo "=== Ensuring git submodules are initialized ==="
+# pubspec.yaml has path: dependencies (mermaid_core, mermaid_flutter) that live
+# inside the third_party/mermaid submodule. Xcode Cloud's automatic submodule
+# checkout can be unreliable for submodules newly added in the commit being
+# built, so initialize explicitly rather than relying on it.
+cd "$CI_PRIMARY_REPOSITORY_PATH"
+git submodule update --init --recursive
+
 echo "=== Installing Flutter (stable) ==="
 git clone https://github.com/flutter/flutter.git \
   --depth 1 \
