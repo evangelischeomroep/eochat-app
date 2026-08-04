@@ -47,7 +47,19 @@ jobs:
       - name: Read app version
         id: ver
         run: |
-          VERSION=$(cat .conduit-sync-version | sed 's/^v//')
+          # Read from pubspec.yaml, which is the source of the build's
+          # CFBundleShortVersionString and therefore the version the build
+          # actually appears under in App Store Connect.
+          #
+          # This previously read .conduit-sync-version, which records which
+          # upstream Conduit release the fork is synced to. Those two happened
+          # to match, so a shipped-version bump that left the sync marker alone
+          # would silently make this job poll for a version that never appears.
+          VERSION=$(sed -n 's/^version:[[:space:]]*\([^+]*\)+.*/\1/p' pubspec.yaml)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not parse version from pubspec.yaml"
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Targeting version $VERSION"
 
