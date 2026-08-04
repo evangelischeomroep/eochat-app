@@ -1333,6 +1333,10 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         MediaQuery.of(context).padding.top +
         conduitAdaptiveToolbarHeightOf(context) +
         Spacing.md;
+    // Space the overlaid composer occupies at the bottom of the viewport.
+    final composerReservedHeight = _inputHeight > 0
+        ? _inputHeight
+        : (Spacing.xxxl * 2);
     final slivers = <Widget>[
       SliverToBoxAdapter(child: SizedBox(height: topPadding)),
       SliverPadding(
@@ -1422,28 +1426,43 @@ class _FolderPageState extends ConsumerState<FolderPage> {
           ),
         ),
       ] else
-        SliverToBoxAdapter(
+        // Fills the remaining viewport so the message centres in the void
+        // instead of sitting just under the header. Reserves the composer
+        // height itself, so the trailing spacer below is skipped.
+        SliverFillRemaining(
+          hasScrollBody: false,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Spacing.lg,
-              vertical: Spacing.xl,
+            padding: EdgeInsets.only(
+              left: Spacing.lg,
+              right: Spacing.lg,
+              bottom: composerReservedHeight,
             ),
             child: Center(
-              child: Text(
-                l10n.noConversationsYet,
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyMediumStyle.copyWith(
-                  color: context.conduitTheme.textSecondary,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Platform.isIOS
+                        ? CupertinoIcons.bubble_left_bubble_right
+                        : Icons.forum_outlined,
+                    size: 48,
+                    color: context.conduitTheme.iconSecondary,
+                  ),
+                  const SizedBox(height: Spacing.md),
+                  Text(
+                    l10n.noConversationsYet,
+                    textAlign: TextAlign.center,
+                    style: AppTypography.bodyMediumStyle.copyWith(
+                      color: context.conduitTheme.textSecondary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
         ),
-      SliverToBoxAdapter(
-        child: SizedBox(
-          height: _inputHeight > 0 ? _inputHeight : (Spacing.xxxl * 2),
-        ),
-      ),
+      if (isLoadingConversations || sortedConversations.isNotEmpty)
+        SliverToBoxAdapter(child: SizedBox(height: composerReservedHeight)),
     ];
 
     final scrollView = ConduitRefreshIndicator(
