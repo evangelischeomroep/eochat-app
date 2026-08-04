@@ -104,6 +104,14 @@ class ConduitMarkdownStyle {
         ? const Color(0xFFE06C75)
         : const Color(0xFFEB5757);
 
+    // Inline code renders as a padded `WidgetSpan`, so at full body size it
+    // grows the line box and gives list items containing code taller leading
+    // than their neighbours. Cap it below body size and pin the height so it
+    // can never drive the line box. `codeBlock` keeps the full size.
+    final codeSpanFontSize =
+        (monoBase.fontSize ?? bodyStyle.fontSize ?? AppTypography.bodyLarge) *
+        0.9;
+
     return ConduitMarkdownStyle(
       isDark: dark,
 
@@ -139,7 +147,11 @@ class ConduitMarkdownStyle {
         AppTypography.titleMediumStyle,
         color: theme.textSecondary,
       ),
-      codeSpan: monoBase.copyWith(color: codeSpanText),
+      codeSpan: monoBase.copyWith(
+        color: codeSpanText,
+        fontSize: codeSpanFontSize,
+        height: 1.0,
+      ),
       codeBlock: monoBase.copyWith(color: theme.codeText),
       blockquoteText: bodyStyle.copyWith(color: theme.textSecondary),
       tableHeader: bodyStyle.copyWith(
