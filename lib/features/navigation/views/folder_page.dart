@@ -225,6 +225,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
           key: const ValueKey<String>('folder-page-model-selector'),
           label: label,
           maxWidth: maxModelWidth,
+          useMiddleEllipsis: false,
           onPressed: _showModelSelector,
         ),
       ],

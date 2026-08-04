@@ -525,6 +525,7 @@ class ConduitAdaptiveAppBarModelSelector extends StatelessWidget {
     this.isLoading = false,
     this.textStyle,
     this.showChevron = true,
+    this.useMiddleEllipsis = true,
   });
 
   /// Text shown inside the selector.
@@ -549,6 +550,14 @@ class ConduitAdaptiveAppBarModelSelector extends StatelessWidget {
   /// Hidden for single-agent backends (e.g. the Hermes agent) where there is
   /// nothing to pick.
   final bool showChevron;
+
+  /// Whether to truncate the middle of an overlong label.
+  ///
+  /// Middle-ellipsis suits labels where both ends carry information, such as
+  /// file paths. For a model name the head is the entire signal, so callers
+  /// showing model names should pass `false` to get head-preserving
+  /// end-ellipsis instead. The full label always stays in the semantics label.
+  final bool useMiddleEllipsis;
 
   @override
   Widget build(BuildContext context) {
@@ -594,16 +603,29 @@ class ConduitAdaptiveAppBarModelSelector extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(
-                        child: MiddleEllipsisText(
-                          label,
-                          style: effectiveTextStyle,
-                          textAlign: TextAlign.center,
-                          semanticsLabel: label,
-                          textHeightBehavior: const TextHeightBehavior(
-                            applyHeightToFirstAscent: false,
-                            applyHeightToLastDescent: false,
-                          ),
-                        ),
+                        child: useMiddleEllipsis
+                            ? MiddleEllipsisText(
+                                label,
+                                style: effectiveTextStyle,
+                                textAlign: TextAlign.center,
+                                semanticsLabel: label,
+                                textHeightBehavior: const TextHeightBehavior(
+                                  applyHeightToFirstAscent: false,
+                                  applyHeightToLastDescent: false,
+                                ),
+                              )
+                            : Text(
+                                label,
+                                style: effectiveTextStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                semanticsLabel: label,
+                                textHeightBehavior: const TextHeightBehavior(
+                                  applyHeightToFirstAscent: false,
+                                  applyHeightToLastDescent: false,
+                                ),
+                              ),
                       ),
                       if (showChevron) ...[
                         const SizedBox(width: Spacing.xs),

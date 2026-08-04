@@ -3585,6 +3585,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           maxWidth: maxModelWidth,
           isLoading: isLoadingConversation,
           showChevron: showModelDropdown,
+          // Model names lead with their distinguishing part; middle-ellipsis
+          // would eat it. Full name stays in the picker and semantics label.
+          useMiddleEllipsis: false,
           onPressed: () => _openModelSelector(context),
         ),
       ],
