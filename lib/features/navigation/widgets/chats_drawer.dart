@@ -909,7 +909,10 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
             sliver: SliverToBoxAdapter(
-              child: _buildSectionHeader('Results', count: list.length),
+              child: _buildSectionHeader(
+                AppLocalizations.of(context)!.searchResultsHeader,
+                count: list.length,
+              ),
             ),
           ),
           const SliverToBoxAdapter(child: SizedBox(height: Spacing.xs)),
@@ -1035,7 +1038,7 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
         child: Padding(
           padding: const EdgeInsets.all(Spacing.md),
           child: Text(
-            'Search failed',
+            AppLocalizations.of(context)!.searchFailed,
             style: AppTypography.bodyMediumStyle.copyWith(
               color: context.sidebarTheme.foreground.withValues(alpha: 0.7),
             ),

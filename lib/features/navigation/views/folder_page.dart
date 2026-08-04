@@ -1244,7 +1244,9 @@ class _FolderPageState extends ConsumerState<FolderPage> {
 
   Widget _buildComposerOverlay(BuildContext context, Folder folder) {
     final folderName = folder.name.trim();
-    final placeholder = folderName.isEmpty ? null : 'Message $folderName';
+    final placeholder = folderName.isEmpty
+        ? null
+        : AppLocalizations.of(context)!.composerHintForFolder(folderName);
 
     return RepaintBoundary(
       child: MeasureSize(

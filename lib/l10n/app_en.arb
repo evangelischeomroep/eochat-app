@@ -5260,5 +5260,56 @@
   "ollamaThinkingMaximum": "Maximum",
   "@ollamaThinkingMaximum": {
     "description": "Maximum Ollama thinking level."
+  },
+  "searchFailed": "Search failed",
+  "@searchFailed": {
+    "description": "Error state shown when the chat search request fails."
+  },
+  "searchResultsHeader": "Results",
+  "@searchResultsHeader": {
+    "description": "Section header above the list of chat search results."
+  },
+  "threadNoRepliesYet": "No replies yet",
+  "@threadNoRepliesYet": {
+    "description": "Empty state shown in a channel thread with no replies."
+  },
+  "composerHintForFolder": "Message {folderName}",
+  "@composerHintForFolder": {
+    "description": "Composer placeholder on a folder page. The folder name comes from the server and is inserted verbatim.",
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "Minimize",
+  "@voiceMinimize": {
+    "description": "Tooltip for the button that collapses the voice mode overlay."
+  },
+  "voiceExpand": "Expand",
+  "@voiceExpand": {
+    "description": "Tooltip for the button that expands the voice mode overlay."
+  },
+  "share": "Share",
+  "@share": {
+    "description": "Tooltip for a button that opens the system share sheet."
+  },
+  "pdfNoPagesToDisplay": "No pages to display.",
+  "@pdfNoPagesToDisplay": {
+    "description": "Empty state shown when an inline PDF has no renderable pages."
+  },
+  "markdownShowAllCharacters": "Show all ({count} characters)",
+  "@markdownShowAllCharacters": {
+    "description": "Action that expands a truncated tool result in a markdown details block.",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "Preview will be available after streaming completes.",
+  "@markdownPreviewAfterStreaming": {
+    "description": "Notice shown in place of a heavy markdown preview while a response is still streaming."
   }
 }

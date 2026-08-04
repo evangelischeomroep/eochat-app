@@ -2648,5 +2648,15 @@
   "ollamaThinkingLow": "Laag",
   "ollamaThinkingMedium": "Gemiddeld",
   "ollamaThinkingHigh": "Hoog",
-  "ollamaThinkingMaximum": "Maximaal"
+  "ollamaThinkingMaximum": "Maximaal",
+  "searchFailed": "Zoeken mislukt",
+  "searchResultsHeader": "Resultaten",
+  "threadNoRepliesYet": "Nog geen reacties",
+  "composerHintForFolder": "Bericht aan {folderName}",
+  "voiceMinimize": "Minimaliseren",
+  "voiceExpand": "Uitklappen",
+  "share": "Delen",
+  "pdfNoPagesToDisplay": "Geen pagina\u0027s om weer te geven.",
+  "markdownShowAllCharacters": "Alles tonen ({count} tekens)",
+  "markdownPreviewAfterStreaming": "Voorbeeld is beschikbaar zodra het streamen klaar is."
 }

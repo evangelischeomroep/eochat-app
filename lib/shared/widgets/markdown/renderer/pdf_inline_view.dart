@@ -1080,7 +1080,7 @@ class _PdfInlineViewState extends ConsumerState<PdfInlineView> {
             IconButton(
               onPressed: () => unawaited(_sharePdf(_filePath!, title)),
               icon: Icon(Icons.share, size: 19, color: scheme.primary),
-              tooltip: 'Share',
+              tooltip: AppLocalizations.of(context)!.share,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
@@ -1323,7 +1323,7 @@ class _PdfFullscreenPageState extends State<_PdfFullscreenPage> {
           IconButton(
             onPressed: () => unawaited(_sharePdf(widget.path, widget.title)),
             icon: const Icon(Icons.share),
-            tooltip: 'Share',
+            tooltip: AppLocalizations.of(context)!.share,
           ),
         ],
       ),
@@ -1372,7 +1372,7 @@ class _PdfFullscreenPageState extends State<_PdfFullscreenPage> {
               size: 40,
             ),
             const SizedBox(height: Spacing.sm),
-            const Text('No pages to display.'),
+            Text(AppLocalizations.of(context)!.pdfNoPagesToDisplay),
           ],
         ),
       );

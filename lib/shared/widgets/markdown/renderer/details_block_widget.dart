@@ -546,7 +546,9 @@ class _MarkdownDetailsBlockState extends State<MarkdownDetailsBlock> {
                     alignment: Alignment.centerLeft,
                   ),
                   child: Text(
-                    'Show all (${resultText.length} characters)',
+                    AppLocalizations.of(
+                      context,
+                    )!.markdownShowAllCharacters(resultText.length),
                     style: markdownStyle.detailAction,
                   ),
                 ),
@@ -568,7 +570,7 @@ class _MarkdownDetailsBlockState extends State<MarkdownDetailsBlock> {
           }
           children.add(
             Text(
-              'Preview will be available after streaming completes.',
+              AppLocalizations.of(context)!.markdownPreviewAfterStreaming,
               style: markdownStyle.detailValue,
             ),
           );

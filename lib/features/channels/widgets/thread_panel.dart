@@ -309,7 +309,7 @@ class _ThreadReplies extends StatelessWidget {
     if (messages.isEmpty) {
       return Center(
         child: Text(
-          'No replies yet',
+          AppLocalizations.of(context)!.threadNoRepliesYet,
           style: AppTypography.bodyMediumStyle.copyWith(
             color: theme.textSecondary,
           ),

@@ -132,7 +132,7 @@ class _ExpandedVoicePanel extends ConsumerWidget {
                   ),
                 ),
                 _AdaptiveVoiceAction(
-                  tooltip: 'Minimize',
+                  tooltip: AppLocalizations.of(context)!.voiceMinimize,
                   onPressed: controller.collapse,
                   icon: Platform.isIOS
                       ? CupertinoIcons.chevron_down
@@ -246,7 +246,7 @@ class _CollapsedVoicePill extends ConsumerWidget {
                 ),
                 const SizedBox(width: Spacing.sm),
                 _AdaptiveVoiceAction(
-                  tooltip: 'Expand',
+                  tooltip: AppLocalizations.of(context)!.voiceExpand,
                   onPressed: controller.expand,
                   icon: Platform.isIOS
                       ? CupertinoIcons.chevron_up
