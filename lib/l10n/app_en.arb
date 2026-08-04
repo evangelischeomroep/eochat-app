@@ -5311,5 +5311,9 @@
   "markdownPreviewAfterStreaming": "Preview will be available after streaming completes.",
   "@markdownPreviewAfterStreaming": {
     "description": "Notice shown in place of a heavy markdown preview while a response is still streaming."
+  },
+  "searchResultsHeader": "Results",
+  "@searchResultsHeader": {
+    "description": "Section header above the list of chat search results."
   }
 }

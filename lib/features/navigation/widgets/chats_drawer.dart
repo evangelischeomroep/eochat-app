@@ -945,24 +945,36 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
           );
         }
 
-        // Folders section (hidden when feature is disabled server-side)
-        if (foldersEnabled) {
+        // Folders section. In search this must reflect the query: only render
+        // it when some folder actually contains a match, and never show the
+        // create-folder affordance in a read-only results view.
+        final hasFolderMatches = folderSearchResults.isNotEmpty;
+        final showFolderSection = foldersEnabled && hasFolderMatches;
+
+        if (showFolderSection) {
           slivers.add(
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              sliver: SliverToBoxAdapter(child: _buildFoldersSectionHeader()),
+              sliver: SliverToBoxAdapter(
+                child: _buildFoldersSectionHeader(showCreateAction: false),
+              ),
             ),
           );
         }
 
-        if (showFolders && foldersEnabled) {
+        if (showFolders && showFolderSection) {
           slivers.add(
             const SliverToBoxAdapter(child: SizedBox(height: Spacing.xs)),
           );
 
           final folderSlivers = foldersState.when(
             data: (folders) => _buildFolderSectionSlivers(
-              folders: folders,
+              // Only folders holding a match. `_buildFolderSectionSlivers`
+              // re-roots entries whose parent is absent, so filtering here is
+              // safe for nested folders.
+              folders: folders
+                  .where((f) => folderSearchResults.containsKey(f.id))
+                  .toList(),
               folderConversationFallbacks: folderSearchResults,
               fetchFromServerForFolders: false,
             ),
@@ -976,7 +988,7 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
           slivers.addAll(folderSlivers);
         }
 
-        if (foldersEnabled) {
+        if (showFolderSection) {
           slivers.add(
             const SliverToBoxAdapter(child: SizedBox(height: Spacing.md)),
           );
@@ -1118,7 +1130,9 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
   }
 
   /// Header for the Folders section with a create button on the right
-  Widget _buildFoldersSectionHeader() {
+  /// [showCreateAction] is false in read-only contexts such as search results,
+  /// where a "new folder" affordance does not belong.
+  Widget _buildFoldersSectionHeader({bool showCreateAction = true}) {
     final theme = context.conduitTheme;
     final isExpanded = ref.watch(showFoldersProvider);
 
@@ -1151,18 +1165,19 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
           ),
         ),
         const Spacer(),
-        IconButton(
-          visualDensity: VisualDensity.compact,
-          tooltip: AppLocalizations.of(context)!.newFolder,
-          icon: Icon(
-            Platform.isIOS
-                ? CupertinoIcons.folder_badge_plus
-                : Icons.create_new_folder_outlined,
-            color: theme.iconPrimary,
+        if (showCreateAction)
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            tooltip: AppLocalizations.of(context)!.newFolder,
+            icon: Icon(
+              Platform.isIOS
+                  ? CupertinoIcons.folder_badge_plus
+                  : Icons.create_new_folder_outlined,
+              color: theme.iconPrimary,
+            ),
+            onPressed: () =>
+                CreateFolderDialog.show(context, ref, onError: _showDrawerError),
           ),
-          onPressed: () =>
-              CreateFolderDialog.show(context, ref, onError: _showDrawerError),
-        ),
       ],
     );
   }
