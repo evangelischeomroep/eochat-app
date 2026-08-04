@@ -242,7 +242,9 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         icon: isTemporary
             ? (Platform.isIOS ? CupertinoIcons.eye_slash : Icons.visibility_off)
             : (Platform.isIOS ? CupertinoIcons.eye : Icons.visibility_outlined),
-        iconColor: isTemporary ? Colors.blue : context.conduitTheme.textPrimary,
+        iconColor: isTemporary
+            ? context.conduitTheme.info
+            : context.conduitTheme.textPrimary,
         onPressed: () {
           ConduitHaptics.selectionClick();
           final current = ref.read(temporaryChatEnabledProvider);

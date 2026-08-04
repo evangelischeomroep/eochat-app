@@ -3657,7 +3657,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       icon: isTemporary
           ? (Platform.isIOS ? CupertinoIcons.eye_slash : Icons.visibility_off)
           : (Platform.isIOS ? CupertinoIcons.eye : Icons.visibility_outlined),
-      iconColor: isTemporary ? Colors.blue : tintColor,
+      iconColor: isTemporary ? context.conduitTheme.info : tintColor,
       onPressed: () {
         ConduitHaptics.selectionClick();
         final current = ref.read(temporaryChatEnabledProvider);

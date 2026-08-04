@@ -77,8 +77,12 @@ final TweakcnThemeVariant _eochatDark = TweakcnThemeVariant(
   ring: EOchatBrand.purple,
   sidebarBackground: const Color(0xFF351973),
   sidebarForeground: const Color(0xFFF5EEFF),
-  sidebarPrimary: EOchatBrand.yellow,
-  sidebarPrimaryForeground: const Color(0xFF2B213D),
+  // Purple, matching the light variant and every other selected/active state.
+  // Yellow here made the active sidebar tab the only yellow selection in the
+  // app, so no single colour read as *the* accent. Yellow stays reserved for
+  // `warning` and for non-selection brand emphasis via `accent`.
+  sidebarPrimary: EOchatBrand.purple,
+  sidebarPrimaryForeground: const Color(0xFFFFFFFF),
   sidebarAccent: const Color(0xFF25113F),
   sidebarAccentForeground: const Color(0xFFD4B8F5),
   sidebarBorder: const Color(0xFF3A1F63),
