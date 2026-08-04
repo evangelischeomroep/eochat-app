@@ -2615,5 +2615,30 @@
   "ollamaThinkingLow": "Низкий",
   "ollamaThinkingMedium": "Средний",
   "ollamaThinkingHigh": "Высокий",
-  "ollamaThinkingMaximum": "Максимальный"
+  "ollamaThinkingMaximum": "Максимальный",
+  "searchFailed": "Не удалось выполнить поиск",
+  "searchResultsHeader": "Результаты",
+  "threadNoRepliesYet": "Ответов пока нет",
+  "composerHintForFolder": "Сообщение в {folderName}",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "Свернуть",
+  "voiceExpand": "Развернуть",
+  "share": "Поделиться",
+  "pdfNoPagesToDisplay": "Нет страниц для отображения.",
+  "markdownShowAllCharacters": "Показать всё ({count} символов)",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "Предварительный просмотр будет доступен после завершения потоковой передачи."
 }

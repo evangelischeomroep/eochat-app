@@ -2615,5 +2615,30 @@
   "ollamaThinkingLow": "Low",
   "ollamaThinkingMedium": "Medium",
   "ollamaThinkingHigh": "High",
-  "ollamaThinkingMaximum": "Maximum"
+  "ollamaThinkingMaximum": "Maximum",
+  "searchFailed": "搜尋失敗",
+  "searchResultsHeader": "結果",
+  "threadNoRepliesYet": "尚無回覆",
+  "composerHintForFolder": "傳訊息給 {folderName}",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "最小化",
+  "voiceExpand": "展開",
+  "share": "分享",
+  "pdfNoPagesToDisplay": "沒有可顯示的頁面。",
+  "markdownShowAllCharacters": "顯示全部（{count} 個字元）",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "串流完成後即可預覽。"
 }

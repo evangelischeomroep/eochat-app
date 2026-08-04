@@ -2387,5 +2387,30 @@
   "ollamaThinkingLow": "낮음",
   "ollamaThinkingMedium": "중간",
   "ollamaThinkingHigh": "높음",
-  "ollamaThinkingMaximum": "최대"
+  "ollamaThinkingMaximum": "최대",
+  "searchFailed": "검색 실패",
+  "searchResultsHeader": "결과",
+  "threadNoRepliesYet": "아직 답글이 없습니다",
+  "composerHintForFolder": "{folderName}에 메시지",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "최소화",
+  "voiceExpand": "확대",
+  "share": "공유",
+  "pdfNoPagesToDisplay": "표시할 페이지가 없습니다.",
+  "markdownShowAllCharacters": "모두 표시({count}자)",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "스트리밍이 완료되면 미리보기를 사용할 수 있습니다."
 }

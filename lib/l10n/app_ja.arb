@@ -3955,5 +3955,30 @@
   "ollamaThinkingLow": "Low",
   "ollamaThinkingMedium": "Medium",
   "ollamaThinkingHigh": "High",
-  "ollamaThinkingMaximum": "Maximum"
+  "ollamaThinkingMaximum": "Maximum",
+  "searchFailed": "検索に失敗しました",
+  "searchResultsHeader": "検索結果",
+  "threadNoRepliesYet": "まだ返信はありません",
+  "composerHintForFolder": "{folderName} にメッセージ",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "最小化",
+  "voiceExpand": "展開",
+  "share": "共有",
+  "pdfNoPagesToDisplay": "表示するページがありません。",
+  "markdownShowAllCharacters": "すべて表示（{count} 文字）",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "ストリーミングの完了後にプレビューを利用できます。"
 }

@@ -2615,5 +2615,30 @@
   "ollamaThinkingLow": "Low",
   "ollamaThinkingMedium": "Medium",
   "ollamaThinkingHigh": "High",
-  "ollamaThinkingMaximum": "Maximum"
+  "ollamaThinkingMaximum": "Maximum",
+  "searchFailed": "搜索失败",
+  "searchResultsHeader": "结果",
+  "threadNoRepliesYet": "暂无回复",
+  "composerHintForFolder": "发消息给 {folderName}",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "最小化",
+  "voiceExpand": "展开",
+  "share": "分享",
+  "pdfNoPagesToDisplay": "没有可显示的页面。",
+  "markdownShowAllCharacters": "显示全部（{count} 个字符）",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "流式传输完成后可预览。"
 }

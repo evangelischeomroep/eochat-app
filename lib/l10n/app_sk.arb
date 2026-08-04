@@ -4245,5 +4245,49 @@
   "ollamaThinkingLow": "Nízka",
   "ollamaThinkingMedium": "Stredná",
   "ollamaThinkingHigh": "Vysoká",
-  "ollamaThinkingMaximum": "Maximálna"
+  "ollamaThinkingMaximum": "Maximálna",
+  "searchFailed": "Vyhľadávanie zlyhalo",
+  "searchResultsHeader": "Výsledky",
+  "threadNoRepliesYet": "Zatiaľ žiadne odpovede",
+  "composerHintForFolder": "Správa do {folderName}",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "Minimalizovať",
+  "voiceExpand": "Rozbaliť",
+  "share": "Zdieľať",
+  "pdfNoPagesToDisplay": "Žiadne stránky na zobrazenie.",
+  "markdownShowAllCharacters": "Zobraziť všetko ({count} znakov)",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "Náhľad bude dostupný po dokončení streamovania.",
+  "aiAndMemoryTitle": "AI a pamäť",
+  "appearanceTitle": "Vzhľad",
+  "callkitActionAccept": "Prijať",
+  "callkitActionDecline": "Odmietnuť",
+  "callkitCallBackAction": "Zavolať späť",
+  "callkitCallingSubtitle": "Volanie…",
+  "callkitHangUpAction": "Zavesiť",
+  "callkitIncomingCallChannelName": "Prichádzajúci hovor",
+  "callkitMissedCallChannelName": "Zmeškaný hovor",
+  "callkitMissedCallSubtitle": "Zmeškaný hovor",
+  "callkitNotificationPermissionPostMessage": "Povoľte oznámenia na zobrazenie prichádzajúcich hovorov.",
+  "callkitNotificationPermissionRationale": "Upozornenia na hovory vyžadujú povolenie oznámení.",
+  "callkitNotificationPermissionTitle": "Povolenie oznámení",
+  "chatsTitle": "Chaty",
+  "dataAndConnectionTitle": "Údaje a pripojenie",
+  "profileTitle": "Profil",
+  "settingsTitle": "Nastavenia",
+  "themePaletteEochatDescription": "Značková paleta EO — fialová, žltá a broskyňová.",
+  "themePaletteEochatLabel": "EOchat"
 }

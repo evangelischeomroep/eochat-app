@@ -2904,8 +2904,17 @@
   },
   "personalizationSubtitle": "Default model, personal prompt, and memories",
   "defaultImageGenerationModel": "Default image generation model",
+  "@defaultImageGenerationModel": {
+    "description": "Label for the setting that chooses which model generates images."
+  },
   "defaultImageGenerationModelDescription": "Enter an OpenRouter image model ID. Leave blank to use OpenRouter's default.",
+  "@defaultImageGenerationModelDescription": {
+    "description": "Helper text under the default image generation model field."
+  },
   "openRouterDefaultImageGenerationModel": "OpenRouter default (openai/gpt-5-image)",
+  "@openRouterDefaultImageGenerationModel": {
+    "description": "Placeholder shown when no image generation model is set and OpenRouter's default applies."
+  },
   "@personalizationSubtitle": {
     "description": "Subtitle for the personalization hub tile."
   },

@@ -2615,5 +2615,30 @@
   "ollamaThinkingLow": "Niedrig",
   "ollamaThinkingMedium": "Mittel",
   "ollamaThinkingHigh": "Hoch",
-  "ollamaThinkingMaximum": "Maximal"
+  "ollamaThinkingMaximum": "Maximal",
+  "searchFailed": "Suche fehlgeschlagen",
+  "searchResultsHeader": "Ergebnisse",
+  "threadNoRepliesYet": "Noch keine Antworten",
+  "composerHintForFolder": "Nachricht an {folderName}",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "Minimieren",
+  "voiceExpand": "Erweitern",
+  "share": "Teilen",
+  "pdfNoPagesToDisplay": "Keine Seiten zum Anzeigen.",
+  "markdownShowAllCharacters": "Alle anzeigen ({count} Zeichen)",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "Die Vorschau ist verfügbar, sobald das Streaming abgeschlossen ist."
 }

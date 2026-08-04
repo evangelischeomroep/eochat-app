@@ -2659,5 +2659,20 @@
   "pdfNoPagesToDisplay": "Geen pagina\u0027s om weer te geven.",
   "markdownShowAllCharacters": "Alles tonen ({count} tekens)",
   "markdownPreviewAfterStreaming": "Voorbeeld is beschikbaar zodra het streamen klaar is.",
-  "searchResultsHeader": "Resultaten"
+  "searchResultsHeader": "Resultaten",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

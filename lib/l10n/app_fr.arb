@@ -2615,5 +2615,30 @@
   "ollamaThinkingLow": "Faible",
   "ollamaThinkingMedium": "Moyen",
   "ollamaThinkingHigh": "Élevé",
-  "ollamaThinkingMaximum": "Maximal"
+  "ollamaThinkingMaximum": "Maximal",
+  "searchFailed": "Échec de la recherche",
+  "searchResultsHeader": "Résultats",
+  "threadNoRepliesYet": "Aucune réponse pour l'instant",
+  "composerHintForFolder": "Message à {folderName}",
+  "@composerHintForFolder": {
+    "placeholders": {
+      "folderName": {
+        "type": "String",
+        "example": "Marketing"
+      }
+    }
+  },
+  "voiceMinimize": "Réduire",
+  "voiceExpand": "Agrandir",
+  "share": "Partager",
+  "pdfNoPagesToDisplay": "Aucune page à afficher.",
+  "markdownShowAllCharacters": "Tout afficher ({count} caractères)",
+  "@markdownShowAllCharacters": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "markdownPreviewAfterStreaming": "L'aperçu sera disponible une fois le streaming terminé."
 }
