@@ -2,6 +2,7 @@ import CryptoKit
 import Flutter
 import ImageIO
 import PhotosUI
+import StoreKit
 import UIKit
 import UniformTypeIdentifiers
 
@@ -1175,6 +1176,27 @@ final class NativeSheetBridge: NativeSheetHostApi {
         return true
     }
 
+    func requestAppStoreReview() throws -> Bool {
+        let request = {
+            MainActor.assumeIsolated {
+                guard let scene = UIApplication.shared.connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .first(where: { $0.activationState == .foregroundActive })
+                else {
+                    return false
+                }
+
+                AppStore.requestReview(in: scene)
+                return true
+            }
+        }
+
+        if Thread.isMainThread {
+            return request()
+        }
+        return DispatchQueue.main.sync(execute: request)
+    }
+
     func presentModelSelector(
         request: PlatformNativeSheetModelSelectorRequest,
         completion: @escaping (Result<String?, Error>) -> Void
@@ -1211,6 +1233,29 @@ final class NativeSheetBridge: NativeSheetHostApi {
             activePresentationId: { self.activeModelSelectorPresentationId },
             update: {
                 self.activeModelSelectorController?.updateModels(hydratedModels)
+            }
+        )
+    }
+
+    func updateModelSelectorReasoningEffort(
+        presentationId: String,
+        value: String,
+        options: [String],
+        allowsCustom: Bool
+    ) throws {
+        let normalizedPresentationId = presentationId.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !normalizedPresentationId.isEmpty else { return }
+        applyNativeSheetModelUpdateSynchronouslyOnMain(
+            presentationId: normalizedPresentationId,
+            activePresentationId: { self.activeModelSelectorPresentationId },
+            update: {
+                self.activeModelSelectorController?.updateReasoningEffort(
+                    value: value,
+                    options: options,
+                    allowsCustom: allowsCustom
+                )
             }
         )
     }
@@ -4628,6 +4673,8 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
     private var featuredModels: [NativeModelSelectorOption] = []
     private var moreModels: [NativeModelSelectorOption] = []
     private var reasoningEffortValue: String
+    private var reasoningEffortOptions: [String]
+    private var allowsCustomReasoningEffort: Bool
     private weak var moreModelsController: NativeMoreModelsTableViewController?
 
     init(
@@ -4646,6 +4693,8 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
         pinnedModelIdSet = Set(configuration.pinnedModelIds)
         models = configuration.models
         reasoningEffortValue = configuration.reasoningEffortValue
+        reasoningEffortOptions = configuration.reasoningEffortOptions
+        allowsCustomReasoningEffort = configuration.allowsCustomReasoningEffort
         super.init(style: .insetGrouped)
         refreshModelPartitions()
     }
@@ -4802,6 +4851,20 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
         if isViewLoaded { tableView.reloadData() }
     }
 
+    func updateReasoningEffort(
+        value: String,
+        options: [String],
+        allowsCustom: Bool
+    ) {
+        guard let normalized = normalizedEffort(value) else { return }
+        reasoningEffortValue = normalized
+        reasoningEffortOptions = options
+        allowsCustomReasoningEffort = allowsCustom
+        if isViewLoaded {
+            tableView.reloadSections(IndexSet(integer: 1), with: .none)
+        }
+    }
+
     private func refreshModelPartitions() {
         let ids = nativeModelSelectorFeaturedIds(
             pinnedModelIds: pinnedModelIds,
@@ -4822,8 +4885,7 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
     }
 
     private var effortSelectionEnabled: Bool {
-        !configuration.reasoningEffortOptions.isEmpty ||
-            configuration.allowsCustomReasoningEffort
+        !reasoningEffortOptions.isEmpty || allowsCustomReasoningEffort
     }
 
     private func presentEffortSelector(sourceView: UIView?) {
@@ -4832,7 +4894,7 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
             message: nil,
             preferredStyle: .actionSheet
         )
-        for option in configuration.reasoningEffortOptions {
+        for option in reasoningEffortOptions {
             let label = option == reasoningEffortValue
                 ? "✓ \(effortLabel(option))"
                 : effortLabel(option)
@@ -4841,7 +4903,7 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
             }
             alert.addAction(action)
         }
-        if configuration.allowsCustomReasoningEffort {
+        if allowsCustomReasoningEffort {
             alert.addAction(UIAlertAction(
                 title: configuration.customReasoningEffortTitle,
                 style: .default
@@ -4864,7 +4926,7 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
         alert.addTextField { [weak self] field in
             guard let self else { return }
             field.placeholder = configuration.customReasoningEffortHint
-            if !configuration.reasoningEffortOptions.contains(reasoningEffortValue) {
+            if !reasoningEffortOptions.contains(reasoningEffortValue) {
                 field.text = reasoningEffortValue
             }
             field.autocapitalizationType = .none
@@ -6639,6 +6701,12 @@ private func configureNavigationCell(
         content.imageProperties.tintColor = .systemRed
     }
     content.textProperties.font = .preferredFont(forTextStyle: .body)
+    if item.kind == "info" && !showsDisclosure {
+        content.textProperties.numberOfLines = 0
+        content.textProperties.lineBreakMode = .byWordWrapping
+        content.secondaryTextProperties.numberOfLines = 0
+        content.secondaryTextProperties.lineBreakMode = .byWordWrapping
+    }
     cell.contentConfiguration = content
     cell.accessoryType = showsDisclosure ? .disclosureIndicator : .none
     NativeSheetSettingsStyle.applyCellStyle(cell)

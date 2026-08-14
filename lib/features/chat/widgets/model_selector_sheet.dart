@@ -18,6 +18,7 @@ import '../../../shared/widgets/modal_safe_area.dart';
 import '../../../shared/widgets/model_list_tile.dart';
 import '../../../shared/widgets/sheet_handle.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
+import '../../../shared/widgets/themed_sheets.dart';
 import '../../direct_connections/models/direct_connection_profile.dart';
 import '../../direct_connections/providers/direct_connection_providers.dart';
 import '../../direct_connections/services/direct_model_registry.dart';
@@ -270,6 +271,10 @@ String _effortLabel(AppLocalizations l10n, String effort) => switch (effort) {
 };
 
 @visibleForTesting
+String reasoningEffortLabelForTest(AppLocalizations l10n, String effort) =>
+    _effortLabel(l10n, effort);
+
+@visibleForTesting
 bool modelSelectorQueryMatches(Model model, String query) {
   final normalizedQuery = query.trim().toLowerCase();
   if (normalizedQuery.isEmpty) return true;
@@ -308,19 +313,20 @@ class _SelectorHeader extends StatelessWidget {
         ),
         Align(
           alignment: Alignment.centerLeft,
-          child: IconButton(
-            onPressed: onPressed,
-            tooltip: isBack
-                ? MaterialLocalizations.of(context).backButtonTooltip
-                : MaterialLocalizations.of(context).closeButtonTooltip,
-            icon: Icon(
-              isBack
-                  ? (Platform.isIOS
+          child: isBack
+              ? IconButton(
+                  onPressed: onPressed,
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  icon: Icon(
+                    Platform.isIOS
                         ? CupertinoIcons.back
-                        : Icons.arrow_back_rounded)
-                  : (Platform.isIOS ? CupertinoIcons.xmark : Icons.close),
-            ),
-          ),
+                        : Icons.arrow_back_rounded,
+                  ),
+                )
+              : SheetCloseButton(
+                  onPressed: onPressed,
+                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                ),
         ),
       ],
     ),

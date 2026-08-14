@@ -7034,7 +7034,7 @@ List<String> selectedFilterIdsForModel(dynamic ref, Model model) {
 }
 
 // Start a new chat (unified function for both "New Chat" button and home screen)
-void startNewChat(dynamic ref) {
+void startNewChat(dynamic ref, {Model? modelForNewConversation}) {
   resetHermesForNewChat(ref);
   resetDirectRunsForNewChat(ref);
   clearSelectedFiltersForConversationBoundary(ref);
@@ -7051,8 +7051,18 @@ void startNewChat(dynamic ref) {
   // Clear any pending folder selection
   ref.read(pendingFolderIdProvider.notifier).clear();
 
-  // Reset to default model for new conversations (fixes #296)
-  restoreDefaultModel(ref);
+  if (modelForNewConversation != null) {
+    // Voice startup admits a concrete transport before this reset. Keep that
+    // exact model pinned so the asynchronous default restore cannot switch the
+    // first voice turn to a different, potentially unauthenticated backend.
+    ref.read(isManualModelSelectionProvider.notifier).set(true);
+    ref
+        .read(selectedModelProvider.notifier)
+        .set(modelForNewConversation, allowHidden: true);
+  } else {
+    // Reset to default model for new conversations (fixes #296)
+    restoreDefaultModel(ref);
+  }
 
   final settings = ref.read(appSettingsProvider);
   ref
@@ -18287,6 +18297,8 @@ Map<String, dynamic> _buildLocalModelItem(
         ],
     'capabilities': selectedModel.capabilities,
     'info': meta?['info'],
+    if (meta?['params'] != null) 'params': meta!['params'],
+    if (meta?['base_model_id'] != null) 'base_model_id': meta!['base_model_id'],
     // Routing-critical fields for pipe models
     if (meta?['pipe'] != null) 'pipe': meta!['pipe'],
     if (meta?['actions'] != null) 'actions': meta!['actions'],
@@ -18303,3 +18315,7 @@ Map<String, dynamic> _buildLocalModelItem(
           .toList(),
   };
 }
+
+@visibleForTesting
+Map<String, dynamic> buildLocalModelItemForTest(Model selectedModel) =>
+    _buildLocalModelItem(selectedModel);

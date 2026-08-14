@@ -46,6 +46,16 @@ class ForkOverrides {
     defaultValue: false,
   );
 
+  /// When false, the upstream in-app release notes banner/sheet (added in
+  /// conduit 4.0.1) never presents. Off by default for EOchat builds: its
+  /// copy is written in cogwheel0's first-person voice about "Conduit" and
+  /// its review-prompt button links to upstream's own App Store/Play Store
+  /// listings (release_links.dart), not EOchat's.
+  static const bool showReleaseNotesBanner = bool.fromEnvironment(
+    'SHOW_RELEASE_NOTES_BANNER',
+    defaultValue: false,
+  );
+
   /// Brand name shown in accessibility labels and a handful of UI strings.
   /// Empty means "use the upstream default".
   static const String _brandName = String.fromEnvironment(
