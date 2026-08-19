@@ -2,11 +2,16 @@ name: App Store Submit
 
 # Manual trigger — run this from GitHub Actions UI or via GitHub CLI:
 #
+#   Submit a build for review:
 #   gh workflow run app-store-submit.yml \
 #     -f app_store_version=1.2 \
 #     -f build_version=3.4.2 \
 #     -f whats_new="Bug fixes and performance improvements." \
 #     -f locale=nl-NL
+#
+#   Delete an existing, not-yet-submitted App Store version (e.g. to clean up
+#   an orphan left behind by a run that failed partway through):
+#   gh workflow run app-store-submit.yml -f delete_app_store_version=1.3
 #
 # One-time setup:
 #   GitHub → Settings → Secrets and variables → Actions → New repository secret
@@ -14,11 +19,13 @@ name: App Store Submit
 #   Value: base64 -i scripts/AuthKey_SNL4WUUBST.p8 | pbcopy   (macOS)
 #          base64 -w0 scripts/AuthKey_SNL4WUUBST.p8            (Linux)
 #
-# What this does:
-#   1. Creates a new App Store version entry (e.g. "1.2")
+# What the submit flow does:
+#   1. Creates a new App Store version entry (e.g. "1.2") — reuses one that
+#      already exists with that version string instead of erroring
 #   2. Attaches the specified build (looked up by marketing version)
 #   3. Sets the "What's New" release notes
-#   4. Submits for App Review — no browser required
+#   4. Submits for App Review via Apple's current 3-step reviewSubmissions
+#      flow — no browser required
 #
 # Apple reviews typically take < 24 hours; you'll get an email when done.
 
@@ -26,8 +33,8 @@ on:
   workflow_dispatch:
     inputs:
       app_store_version:
-        description: 'App Store version string (e.g. 1.2) — shown in the App Store'
-        required: true
+        description: 'App Store version string (e.g. 1.2) — shown in the App Store. Required unless delete_app_store_version is set.'
+        required: false
         type: string
       build_version:
         description: 'Marketing version of build to attach (e.g. 3.4.2) — matches pubspec version'
@@ -38,13 +45,17 @@ on:
         required: false
         type: string
       whats_new:
-        description: "What's New release notes (shown on App Store listing)"
-        required: true
+        description: "What's New release notes (shown on App Store listing). Required unless delete_app_store_version is set."
+        required: false
         type: string
       locale:
         description: 'Locale for release notes'
         required: false
         default: 'nl-NL'
+        type: string
+      delete_app_store_version:
+        description: 'Instead of submitting: delete this existing, not-yet-submitted App Store version string (e.g. 1.3). Leave empty for a normal submission.'
+        required: false
         type: string
 
 jobs:
@@ -64,7 +75,14 @@ jobs:
           echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_SNL4WUUBST.p8
           chmod 600 scripts/AuthKey_SNL4WUUBST.p8
 
+      - name: Delete App Store version
+        if: ${{ inputs.delete_app_store_version != '' }}
+        run: |
+          python3 scripts/asc_testflight.py \
+            --delete-app-store-version "${{ inputs.delete_app_store_version }}"
+
       - name: Resolve build lookup flag
+        if: ${{ inputs.delete_app_store_version == '' }}
         id: flags
         run: |
           if [ -n "${{ inputs.build_id }}" ]; then
@@ -74,6 +92,7 @@ jobs:
           fi
 
       - name: Submit for App Store review
+        if: ${{ inputs.delete_app_store_version == '' }}
         run: |
           python3 scripts/asc_testflight.py \
             --submit-for-review \
