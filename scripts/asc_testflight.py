@@ -283,13 +283,61 @@ def get_app_store_version_id_by_string(version_string: str) -> str | None:
     return None
 
 
+def find_prepare_for_submission_version() -> tuple[str, str] | None:
+    """Return (id, versionString) of an existing App Store version for this
+    app's iOS platform that is still in PREPARE_FOR_SUBMISSION state — i.e.
+    created but never submitted, 100% safe to edit. Deliberately narrow: we
+    never want to touch a version that has entered review or been released,
+    so no other appVersionState is treated as reusable."""
+    data = get(
+        f"/apps/{APP_ID}/appStoreVersions"
+        f"?filter[platform]=IOS&filter[appVersionState]=PREPARE_FOR_SUBMISSION&limit=1"
+    )
+    if data["data"]:
+        v = data["data"][0]
+        return v["id"], v["attributes"]["versionString"]
+    return None
+
+
+def rename_app_store_version(version_id: str, new_version_string: str) -> None:
+    """Change the versionString of an existing (unsubmitted) App Store version."""
+    body = {
+        "data": {
+            "type": "appStoreVersions",
+            "id": version_id,
+            "attributes": {"versionString": new_version_string},
+        }
+    }
+    patch(f"/appStoreVersions/{version_id}", body)
+
+
 def create_app_store_version(version_string: str) -> str:
-    """Create a new App Store version entry, or reuse one that already exists
-    (idempotent: safe to re-run after a partial failure); return its ID."""
+    """Create a new App Store version entry; return its ID.
+
+    Idempotent in two ways, so a retry after a partial failure never needs
+    manual cleanup first:
+      1. If a version with this exact versionString already exists, reuse it.
+      2. Else, if there's an unrelated draft version stuck in
+         PREPARE_FOR_SUBMISSION (e.g. left behind by an earlier run that used
+         a different version string before failing), rename it to this
+         versionString and reuse it instead of creating a new one. Apple
+         refuses to delete "the last version of an app" once a build has
+         been attached to it, so renaming — not deleting — is the only way
+         to recover a stranded draft like that.
+    """
     existing_id = get_app_store_version_id_by_string(version_string)
     if existing_id:
         print(f"  App Store version {version_string} already exists → id={existing_id} (reusing)")
         return existing_id
+
+    draft = find_prepare_for_submission_version()
+    if draft is not None:
+        draft_id, draft_version_string = draft
+        print(f"  Found unsubmitted draft version {draft_version_string} (id={draft_id}); "
+              f"renaming it to {version_string} instead of creating a new one")
+        rename_app_store_version(draft_id, version_string)
+        print(f"  Renamed App Store version {draft_version_string} → {version_string} (id={draft_id})")
+        return draft_id
 
     body = {
         "data": {
@@ -311,8 +359,11 @@ def create_app_store_version(version_string: str) -> str:
 
 
 def delete_app_store_version(version_id: str) -> None:
-    """Delete an App Store version. Only allowed while it hasn't been submitted
-    for review (e.g. to clean up an orphan from a failed submission attempt)."""
+    """Delete an App Store version. Apple only allows this in narrow cases —
+    e.g. it refuses if the version is the app's only/last version, or if any
+    build has already been attached to it (see STATE_ERROR responses). For
+    a stranded draft that already has a build attached, use
+    create_app_store_version()'s automatic rename-and-reuse behavior instead."""
     delete(f"/appStoreVersions/{version_id}")
 
 
