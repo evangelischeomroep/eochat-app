@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-asc_testflight.py â App Store Connect API: poll Xcode Cloud builds, add to TestFlight group,
+asc_testflight.py — App Store Connect API: poll Xcode Cloud builds, add to TestFlight group,
                     and submit new App Store versions for review.
 
 Usage:
@@ -26,8 +26,12 @@ Usage:
       --build-id <build-uuid> \\
       --whats-new "Bug fixes and performance improvements."
 
+  # Delete an existing, not-yet-submitted App Store version (e.g. to clean up
+  # an orphan left behind by a --submit-for-review run that failed partway):
+  python3 scripts/asc_testflight.py --delete-app-store-version 1.3
+
 Requirements:
-  None â uses only Python stdlib + the openssl binary (always present on macOS)
+  None — uses only Python stdlib + the openssl binary (always present on macOS)
 """
 
 import argparse
@@ -41,7 +45,7 @@ from pathlib import Path
 from urllib import request as urllib_request, error as urllib_error
 
 # ---------------------------------------------------------------------------
-# Config â all non-secret; the only secret is the .p8 file on disk
+# Config — all non-secret; the only secret is the .p8 file on disk
 # ---------------------------------------------------------------------------
 APP_ID          = "6763726069"
 KEY_ID          = "SNL4WUUBST"
@@ -101,7 +105,8 @@ def _request(method: str, path: str, body: dict | None = None) -> dict:
     req = urllib_request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib_request.urlopen(req) as resp:
-            return json.loads(resp.read())
+            raw = resp.read()
+            return json.loads(raw) if raw else {}
     except urllib_error.HTTPError as e:
         body_text = e.read().decode()
         print(f"HTTP {e.code} on {method} {url}: {body_text}", file=sys.stderr)
@@ -118,6 +123,10 @@ def post(path: str, body: dict) -> dict:
 
 def patch(path: str, body: dict) -> dict:
     return _request("PATCH", path, body)
+
+
+def delete(path: str) -> dict:
+    return _request("DELETE", path)
 
 
 # ---------------------------------------------------------------------------
@@ -162,14 +171,14 @@ def get_build_run_failure_reason(build_run_id: str) -> str:
 
 def wait_for_build_run(ci_product_id: str, version: str) -> dict:
     """Poll until a build run for the given version completes successfully."""
-    print(f"Waiting for Xcode Cloud build for v{version}â¦")
+    print(f"Waiting for Xcode Cloud build for v{version}…")
     deadline = time.time() + POLL_TIMEOUT
     seen_id = None
 
     while time.time() < deadline:
         run = get_latest_build_run(ci_product_id, version)
         if run is None:
-            print("  No build run found yet, waitingâ¦")
+            print("  No build run found yet, waiting…")
             time.sleep(POLL_INTERVAL)
             continue
 
@@ -186,7 +195,7 @@ def wait_for_build_run(ci_product_id: str, version: str) -> dict:
         print(f"  [{datetime.now(timezone.utc).strftime('%H:%M:%S')}] status={status} completion={completed}")
 
         if completed == "SUCCEEDED":
-            print(f"  â Build run succeeded.")
+            print(f"  ✅ Build run succeeded.")
             return run
         elif completed in ("FAILED", "ERRORED", "CANCELED"):
             reason = get_build_run_failure_reason(run_id)
@@ -229,7 +238,7 @@ def cmd_list_builds():
         f"&include=preReleaseVersion"
         f"&sort=-uploadedDate&limit=10"
     )
-    # Build a map from preReleaseVersion id â version string
+    # Build a map from preReleaseVersion id → version string
     prv_map = {
         r["id"]: r["attributes"]["version"]
         for r in data.get("included", [])
@@ -251,10 +260,10 @@ def add_build_to_group(group_id: str, build_id: str) -> None:
     body = {"data": [{"type": "builds", "id": build_id}]}
     try:
         post(f"/betaGroups/{group_id}/relationships/builds", body)
-        print(f"  â Build {build_id} added to group {GROUP_NAME}.")
+        print(f"  ✅ Build {build_id} added to group {GROUP_NAME}.")
     except urllib_error.HTTPError as e:
         if e.code == 409:
-            print(f"  â¹ï¸  Build {build_id} already in group {GROUP_NAME} (409 conflict â OK).")
+            print(f"  ℹ️  Build {build_id} already in group {GROUP_NAME} (409 conflict — OK).")
         else:
             raise
 
@@ -262,8 +271,26 @@ def add_build_to_group(group_id: str, build_id: str) -> None:
 # ---------------------------------------------------------------------------
 # App Store submission helpers
 # ---------------------------------------------------------------------------
+def get_app_store_version_id_by_string(version_string: str) -> str | None:
+    """Look up an existing App Store version for this app by its version string
+    (e.g. '1.4'). Returns None if no such version exists yet."""
+    data = get(
+        f"/apps/{APP_ID}/appStoreVersions"
+        f"?filter[versionString]={version_string}&limit=1"
+    )
+    if data["data"]:
+        return data["data"][0]["id"]
+    return None
+
+
 def create_app_store_version(version_string: str) -> str:
-    """Create a new App Store version entry; return its ID."""
+    """Create a new App Store version entry, or reuse one that already exists
+    (idempotent: safe to re-run after a partial failure); return its ID."""
+    existing_id = get_app_store_version_id_by_string(version_string)
+    if existing_id:
+        print(f"  App Store version {version_string} already exists → id={existing_id} (reusing)")
+        return existing_id
+
     body = {
         "data": {
             "type": "appStoreVersions",
@@ -279,8 +306,14 @@ def create_app_store_version(version_string: str) -> str:
     }
     data = post("/appStoreVersions", body)
     version_id = data["data"]["id"]
-    print(f"  Created App Store version {version_string} â id={version_id}")
+    print(f"  Created App Store version {version_string} → id={version_id}")
     return version_id
+
+
+def delete_app_store_version(version_id: str) -> None:
+    """Delete an App Store version. Only allowed while it hasn't been submitted
+    for review (e.g. to clean up an orphan from a failed submission attempt)."""
+    delete(f"/appStoreVersions/{version_id}")
 
 
 def attach_build_to_asc_version(version_id: str, build_id: str) -> None:
@@ -330,20 +363,73 @@ def upsert_localization(version_id: str, locale: str, whats_new: str) -> None:
         print(f"  Created '{locale}' localization with What's New text.")
 
 
-def submit_version_for_review(version_id: str) -> None:
-    """Submit an App Store version for App Review."""
+def create_review_submission() -> str:
+    """Create a new review-submission container for this app; return its ID.
+
+    This is step 1 of Apple's current 3-step review flow. `platform` is no
+    longer required here (Apple will infer it), but is passed explicitly
+    since we only ever submit iOS versions.
+    """
     body = {
         "data": {
-            "type": "appStoreVersionSubmissions",
+            "type": "reviewSubmissions",
+            "attributes": {"platform": "IOS"},
             "relationships": {
-                "appStoreVersion": {
-                    "data": {"type": "appStoreVersions", "id": version_id}
-                }
+                "app": {"data": {"type": "apps", "id": APP_ID}}
             },
         }
     }
-    post("/appStoreVersionSubmissions", body)
-    print("  â Submitted for App Review.")
+    data = post("/reviewSubmissions", body)
+    submission_id = data["data"]["id"]
+    print(f"  Created review submission → id={submission_id}")
+    return submission_id
+
+
+def add_version_to_review_submission(submission_id: str, version_id: str) -> None:
+    """Attach an App Store version to a review submission (step 2)."""
+    body = {
+        "data": {
+            "type": "reviewSubmissionItems",
+            "relationships": {
+                "reviewSubmission": {
+                    "data": {"type": "reviewSubmissions", "id": submission_id}
+                },
+                "appStoreVersion": {
+                    "data": {"type": "appStoreVersions", "id": version_id}
+                },
+            },
+        }
+    }
+    post("/reviewSubmissionItems", body)
+    print(f"  Added App Store version to the review submission.")
+
+
+def submit_review_submission(submission_id: str) -> None:
+    """Flip `submitted` to true, sending the review submission to Apple's queue (step 3)."""
+    body = {
+        "data": {
+            "type": "reviewSubmissions",
+            "id": submission_id,
+            "attributes": {"submitted": True},
+        }
+    }
+    patch(f"/reviewSubmissions/{submission_id}", body)
+    print("  ✅ Submitted for App Review.")
+
+
+def submit_version_for_review(version_id: str) -> None:
+    """Submit an App Store version for App Review.
+
+    Apple deprecated the old single-call `POST /appStoreVersionSubmissions`
+    endpoint — it now returns 403 "does not allow 'CREATE', only 'DELETE'".
+    This uses the current 3-step flow instead:
+      1. POST /reviewSubmissions       — create the submission container
+      2. POST /reviewSubmissionItems   — attach the App Store version to it
+      3. PATCH /reviewSubmissions/{id} — set submitted=true to send it to Apple
+    """
+    submission_id = create_review_submission()
+    add_version_to_review_submission(submission_id, version_id)
+    submit_review_submission(submission_id)
 
 
 def cmd_submit_for_review(
@@ -353,9 +439,9 @@ def cmd_submit_for_review(
     whats_new: str,
     locale: str,
 ) -> None:
-    """End-to-end: create version â attach build â set What's New â submit."""
+    """End-to-end: create version → attach build → set What's New → submit."""
     if not P8_PATH.exists():
-        print(f"â .p8 key not found at {P8_PATH}", file=sys.stderr)
+        print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
         sys.exit(1)
 
     # Resolve build ID
@@ -363,54 +449,70 @@ def cmd_submit_for_review(
         resolved_build_id = build_id
         print(f"Using supplied build ID: {resolved_build_id}")
     elif build_version:
-        print(f"Looking up latest build for marketing version {build_version}â¦")
+        print(f"Looking up latest build for marketing version {build_version}…")
         resolved_build_id = get_build_id_by_version(build_version)
         print(f"Found build: {resolved_build_id}")
     else:
-        print("â Provide --build-version or --build-id.", file=sys.stderr)
+        print("❌ Provide --build-version or --build-id.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"\nCreating App Store version {app_store_version}â¦")
+    print(f"\nCreating App Store version {app_store_version}…")
     version_id = create_app_store_version(app_store_version)
 
-    print(f"\nAttaching buildâ¦")
+    print(f"\nAttaching build…")
     attach_build_to_asc_version(version_id, resolved_build_id)
 
-    print(f"\nSetting What's New ({locale})â¦")
+    print(f"\nSetting What's New ({locale})…")
     upsert_localization(version_id, locale, whats_new)
 
-    print(f"\nSubmitting for reviewâ¦")
+    print(f"\nSubmitting for review…")
     submit_version_for_review(version_id)
 
-    print(f"\nâ EOchat {app_store_version} submitted for App Store review.")
+    print(f"\n✅ EOchat {app_store_version} submitted for App Store review.")
     print(f"   Apple will email when review is complete (typically < 24 h).")
+
+
+def cmd_delete_app_store_version(version_string: str) -> None:
+    """Delete an existing, not-yet-submitted App Store version by its version string."""
+    if not P8_PATH.exists():
+        print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
+        sys.exit(1)
+
+    version_id = get_app_store_version_id_by_string(version_string)
+    if not version_id:
+        print(f"No App Store version '{version_string}' found — nothing to delete.")
+        return
+
+    print(f"Deleting App Store version {version_string} (id={version_id})…")
+    delete_app_store_version(version_id)
+    print(f"✅ Deleted App Store version {version_string}.")
 
 
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 def cmd_discover():
-    print("Verifying App Store Connect API accessâ¦\n")
+    print("Verifying App Store Connect API access…\n")
     try:
         ci_id = get_ci_product_id()
         print(f"CI Product ID : {ci_id}")
     except Exception as e:
-        print(f"â Could not fetch CI product: {e}")
+        print(f"❌ Could not fetch CI product: {e}")
         sys.exit(1)
 
     try:
         group_id = get_ai_team_group_id()
         print(f"AI-team group ID: {group_id}")
     except Exception as e:
-        print(f"â Could not fetch beta groups: {e}")
+        print(f"❌ Could not fetch beta groups: {e}")
         sys.exit(1)
 
-    print("\nâ Setup looks good.")
+    print("\n✅ Setup looks good.")
 
 
 def cmd_add_to_testflight(version: str, wait: bool):
     if not P8_PATH.exists():
-        print(f"â .p8 key not found at {P8_PATH}", file=sys.stderr)
+        print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
         sys.exit(1)
 
     ci_product_id = CI_PRODUCT_ID
@@ -422,8 +524,8 @@ def cmd_add_to_testflight(version: str, wait: bool):
         try:
             build_id = get_app_store_build_from_run(build_run["id"])
         except RuntimeError:
-            # CI run exists but build link not yet propagated â fall back to version lookup
-            print("  Build not linked to CI run yet, falling back to version lookupâ¦")
+            # CI run exists but build link not yet propagated — fall back to version lookup
+            print("  Build not linked to CI run yet, falling back to version lookup…")
             time.sleep(30)
             build_id = get_build_id_by_version(version)
     else:
@@ -450,7 +552,7 @@ def main():
     parser.add_argument("--submit-for-review", action="store_true",
                         help="Create a new App Store version and submit for review")
     parser.add_argument("--app-store-version", metavar="VER",
-                        help="App Store version string (e.g. 1.2) â required with --submit-for-review")
+                        help="App Store version string (e.g. 1.2) — required with --submit-for-review")
     parser.add_argument("--build-version", metavar="VER",
                         help="Marketing version of the build to attach (e.g. 3.4.2); "
                              "finds the latest matching build")
@@ -460,6 +562,11 @@ def main():
                         help="Release notes for the App Store listing")
     parser.add_argument("--locale", metavar="LOCALE", default="nl-NL",
                         help="Locale for What's New text (default: nl-NL)")
+
+    # --- App Store version cleanup command ---
+    parser.add_argument("--delete-app-store-version", metavar="VER",
+                        help="Delete an existing, not-yet-submitted App Store version "
+                             "by its version string (e.g. 1.3)")
 
     args = parser.parse_args()
 
@@ -491,6 +598,8 @@ def main():
             whats_new=args.whats_new,
             locale=args.locale,
         )
+    elif args.delete_app_store_version:
+        cmd_delete_app_store_version(args.delete_app_store_version)
     elif args.version:
         cmd_add_to_testflight(args.version, wait=not args.no_wait)
     else:
