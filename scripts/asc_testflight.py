@@ -523,6 +523,16 @@ def cmd_submit_for_review(
     print(f"   Apple will email when review is complete (typically < 24 h).")
 
 
+def cmd_describe_app_store_version(version_string: str) -> None:
+    """Print full details (including build/state) for an App Store version — read-only diagnostic."""
+    version_id = get_app_store_version_id_by_string(version_string)
+    if not version_id:
+        print(f"No App Store version '{version_string}' found.")
+        return
+    data = get(f"/appStoreVersions/{version_id}?include=build&fields[builds]=version,processingState,uploadedDate,expired")
+    print(json.dumps(data, indent=2))
+
+
 def cmd_delete_app_store_version(version_string: str) -> None:
     """Delete an existing, not-yet-submitted App Store version by its version string."""
     if not P8_PATH.exists():
@@ -614,10 +624,13 @@ def main():
     parser.add_argument("--locale", metavar="LOCALE", default="nl-NL",
                         help="Locale for What's New text (default: nl-NL)")
 
-    # --- App Store version cleanup command ---
+    # --- App Store version cleanup / diagnostic commands ---
     parser.add_argument("--delete-app-store-version", metavar="VER",
                         help="Delete an existing, not-yet-submitted App Store version "
                              "by its version string (e.g. 1.3)")
+    parser.add_argument("--describe-app-store-version", metavar="VER",
+                        help="Print full details (state, attached build) for an "
+                             "App Store version string, e.g. 1.4 (read-only)")
 
     args = parser.parse_args()
 
@@ -651,6 +664,8 @@ def main():
         )
     elif args.delete_app_store_version:
         cmd_delete_app_store_version(args.delete_app_store_version)
+    elif args.describe_app_store_version:
+        cmd_describe_app_store_version(args.describe_app_store_version)
     elif args.version:
         cmd_add_to_testflight(args.version, wait=not args.no_wait)
     else:

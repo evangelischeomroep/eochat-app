@@ -57,6 +57,10 @@ on:
         description: 'Instead of submitting: delete this existing, not-yet-submitted App Store version string (e.g. 1.3). Leave empty for a normal submission.'
         required: false
         type: string
+      diagnostic_args:
+        description: 'Advanced/debugging: raw CLI flags passed directly to scripts/asc_testflight.py (e.g. "--list-builds" or "--describe-app-store-version 1.4"). Read-only commands only. Overrides submit/delete when set.'
+        required: false
+        type: string
 
 jobs:
   submit:
@@ -75,14 +79,19 @@ jobs:
           echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_SNL4WUUBST.p8
           chmod 600 scripts/AuthKey_SNL4WUUBST.p8
 
+      - name: Run diagnostic command
+        if: ${{ inputs.diagnostic_args != '' }}
+        run: |
+          python3 scripts/asc_testflight.py ${{ inputs.diagnostic_args }}
+
       - name: Delete App Store version
-        if: ${{ inputs.delete_app_store_version != '' }}
+        if: ${{ inputs.diagnostic_args == '' && inputs.delete_app_store_version != '' }}
         run: |
           python3 scripts/asc_testflight.py \
             --delete-app-store-version "${{ inputs.delete_app_store_version }}"
 
       - name: Resolve build lookup flag
-        if: ${{ inputs.delete_app_store_version == '' }}
+        if: ${{ inputs.diagnostic_args == '' && inputs.delete_app_store_version == '' }}
         id: flags
         run: |
           if [ -n "${{ inputs.build_id }}" ]; then
@@ -92,7 +101,7 @@ jobs:
           fi
 
       - name: Submit for App Store review
-        if: ${{ inputs.delete_app_store_version == '' }}
+        if: ${{ inputs.diagnostic_args == '' && inputs.delete_app_store_version == '' }}
         run: |
           python3 scripts/asc_testflight.py \
             --submit-for-review \
