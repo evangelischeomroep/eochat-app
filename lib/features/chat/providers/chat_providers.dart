@@ -47,18 +47,25 @@ import '../../../core/services/location_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/services/socket_service.dart';
 import '../../../core/services/streaming_response_controller.dart';
+import '../../../core/services/streaming_helper.dart';
 import '../../../core/services/performance_profiler.dart';
 import '../../../core/services/conversation_parsing.dart';
 import '../../../core/services/worker_manager.dart';
 import '../../../core/utils/debug_logger.dart';
 import '../../../core/utils/json_normalization.dart';
 import '../../../core/utils/message_tree_utils.dart' as message_tree;
+import '../../../core/utils/openwebui_message_payload.dart';
+import '../../../core/utils/semantic_details.dart';
 import '../../auth/providers/unified_auth_providers.dart';
+import '../utils/follow_ups_socket_event.dart';
 import '../../hermes/models/hermes_chat_input.dart';
 import '../../hermes/models/hermes_capabilities.dart';
+import '../../hermes/models/hermes_config.dart';
 import '../../hermes/models/hermes_model.dart';
+import '../../hermes/controllers/hermes_busy_turn_controller.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_api_service.dart';
+import '../../hermes/services/hermes_backend_service.dart';
 import '../../hermes/services/hermes_local_document_service.dart';
 import '../../hermes/services/hermes_local_document_trust_store.dart';
 import '../../hermes/services/hermes_message_mapper.dart';
@@ -1173,59 +1180,74 @@ bool failedCompactedHermesApprovalRemainsAdoptableForTest() {
 class _ChatMessageListStructure {
   const _ChatMessageListStructure({required this.ids, required this.signature});
 
+  // ChatMessage is immutable and unchanged messages keep their identity
+  // across chatMessagesProvider emissions, so per-message signature fragments
+  // are cached by identity. This factory runs on every message-list emission;
+  // without the cache it re-derived O(messages × versions) string work each
+  // time even when nothing changed.
+  static final Expando<String> _messageSignatureCache = Expando<String>();
+
   factory _ChatMessageListStructure.fromMessages(List<ChatMessage> messages) {
     final ids = List<String>.unmodifiable(
       messages.map((message) => message.id).toList(growable: false),
     );
     final buffer = StringBuffer();
     for (final message in messages) {
-      buffer
-        ..write(message.id)
-        ..write('\u0000')
-        ..write(message.role)
-        ..write('\u0000')
-        ..write(message.model ?? '')
-        ..write('\u0000')
-        ..write(message.attachmentIds?.length ?? 0)
-        ..write('\u0000')
-        ..write(message.files?.length ?? 0)
-        ..write('\u0000')
-        ..write(message.embeds?.length ?? 0)
-        ..write('\u0000')
-        ..write(message.output?.length ?? 0)
-        ..write('\u0000')
-        ..write(message.statusHistory.length)
-        ..write('\u0000')
-        ..write(message.followUps.length)
-        ..write('\u0000')
-        ..write(message.sources.length)
-        ..write('\u0000')
-        ..write(message.codeExecutions.length)
-        ..write('\u0000')
-        ..write(message.error == null ? 0 : 1)
-        ..write('\u0000')
-        ..write(message.metadata?['archivedVariant'] == true ? 1 : 0)
-        ..write('\u0000')
-        // responseDone flips the rendered turn phase (running footer host /
-        // pin-to-top) while isStreaming is still set, so the list shell must
-        // rebuild on this transition to recompute the timeline.
-        ..write(message.metadata?['responseDone'] == true ? 1 : 0)
-        ..write('\u0000')
-        // Include the displayed model-name fallback so the structure signature
-        // changes whenever the label changes, keeping the list-shell rebuild
-        // trigger in agreement with chat_page's layout signature. Use the
-        // normalized extractor so trim/empty handling matches the displayed name.
-        ..write(_messageModelName(message) ?? '')
-        ..write('\u0000')
-        ..write(message.versions.length);
-      for (final version in message.versions) {
-        buffer
-          ..write('\u0000')
-          ..write(version.model ?? '');
-      }
-      buffer.writeln();
+      buffer.write(
+        _messageSignatureCache[message] ??= _buildMessageSignature(message),
+      );
     }
     return _ChatMessageListStructure(ids: ids, signature: buffer.toString());
+  }
+
+  static String _buildMessageSignature(ChatMessage message) {
+    final buffer = StringBuffer();
+    buffer
+      ..write(message.id)
+      ..write('\u0000')
+      ..write(message.role)
+      ..write('\u0000')
+      ..write(message.model ?? '')
+      ..write('\u0000')
+      ..write(message.attachmentIds?.length ?? 0)
+      ..write('\u0000')
+      ..write(message.files?.length ?? 0)
+      ..write('\u0000')
+      ..write(message.embeds?.length ?? 0)
+      ..write('\u0000')
+      ..write(message.output?.length ?? 0)
+      ..write('\u0000')
+      ..write(message.statusHistory.length)
+      ..write('\u0000')
+      ..write(message.followUps.length)
+      ..write('\u0000')
+      ..write(message.sources.length)
+      ..write('\u0000')
+      ..write(message.codeExecutions.length)
+      ..write('\u0000')
+      ..write(message.error == null ? 0 : 1)
+      ..write('\u0000')
+      ..write(message.metadata?['archivedVariant'] == true ? 1 : 0)
+      ..write('\u0000')
+      // responseDone flips the rendered turn phase (running footer host /
+      // pin-to-top) while isStreaming is still set, so the list shell must
+      // rebuild on this transition to recompute the timeline.
+      ..write(message.metadata?['responseDone'] == true ? 1 : 0)
+      ..write('\u0000')
+      // Include the displayed model-name fallback so the structure signature
+      // changes whenever the label changes, keeping the list-shell rebuild
+      // trigger in agreement with chat_page's layout signature. Use the
+      // normalized extractor so trim/empty handling matches the displayed name.
+      ..write(_messageModelName(message) ?? '')
+      ..write('\u0000')
+      ..write(message.versions.length);
+    for (final version in message.versions) {
+      buffer
+        ..write('\u0000')
+        ..write(version.model ?? '');
+    }
+    buffer.writeln();
+    return buffer.toString();
   }
 
   final List<String> ids;
@@ -1628,7 +1650,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
         openWebUiAuthSessionEpochProvider,
         (_, _) => _onOpenWebUiContextChanged(),
       );
-      ref.listen<HermesApiService?>(hermesApiServiceProvider, (_, next) {
+      ref.listen<HermesBackendService?>(hermesApiServiceProvider, (_, next) {
         // A cold recovery is authorized and routed by the concrete Hermes
         // service that started it. Retire that attempt on every owner change;
         // otherwise the old poll blocks the new service behind the same-message
@@ -1716,7 +1738,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
 
         if (next != null) {
           final nextMessages = _restoreLiveTransportRunState(
-            _preserveFreshLocalAssistantState(next.messages),
+            _preserveFreshLocalMessageState(next.messages),
             next,
             settleOrphanedDirect: true,
           );
@@ -2379,7 +2401,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     // empty echo under the foreign server id could replace the local streaming
     // tail and retire the stream early.
     state = _restoreLiveTransportRunState(
-      _preserveFreshLocalAssistantState(serverMessages),
+      _preserveFreshLocalMessageState(serverMessages),
       ref.read(activeConversationProvider),
     );
     _syncStreamingProfileWithState();
@@ -2452,6 +2474,16 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
             activeOpenWebUiChatIdForMutation(ref, owner) == null) {
           return;
         }
+        // The server emits `chat:message:follow_ups` only AFTER
+        // `chat:completion {done:true}`, and the per-stream socket
+        // subscription is disposed synchronously by that done event — this
+        // passive handler is the only delivery path for follow-ups. Apply
+        // the payload directly: the debounced full refetch below races the
+        // server's own persistence of the suggestions (the event is emitted
+        // before the upsert) and can be rejected by adoption guards.
+        if (_applyPassiveFollowUpsEvent(event)) {
+          return;
+        }
         if (!_shouldRefreshFromPassiveSocketEvent(
           event,
           localSessionId: socket.sessionId,
@@ -2467,23 +2499,73 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     );
   }
 
-  List<ChatMessage> _preserveFreshLocalAssistantState(
+  /// Applies a pushed `chat:message:follow_ups` payload straight to the
+  /// target message. Returns true when the event was consumed.
+  bool _applyPassiveFollowUpsEvent(Map<String, dynamic> event) {
+    final parsed = parseFollowUpsSocketEvent(event);
+    if (parsed == null) {
+      return false;
+    }
+    // An unknown message id must fall through to the debounced refetch —
+    // consuming the event here would silently drop the payload.
+    final messageIndex = state.indexWhere(
+      (message) => message.id == parsed.messageId,
+    );
+    if (messageIndex == -1) {
+      return false;
+    }
+    DebugLogger.log(
+      'follow-ups-received',
+      scope: 'chat/passive-sync',
+      data: {'messageId': parsed.messageId, 'count': parsed.followUps.length},
+    );
+    updateMessageById(parsed.messageId, (current) {
+      if (listEquals(current.followUps, parsed.followUps)) {
+        return current;
+      }
+      return current.copyWith(followUps: parsed.followUps);
+    });
+    // The turn echo was persisted at completion, before this event fired.
+    // Re-persist the message so the suggestions survive a conversation
+    // switch (the local Drift copy would otherwise reload without them).
+    // Re-resolve the index: updateMessageById rebuilt the list above.
+    _persistCompletedTurnForMessage(
+      state.indexWhere((message) => message.id == parsed.messageId),
+    );
+    return true;
+  }
+
+  List<ChatMessage> _preserveFreshLocalMessageState(
     List<ChatMessage> serverMessages,
   ) {
     if (state.isEmpty || serverMessages.isEmpty) {
       return serverMessages;
     }
 
+    final localTrailingUserId = state
+        .where((message) => message.role == 'user')
+        .lastOrNull
+        ?.id;
+    final serverTrailingUserId = serverMessages
+        .where((message) => message.role == 'user')
+        .lastOrNull
+        ?.id;
     final localById = <String, ChatMessage>{
       for (final message in state)
         // Also index empty placeholders that still carry a local-only
         // streaming state or `modelName`, so a stale pre-first-token snapshot
-        // can't drop local turn state before the metadata merge runs.
-        if (message.role == 'assistant' &&
-            (message.isStreaming ||
-                message.content.trim().isNotEmpty ||
-                message.followUps.isNotEmpty ||
-                _messageModelName(message) != null))
+        // can't drop local turn state before the metadata merge runs. Keep the
+        // trailing user's attachments for the same lagging-snapshot window.
+        if ((message.role == 'assistant' &&
+                (message.isStreaming ||
+                    message.content.trim().isNotEmpty ||
+                    message.statusHistory.isNotEmpty ||
+                    message.followUps.isNotEmpty ||
+                    _messageModelName(message) != null)) ||
+            (message.id == localTrailingUserId &&
+                message.id == serverTrailingUserId &&
+                (message.attachmentIds?.isNotEmpty == true ||
+                    message.files?.isNotEmpty == true)))
           message.id: message,
     };
     if (localById.isEmpty) {
@@ -2510,42 +2592,63 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
       final localMessage =
           localById[serverMessage.id] ??
           (boundToTail ? localById[localTailId] : null);
-      final isStreamingTail =
-          localMessage != null &&
-          (serverMessage.id == localTailId || boundToTail);
+      if (localMessage == null) {
+        merged.add(serverMessage);
+        continue;
+      }
+      final isStreamingTail = serverMessage.id == localTailId || boundToTail;
       final preserveContent =
-          localMessage != null &&
           isStreamingTail &&
           _shouldPreserveLocalAssistantContent(localMessage, serverMessage);
       final shouldPreserveStreamingState =
-          localMessage != null &&
           _shouldPreserveLocalAssistantStreamingState(
             localMessage,
             serverMessage,
             isStreamingTail: isStreamingTail,
             serverHasAdditionalMessages: serverHasAdditionalMessages,
           );
-      final sameResponseContent =
-          localMessage != null &&
-          _sameAssistantResponseText(
-            localMessage.content,
-            serverMessage.content,
-          );
+      final sameResponseContent = _sameAssistantResponseText(
+        localMessage.content,
+        serverMessage.content,
+      );
       final shouldPreserveFollowUps =
-          localMessage != null &&
           localMessage.followUps.isNotEmpty &&
           serverMessage.role == 'assistant' &&
           serverMessage.followUps.isEmpty &&
           (sameResponseContent || preserveContent);
+      final serverStatusHistory = serverMessage.statusHistory;
+      final mergedStatusHistory =
+          localMessage.statusHistory.isNotEmpty &&
+              serverMessage.role == 'assistant' &&
+              isStreamingTail &&
+              (sameResponseContent || preserveContent)
+          ? mergeStatusHistoryPreservingSettledLocal(
+              localMessage.statusHistory,
+              serverStatusHistory,
+            )
+          : serverStatusHistory;
+      final shouldPreserveStatusHistory = !identical(
+        mergedStatusHistory,
+        serverStatusHistory,
+      );
+      final shouldPreserveUserAttachments =
+          localMessage.role == 'user' &&
+          serverMessage.role == 'user' &&
+          localMessage.content == serverMessage.content &&
+          (localMessage.attachmentIds?.isNotEmpty == true ||
+              localMessage.files?.isNotEmpty == true) &&
+          serverMessage.attachmentIds?.isNotEmpty != true &&
+          serverMessage.files?.isNotEmpty != true;
       // Preserve a local-only modelName the server snapshot hasn't caught up to
       // (notably an empty placeholder whose first token hasn't landed).
       final shouldPreserveModelName =
-          localMessage != null &&
           serverMessage.role == 'assistant' &&
           _messageModelName(localMessage) != null &&
           _messageModelName(serverMessage) == null;
       if (!preserveContent &&
           !shouldPreserveFollowUps &&
+          !shouldPreserveStatusHistory &&
+          !shouldPreserveUserAttachments &&
           !shouldPreserveModelName &&
           !shouldPreserveStreamingState) {
         merged.add(serverMessage);
@@ -2553,24 +2656,27 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
       }
 
       changed = true;
+      final preservedLocalMessage = localMessage;
       // Merge local + server metadata so local-only fields (e.g. `modelName`)
       // survive a server snapshot captured before the durable payload was
       // finalized. Server values take precedence; local fills only the gaps.
       final metadata = <String, dynamic>{
-        ...?localMessage.metadata,
+        ...?preservedLocalMessage.metadata,
         ...?serverMessage.metadata,
       };
       if (shouldPreserveFollowUps) {
         // Overwrite (not putIfAbsent): the merged map may carry a stale
         // `followUps` from the server snapshot (e.g. an explicit empty list),
         // which must mirror the preserved typed `.followUps` field below.
-        metadata['followUps'] = List<String>.from(localMessage.followUps);
+        metadata['followUps'] = List<String>.from(
+          preservedLocalMessage.followUps,
+        );
       }
       if (shouldPreserveModelName) {
         // The raw server map may carry an empty/whitespace `modelName` that the
         // union spread on top of the local one; restore the normalized local
         // value so an empty server field can't blank the displayed model name.
-        metadata['modelName'] = _messageModelName(localMessage);
+        metadata['modelName'] = _messageModelName(preservedLocalMessage);
       }
       merged.add(
         serverMessage.copyWith(
@@ -2578,11 +2684,18 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
               ? true
               : serverMessage.isStreaming,
           content: preserveContent
-              ? localMessage.content
+              ? preservedLocalMessage.content
               : serverMessage.content,
           followUps: shouldPreserveFollowUps
-              ? List<String>.from(localMessage.followUps)
+              ? List<String>.from(preservedLocalMessage.followUps)
               : serverMessage.followUps,
+          statusHistory: mergedStatusHistory,
+          attachmentIds: shouldPreserveUserAttachments
+              ? preservedLocalMessage.attachmentIds
+              : serverMessage.attachmentIds,
+          files: shouldPreserveUserAttachments
+              ? preservedLocalMessage.files
+              : serverMessage.files,
           metadata: metadata.isEmpty ? null : metadata,
         ),
       );
@@ -2911,6 +3024,18 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
       }
       return;
     }
+    if (service is! HermesApiService) {
+      if (settleUnrecoverable) {
+        _settleColdHermesCheckpoint(
+          owner,
+          checkpoint,
+          error: const ChatMessageError(
+            content: 'Hermes Desktop will reconcile this session when opened.',
+          ),
+        );
+      }
+      return;
+    }
     if (!_canRecoverHermesCheckpointFromProvider(conversation, checkpoint)) {
       if (settleUnrecoverable) {
         _settleColdHermesCheckpoint(
@@ -3155,12 +3280,25 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     if (!_hasLocalStreamingProvenance(localMessage)) {
       return false;
     }
-    final localContent = localMessage.content;
-    final serverContent = serverMessage.content;
-    if (localContent.trim().isEmpty) {
-      return false;
+    if (serverBodyDropsLocalSemanticDetails(
+      localMessage.content,
+      serverMessage.content,
+    )) {
+      return true;
     }
-    if (serverContent.trim().isEmpty) {
+    // Compare answer bodies with rendered semantic <details> wrappers
+    // stripped. Local and server renders of the same turn carry different
+    // details attributes (e.g. the locally injected reasoning duration="0"
+    // vs the server's real duration), which would otherwise defeat both the
+    // length and the prefix checks and let a mid-write server body replace a
+    // complete local answer on every reasoning turn.
+    final localContent = comparableAssistantBody(localMessage.content);
+    final serverContent = comparableAssistantBody(serverMessage.content);
+    if (localContent.isEmpty) {
+      return localMessage.content.trim().isNotEmpty &&
+          serverMessage.content.trim().isEmpty;
+    }
+    if (serverContent.isEmpty) {
       return true;
     }
     if (localContent.length <= serverContent.length) {
@@ -3625,6 +3763,14 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
       unawaited(controller.cancel());
     }
     cancelSocketSubscriptions();
+    // Fold any un-flushed streamed content into state before dropping the
+    // buffer — it is not periodically synced, so clearing it here would
+    // silently discard the whole tail of an in-flight response (e.g. on
+    // conversation switch or message deletion mid-stream). Skipped during
+    // provider dispose, where touching state is forbidden and pointless.
+    if (!_disposed) {
+      _syncStreamingBufferToState();
+    }
     _clearStreamingBuffer();
     _streamingSyncTimer?.cancel();
     _streamingSyncTimer = null;
@@ -4203,7 +4349,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
       return false;
     }
 
-    final mergedServerMessages = _preserveFreshLocalAssistantState(
+    final mergedServerMessages = _preserveFreshLocalMessageState(
       serverMessages,
     );
     var serverTail = mergedServerMessages[serverIndex];
@@ -6107,8 +6253,8 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
           chatId: chatId,
           user: trailingUser == null
               ? null
-              : _localEchoRow(chatId, trailingUser),
-          assistant: _localEchoRow(chatId, assistant),
+              : localEchoRowForMessage(chatId, trailingUser),
+          assistant: localEchoRowForMessage(chatId, assistant),
         );
       });
     } catch (error, stackTrace) {
@@ -6130,44 +6276,75 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
     }
     return null;
   }
+}
 
-  /// Minimal history-message shape (`{id, parentId, childrenIds, role,
-  /// content, timestamp, model?}`) — explicitly a local echo.
-  ///
-  /// The `parentId` written here is only a placeholder for the payload map:
-  /// `MessagesDao.upsertLocalEchoTurn` re-parents these rows via `_withParent`,
-  /// rewriting both the row and `payload['parentId']` to the branch tip.
-  MessageRowData _localEchoRow(String chatId, ChatMessage message) {
-    final timestamp = message.timestamp.millisecondsSinceEpoch ~/ 1000;
-    final resolvedParentId = message_tree.chatMessageParentId(message);
-    final childrenIds = message_tree
-        .chatMessageChildrenIds(message)
-        .toList(growable: false);
-    return MessageRowData(
-      id: message.id,
-      chatId: chatId,
-      parentId: resolvedParentId,
-      role: message.role,
-      content: message.content,
-      model: message.model,
-      createdAt: timestamp,
-      // Recomputed by upsertLocalEcho for new rows.
-      orderIndex: 0,
-      payload: <String, dynamic>{
-        'id': message.id,
-        'parentId': resolvedParentId,
-        'childrenIds': childrenIds,
-        'role': message.role,
-        'content': message.content,
-        'timestamp': timestamp,
-        'isStreaming': message.isStreaming,
-        if (message.role == 'assistant' && !message.isStreaming) 'done': true,
-        if (message.model != null) 'model': message.model,
-        if (message.metadata != null && message.metadata!.isNotEmpty)
-          'metadata': message.metadata,
-      },
-    );
-  }
+/// History-message shape for the local turn echo.
+///
+/// Top-level (rather than a notifier method) so tests can pin payload
+/// completeness against the ChatMessage model.
+///
+/// The `parentId` written here is only a placeholder for the payload map:
+/// `MessagesDao.upsertLocalEchoTurn` re-parents these rows via `_withParent`,
+/// rewriting both the row and `payload['parentId']` to the branch tip.
+///
+/// The payload must carry every durable server-shape field the message has:
+/// the sync outbox rebuilds the full chat blob from these rows and the
+/// server's merge replaces each message object wholesale, so any field
+/// omitted here (`output`, `sources`, `usage`, …) would be wiped from the
+/// server copy on the next push.
+MessageRowData localEchoRowForMessage(String chatId, ChatMessage message) {
+  final timestamp = message.timestamp.millisecondsSinceEpoch ~/ 1000;
+  final resolvedParentId = message_tree.chatMessageParentId(message);
+  final childrenIds = message_tree
+      .chatMessageChildrenIds(message)
+      .toList(growable: false);
+  final sanitizedFiles = sanitizeFilesForWebUi(message.files);
+  return MessageRowData(
+    id: message.id,
+    chatId: chatId,
+    parentId: resolvedParentId,
+    role: message.role,
+    content: message.content,
+    model: message.model,
+    createdAt: timestamp,
+    // Recomputed by upsertLocalEcho for new rows.
+    orderIndex: 0,
+    payload: <String, dynamic>{
+      'id': message.id,
+      'parentId': resolvedParentId,
+      'childrenIds': childrenIds,
+      'role': message.role,
+      'content': message.content,
+      'timestamp': timestamp,
+      'isStreaming': message.isStreaming,
+      if (message.role == 'assistant' && !message.isStreaming) 'done': true,
+      if (message.model != null) 'model': message.model,
+      if (message.metadata != null && message.metadata!.isNotEmpty)
+        'metadata': message.metadata,
+      if (message.output != null && message.output!.isNotEmpty)
+        'output': message.output,
+      'files': ?sanitizedFiles,
+      if (message.embeds != null && message.embeds!.isNotEmpty)
+        'embeds': message.embeds,
+      if (message.usage != null) 'usage': message.usage,
+      // The OWUI web client reads `sources` in citation shape and
+      // `code_executions` in snake_case; the local parser accepts both
+      // shapes, so the server shape is the only safe one to persist.
+      if (message.sources.isNotEmpty)
+        'sources': convertSourcesToOpenWebUIFormat(message.sources),
+      if (message.statusHistory.isNotEmpty)
+        'statusHistory': message.statusHistory
+            .map((status) => status.toJson())
+            .toList(growable: false),
+      if (message.codeExecutions.isNotEmpty)
+        'code_executions': convertCodeExecutionsToOpenWebUIFormat(
+          message.codeExecutions,
+        ),
+      if (message.followUps.isNotEmpty)
+        'followUps': List<String>.from(message.followUps),
+      if (message.error != null) 'error': message.error!.toJson(),
+    },
+  );
 }
 
 bool _shouldIncludeConversationHistoryMessage(ChatMessage message) {
@@ -7721,7 +7898,12 @@ Future<_PreparedHermesTurn> _prepareHermesTurn(
   final images = <String>[];
   final seenImages = <String>{};
   final documentSources = <HermesLocalDocumentSource>[];
+  final desktopFiles = <HermesInputFilePart>[];
+  final desktop =
+      (ref.read(hermesConfigProvider) as HermesConfig).mode ==
+      HermesBackendMode.desktopGateway;
   var decodedImageBytes = 0;
+  var desktopFileBytes = 0;
 
   for (final attachmentId in attachmentIds ?? const <String>[]) {
     if (attachmentId.startsWith('data:image/')) {
@@ -7763,6 +7945,40 @@ Future<_PreparedHermesTurn> _prepareHermesTurn(
     if (state == null || state.isImage == true) {
       throw const HermesAttachmentsUnsupportedException();
     }
+    if (desktop) {
+      final remaining =
+          kHermesMaxAggregateLocalDocumentBytes - desktopFileBytes;
+      final bytes = await _readBoundedHermesDesktopFile(
+        state.file,
+        maxBytes: math.min(kHermesMaxLocalDocumentBytes, remaining),
+      );
+      if (bytes.isEmpty) {
+        throw const HermesChatInputException(
+          'Hermes attachments cannot be empty.',
+        );
+      }
+      desktopFileBytes += bytes.length;
+      final mediaType = _hermesDesktopFileMediaType(state.fileName);
+      if (mediaType == 'application/pdf' &&
+          (bytes.length < 5 ||
+              bytes[0] != 0x25 ||
+              bytes[1] != 0x50 ||
+              bytes[2] != 0x44 ||
+              bytes[3] != 0x46 ||
+              bytes[4] != 0x2d)) {
+        throw const HermesChatInputException(
+          'This attachment is not a valid PDF document.',
+        );
+      }
+      desktopFiles.add(
+        HermesInputFilePart(
+          filename: state.fileName,
+          mediaType: mediaType,
+          base64Data: base64Encode(bytes),
+        ),
+      );
+      continue;
+    }
     documentSources.add(
       await HermesLocalDocumentSource.fromFile(
         state.file,
@@ -7771,20 +7987,27 @@ Future<_PreparedHermesTurn> _prepareHermesTurn(
     );
   }
 
-  final documentService =
-      ref.read(hermesLocalDocumentServiceProvider)
-          as HermesLocalDocumentService;
-  final documents = await documentService.prepareAll(documentSources);
+  final documentService = ref.read(
+    hermesLocalDocumentServiceProvider,
+  ) as HermesLocalDocumentService;
+  final documents = desktop
+      ? const HermesPreparedDocumentBatch(
+          documents: [],
+          totalSourceBytes: 0,
+          totalCharacters: 0,
+        )
+      : await documentService.prepareAll(documentSources);
   final promptText = documents.documents.isEmpty
       ? text
       : '$text\n\n${documents.renderForPrompt()}';
   final HermesChatInput input;
-  if (images.isEmpty) {
+  if (images.isEmpty && desktopFiles.isEmpty) {
     input = HermesChatInput.text(promptText);
   } else {
     input = HermesChatInput.multimodal(<HermesChatContentPart>[
       if (promptText.trim().isNotEmpty) HermesInputTextPart(promptText),
       for (final image in images) HermesInputImagePart(image),
+      ...desktopFiles,
     ]);
   }
 
@@ -7797,6 +8020,13 @@ Future<_PreparedHermesTurn> _prepareHermesTurn(
       },
     for (final document in documents.documents)
       _hermesLocalDocumentDescriptor(document),
+    for (final file in desktopFiles)
+      <String, dynamic>{
+        'type': 'file',
+        'source': 'hermes_desktop_file',
+        'name': file.filename,
+        'content_type': file.mediaType,
+      },
   ];
   return _PreparedHermesTurn(
     input: input,
@@ -7807,6 +8037,45 @@ Future<_PreparedHermesTurn> _prepareHermesTurn(
       documents.documents.map((document) => document.renderForPrompt()),
     ),
   );
+}
+
+Future<Uint8List> _readBoundedHermesDesktopFile(
+  File file, {
+  required int maxBytes,
+}) async {
+  if (maxBytes <= 0) {
+    throw const HermesChatInputException(
+      'Hermes files exceed the 16 MB aggregate limit.',
+    );
+  }
+  final builder = BytesBuilder(copy: false);
+  var length = 0;
+  await for (final chunk in file.openRead()) {
+    length += chunk.length;
+    if (length > maxBytes) {
+      throw const HermesChatInputException(
+        'This file exceeds the Hermes attachment size limit.',
+      );
+    }
+    builder.add(chunk);
+  }
+  return builder.takeBytes();
+}
+
+String _hermesDesktopFileMediaType(String filename) {
+  final extension = filename.toLowerCase().split('.').last;
+  return switch (extension) {
+    'pdf' => 'application/pdf',
+    'txt' => 'text/plain',
+    'md' || 'markdown' => 'text/markdown',
+    'json' || 'jsonl' => 'application/json',
+    'csv' => 'text/csv',
+    'html' || 'htm' => 'text/html',
+    'xml' => 'application/xml',
+    'docx' =>
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    _ => 'application/octet-stream',
+  };
 }
 
 Map<String, dynamic> _hermesLocalDocumentDescriptor(
@@ -8262,7 +8531,7 @@ Future<void> _regenerateHermesMessage(
   required String input,
   required HermesConfigController configController,
   required int configAdmission,
-  required HermesApiService? serviceGeneration,
+  required HermesBackendService? serviceGeneration,
 }) async {
   final reasoningEffort = ref.read(configuredReasoningEffortProvider);
   final activeAtStart = ref.read(activeConversationProvider) as Conversation?;
@@ -8303,6 +8572,44 @@ Future<void> _regenerateHermesMessage(
       null;
   final replayedFiles = replayedUser?.files ?? const <Map<String, dynamic>>[];
   final replayedAttachments = replayedUser?.attachmentIds ?? const <String>[];
+  final assistantMessageId = previousAssistant?.id ?? const Uuid().v4();
+  final notifier = ref.read(chatMessagesProvider.notifier);
+  ChatMessage assistantMessage({
+    required bool isStreaming,
+    ChatMessageError? error,
+  }) => ChatMessage(
+    id: assistantMessageId,
+    role: 'assistant',
+    content: '',
+    timestamp: DateTime.now(),
+    model: selectedModel.id,
+    isStreaming: isStreaming,
+    error: error,
+    versions: previousAssistant == null
+        ? const <ChatMessageVersion>[]
+        : _buildReplayVersions(previousAssistant),
+    metadata: {'modelName': selectedModel.name, 'transport': kHermesTransport},
+  );
+  void installAssistant(ChatMessage message) {
+    if (previousAssistant == null) {
+      notifier.addMessage(message);
+    } else {
+      notifier.updateLastMessageWithFunction((_) => message);
+    }
+  }
+
+  if (replayedFiles.any((file) => file['source'] == 'hermes_desktop_file')) {
+    const error = HermesAttachmentsUnsupportedException(
+      'Desktop file attachments cannot be regenerated. Send the file again.',
+    );
+    installAssistant(
+      assistantMessage(
+        isStreaming: false,
+        error: ChatMessageError(content: chatErrorContentForException(error)),
+      ),
+    );
+    throw error;
+  }
   final useResponses =
       previousAssistant?.metadata?['hermesTransportMode'] ==
           kHermesResponsesMode ||
@@ -8321,25 +8628,8 @@ Future<void> _regenerateHermesMessage(
   // Historical regeneration leaves the selected assistant at the tail. Reuse
   // that message rather than retaining an archived record plus a second
   // placeholder; its previous content remains available through [versions].
-  final assistantMessageId = previousAssistant?.id ?? const Uuid().v4();
-  var assistant = ChatMessage(
-    id: assistantMessageId,
-    role: 'assistant',
-    content: '',
-    timestamp: DateTime.now(),
-    model: selectedModel.id,
-    isStreaming: true,
-    versions: previousAssistant == null
-        ? const <ChatMessageVersion>[]
-        : _buildReplayVersions(previousAssistant),
-    metadata: {'modelName': selectedModel.name, 'transport': kHermesTransport},
-  );
-  final notifier = ref.read(chatMessagesProvider.notifier);
-  if (previousAssistant == null) {
-    notifier.addMessage(assistant);
-  } else {
-    notifier.updateLastMessageWithFunction((_) => assistant);
-  }
+  final assistant = assistantMessage(isStreaming: true);
+  installAssistant(assistant);
   await _dispatchHermesRunFromChat(
     ref,
     assistantMessageId: assistantMessageId,
@@ -8844,7 +9134,7 @@ Future<void> regenerateMessage(
   final int? hermesConfigAdmission = hermesConfigController
       ?.captureSessionActionAdmission();
   if (usesHermesAtRegenerationStart && hermesConfigAdmission == null) return;
-  final HermesApiService? hermesServiceGeneration =
+  final HermesBackendService? hermesServiceGeneration =
       usesHermesAtRegenerationStart ? ref.read(hermesApiServiceProvider) : null;
   final resolvedDirectRoute = await _resolveDirectRoute(
     ref,
@@ -11997,15 +12287,12 @@ captureHermesApprovalProjectionStateUpdater(
 }
 
 Iterable<String> _hermesIdentifierSensitiveValues(
-  HermesApiService service,
-) => <String>[
-  if ((service.config.apiKey ?? '').isNotEmpty) service.config.apiKey!,
-  if ((service.config.sessionKey ?? '').isNotEmpty) service.config.sessionKey!,
-];
+  HermesBackendService service,
+) => service.config.sensitiveValues;
 
 String? _validatedHermesHistoryMessageId(
   Object? value,
-  HermesApiService service,
+  HermesBackendService service,
 ) => validateHermesOpaqueIdentifier(
   value,
   sensitiveValues: _hermesIdentifierSensitiveValues(service),
@@ -12015,7 +12302,7 @@ String? _validatedHermesHistoryMessageId(
 );
 
 Future<void> _rememberCommittedHermesLocalDocumentPrompt({
-  required HermesApiService service,
+  required HermesBackendService service,
   required String connectionIdentity,
   required String sessionId,
   required String promptText,
@@ -12611,7 +12898,7 @@ StreamSubscription<RemapEvent> trackHermesConversationRemaps({
 }
 
 Future<void> _deleteLateHermesSessionWithinDeadline(
-  HermesApiService service,
+  HermesBackendService service,
   String sessionId, {
   required Duration deadline,
 }) async {
@@ -12639,7 +12926,7 @@ Future<void> _deleteLateHermesSessionWithinDeadline(
 }
 
 void _deleteLateHermesSessionBestEffort(
-  HermesApiService service,
+  HermesBackendService service,
   String sessionId, {
   required Duration deadline,
 }) {
@@ -12831,14 +13118,16 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
 
   // Ensure a stable long-term memory key before reading the service (mutating
   // the key rebuilds hermesApiServiceProvider, so read it afterwards).
-  try {
-    await configController.ensureSessionKey();
-  } catch (error) {
-    if (!cancelled()) failPreflight(error);
-    return;
+  if (ref.read(hermesConfigProvider).mode == HermesBackendMode.responsesApi) {
+    try {
+      await configController.ensureSessionKey();
+    } catch (error) {
+      if (!cancelled()) failPreflight(error);
+      return;
+    }
   }
   if (cancelled()) return;
-  final HermesApiService? service = ref.read(hermesApiServiceProvider);
+  final HermesBackendService? service = ref.read(hermesApiServiceProvider);
   if (service == null) {
     if (!registry.complete(currentRunKey(), cancelToken: cancelToken)) return;
     ChatMessage updater(ChatMessage message) => message.copyWith(
@@ -12855,6 +13144,33 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
     finishOwned();
     completeStreamingUiOwned();
     return;
+  }
+  if (service is! HermesResponsesTurnService &&
+      service is! HermesDesktopTurnService) {
+    if (!registry.complete(currentRunKey(), cancelToken: cancelToken)) return;
+    finishOwned();
+    completeStreamingUiOwned();
+    return;
+  }
+  final isDesktop = service is HermesDesktopTurnService;
+  HermesDesktopSessionOptions? desktopOptions;
+  if (service is HermesDesktopTurnService) {
+    final selected = ref.read(selectedModelProvider);
+    final metadata = selected?.metadata;
+    final usesConfiguredDefault = metadata?['hermesConfiguredDefault'] == true;
+    desktopOptions = HermesDesktopSessionOptions(
+      model: usesConfiguredDefault
+          ? null
+          : metadata?['hermesModelId']?.toString(),
+      provider: usesConfiguredDefault
+          ? null
+          : metadata?['hermesProvider']?.toString(),
+      reasoningEffort: reasoningEffort,
+      fast: hermesFastTierSelection(
+        supported: metadata?['hermesFast'] == true,
+        selected: ref.read(hermesFastTierSelectionProvider),
+      ),
+    );
   }
   final endpointIdentity = HermesConfigController.connectionEndpoint(
     service.config.baseUrl,
@@ -12893,7 +13209,7 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
           mixedProvenance: mixedSessionProvenance,
         );
   final responseStartsNewChain =
-      responseInput != null && responsePreviousResponseId == null;
+      !isDesktop && responseInput != null && responsePreviousResponseId == null;
   if (responseStartsNewChain) {
     // The official Responses endpoint owns the session id for a new chain; it
     // does not bind to a pre-created /api/sessions row via request headers.
@@ -12905,10 +13221,13 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
       final title = existingMessages.isEmpty
           ? _deriveHermesSessionTitle(input)
           : null;
-      final createdSessionId = await service.createSession(
-        title: title,
-        cancelToken: cancelToken,
-      );
+      final createdSessionId = service is HermesDesktopTurnService
+          ? await service.createDesktopSession(
+              title: title,
+              options: desktopOptions!,
+              cancelToken: cancelToken,
+            )
+          : await service.createSession(title: title, cancelToken: cancelToken);
       if (cancelled()) {
         _deleteLateHermesSessionBestEffort(
           service,
@@ -12961,7 +13280,7 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
       ref.invalidate(hermesSessionsProvider);
     } catch (error) {
       if (cancelled()) return;
-      if (forceNewSession) {
+      if (isDesktop || forceNewSession) {
         failPreflight(error);
         return;
       }
@@ -12990,7 +13309,7 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
 
   // Attachments require Responses. Once a conversation enters that response
   // chain, callers continue supplying [responseInput] for later text turns.
-  if (responseInput != null) {
+  if (responseInput != null || isDesktop) {
     final hasLocalDocumentProvenance =
         localDocumentPromptText != null && localDocumentEnvelopes.isNotEmpty;
     Set<String>? baselineServerMessageIds;
@@ -13025,17 +13344,32 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
       // prepared below before the known-empty history baseline is recorded.
     }
     if (cancelled()) return;
-    await dispatchHermesResponse(
-      service: service,
+    await dispatchHermesTurn(
+      startTurn: (turnCancelToken) => switch (service) {
+        HermesDesktopTurnService() => service.streamDesktopResponse(
+          responseInput ?? HermesChatInput.text(input),
+          sessionId: sessionId,
+          options: desktopOptions!,
+          cancelToken: turnCancelToken,
+        ),
+        HermesResponsesTurnService() => service.streamResponseWithReasoning(
+          responseInput ?? HermesChatInput.text(input),
+          sessionId: sessionId,
+          previousResponseId: responsePreviousResponseId,
+          conversationHistory: responseStartsNewChain ? responseHistory : null,
+          reasoningEffort: reasoningEffort,
+          cancelToken: turnCancelToken,
+        ),
+        _ => throw StateError('Hermes turn transport is unavailable.'),
+      },
+      sensitiveValues: service.config.sensitiveValues,
+      recoverResponse: service is HermesApiService
+          ? hermesResponseRecoverer(service)
+          : null,
       registry: registry,
       assistantMessageId: assistantMessageId,
       runKey: currentRunKey(),
       currentRunKey: currentRunKey,
-      input: responseInput,
-      sessionId: sessionId,
-      previousResponseId: responsePreviousResponseId,
-      conversationHistory: responseStartsNewChain ? responseHistory : null,
-      reasoningEffort: reasoningEffort,
       cancelToken: cancelToken,
       onSessionEstablished: (establishedSessionId) async {
         if (establishedSessionId == null || cancelled()) return;
@@ -13122,6 +13456,12 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
       appendContent: appendProjectedContent,
       replaceContent: replaceProjectedContent,
       appendStatus: appendProjectedStatus,
+      prefillComposer: (text) {
+        if (!owner.isActive(ref)) return;
+        ref
+            .read(composerTextInsertionProvider.notifier)
+            .insert(targetId: chatComposerTextInsertionTargetId, text: text);
+      },
       updateMessage: updateProjectedMessage,
       finishStreaming: finishOwned,
       completeStreamingUi: completeStreamingUiOwned,
@@ -13139,6 +13479,11 @@ Future<void> _dispatchRegisteredHermesRunFromChat(
     existingMessages,
     inputImagesSupported: false,
   );
+
+  if (service is! HermesApiService) {
+    failPreflight(StateError('Hermes Responses API is unavailable.'));
+    return;
+  }
 
   await dispatchHermesRun(
     service: service,
@@ -14363,7 +14708,8 @@ Map<String, dynamic> _directPersistedMessagePayload(
     if (metadata['modelName'] != null) 'modelName': metadata['modelName'],
     if (message.attachmentIds?.isNotEmpty == true)
       'attachment_ids': List<String>.from(message.attachmentIds!),
-    if (message.files != null) 'files': message.files,
+    if (sanitizeFilesForWebUi(message.files) != null)
+      'files': sanitizeFilesForWebUi(message.files),
     if (message.output != null) 'output': message.output,
     if (message.embeds != null) 'embeds': message.embeds,
     if (message.statusHistory.isNotEmpty)
@@ -14373,13 +14719,11 @@ Map<String, dynamic> _directPersistedMessagePayload(
     if (message.followUps.isNotEmpty)
       'followUps': List<String>.from(message.followUps),
     if (message.codeExecutions.isNotEmpty)
-      'code_executions': message.codeExecutions
-          .map((execution) => execution.toJson())
-          .toList(growable: false),
+      'code_executions': convertCodeExecutionsToOpenWebUIFormat(
+        message.codeExecutions,
+      ),
     if (message.sources.isNotEmpty)
-      'sources': message.sources
-          .map((source) => source.toJson())
-          .toList(growable: false),
+      'sources': convertSourcesToOpenWebUIFormat(message.sources),
     if (message.usage != null) 'usage': message.usage,
     if (message.versions.isNotEmpty)
       'versions': message.versions
@@ -15925,7 +16269,7 @@ Future<void> _sendMessageInternal(
   final int? hermesConfigAdmission = hermesConfigController
       ?.captureSessionActionAdmission();
   if (usesHermes && hermesConfigAdmission == null) return;
-  final HermesApiService? hermesServiceGeneration = usesHermes
+  final HermesBackendService? hermesServiceGeneration = usesHermes
       ? ref.read(hermesApiServiceProvider)
       : null;
   final resolvedDirectRoute = await _resolveDirectRoute(
@@ -18023,7 +18367,10 @@ final stopGenerationProvider = Provider<void Function()>((ref) {
       }
     } catch (_) {}
 
-    if (!hadStreamingAssistant) return;
+    if (!hadStreamingAssistant) {
+      unawaited(ref.read(hermesBusyTurnControllerProvider).stopRecoveredTurn());
+      return;
+    }
 
     // Client-owned direct and Hermes completions never create an OpenWebUI
     // completion task or requestCompletion outbox operation. Do not send a

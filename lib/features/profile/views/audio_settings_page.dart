@@ -1,9 +1,9 @@
 import 'dart:io' show Platform;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/services/native_sheet_bridge.dart';
@@ -12,12 +12,13 @@ import '../../../core/utils/tts_voice_utils.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
-import '../../../shared/widgets/conduit_components.dart';
+import '../../../shared/widgets/adaptive_selection_sheet.dart';
 import '../../chat/providers/text_to_speech_provider.dart';
 import '../../chat/services/voice_input_service.dart';
 import '../widgets/adaptive_segmented_selector.dart';
 import '../widgets/customization_tile.dart';
 import '../widgets/settings_page_scaffold.dart';
+import '../../../shared/widgets/utility_components.dart';
 import '../widgets/stt_language_picker.dart';
 
 bool shouldShowDeviceSttLanguageSetting(
@@ -36,7 +37,7 @@ class AudioSettingsPage extends ConsumerWidget {
     final settings = ref.watch(appSettingsProvider);
     final l10n = AppLocalizations.of(context)!;
 
-    return SettingsPageScaffold(
+    return UtilityPageScaffold.settings(
       title: l10n.audioSettingsTitle,
       children: [
         _buildSttSection(context, ref, settings),
@@ -72,9 +73,8 @@ class AudioSettingsPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SettingsSectionHeader(title: l10n.sttSettings),
-        const SizedBox(height: Spacing.sm),
-        ConduitCard(
+        InsetGroupedSection(
+          title: l10n.sttSettings,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -107,9 +107,7 @@ class AudioSettingsPage extends ConsumerWidget {
                 settings.sttPreference == SttPreference.serverOnly
                     ? l10n.sttEngineServerDescription
                     : l10n.sttEngineDeviceDescription,
-                style: theme.bodyMedium?.copyWith(
-                  color: theme.sidebarForeground.withValues(alpha: 0.85),
-                ),
+                style: theme.bodySmall?.copyWith(color: theme.textSecondary),
               ),
               for (final warning in warnings) ...[
                 const SizedBox(height: Spacing.xs),
@@ -156,14 +154,14 @@ class AudioSettingsPage extends ConsumerWidget {
             onTap: () => showSttLanguagePickerSheet(context, ref, settings),
           ),
           const SizedBox(height: Spacing.sm),
-          ConduitCard(
+          InsetGroupedSection(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   l10n.sttSilenceDuration,
                   style: theme.bodyMedium?.copyWith(
-                    color: theme.sidebarForeground,
+                    color: theme.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -171,7 +169,7 @@ class AudioSettingsPage extends ConsumerWidget {
                 Text(
                   l10n.sttSilenceDurationDescription,
                   style: theme.bodySmall?.copyWith(
-                    color: theme.sidebarForeground.withValues(alpha: 0.75),
+                    color: theme.textSecondary,
                   ),
                 ),
                 const SizedBox(height: Spacing.md),
@@ -207,6 +205,25 @@ class AudioSettingsPage extends ConsumerWidget {
             ),
           ),
         ],
+        const SizedBox(height: Spacing.sm),
+        CustomizationTile(
+          leading: SettingsIconBadge(
+            icon: UiUtils.platformIcon(
+              ios: CupertinoIcons.waveform,
+              android: Icons.record_voice_over,
+            ),
+            color: theme.buttonPrimary,
+          ),
+          title: l10n.voiceBargeIn,
+          subtitle: l10n.voiceBargeInDescription,
+          trailing: AdaptiveSwitch(
+            value: settings.voiceBargeInEnabled,
+            onChanged: notifier.setVoiceBargeInEnabled,
+          ),
+          showChevron: false,
+          onTap: () =>
+              notifier.setVoiceBargeInEnabled(!settings.voiceBargeInEnabled),
+        ),
       ],
     );
   }
@@ -233,9 +250,8 @@ class AudioSettingsPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SettingsSectionHeader(title: l10n.ttsSettings),
-        const SizedBox(height: Spacing.sm),
-        ConduitCard(
+        InsetGroupedSection(
+          title: l10n.ttsSettings,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -267,9 +283,7 @@ class AudioSettingsPage extends ConsumerWidget {
                 settings.ttsEngine == TtsEngine.server
                     ? l10n.ttsEngineServerDescription
                     : l10n.ttsEngineDeviceDescription,
-                style: theme.bodyMedium?.copyWith(
-                  color: theme.sidebarForeground.withValues(alpha: 0.85),
-                ),
+                style: theme.bodySmall?.copyWith(color: theme.textSecondary),
               ),
               for (final warning in warnings) ...[
                 const SizedBox(height: Spacing.xs),
@@ -299,14 +313,14 @@ class AudioSettingsPage extends ConsumerWidget {
         ),
         if (settings.ttsEngine == TtsEngine.device) ...[
           const SizedBox(height: Spacing.sm),
-          ConduitCard(
+          InsetGroupedSection(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   l10n.ttsSpeechRate,
                   style: theme.bodyMedium?.copyWith(
-                    color: theme.sidebarForeground,
+                    color: theme.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -448,10 +462,10 @@ class AudioSettingsPage extends ConsumerWidget {
       }
     }
 
-    await showSettingsSheet<void>(
+    await showAdaptiveSelectionSheet<void>(
       context: context,
       builder: (sheetContext) {
-        return SettingsSelectorSheet(
+        return AdaptiveSelectionSheet(
           title: l10n.ttsSelectVoice,
           itemCount: voiceOptions.length + 1,
           initialChildSize: 0.68,
@@ -459,7 +473,7 @@ class AudioSettingsPage extends ConsumerWidget {
           maxChildSize: 0.9,
           itemBuilder: (context, index) {
             if (index == 0) {
-              return SettingsSelectorTile(
+              return AdaptiveSelectionTile(
                 title: l10n.ttsSystemDefault,
                 selected: selectedOptionId == ttsSystemDefaultVoiceId,
                 onTap: () async {
@@ -475,7 +489,7 @@ class AudioSettingsPage extends ConsumerWidget {
             }
 
             final option = voiceOptions[index - 1];
-            return SettingsSelectorTile(
+            return AdaptiveSelectionTile(
               title: option.label,
               subtitle: option.subtitle,
               selected: option.id == selectedOptionId,

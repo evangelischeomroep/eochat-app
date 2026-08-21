@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,7 +19,6 @@ import '../../../core/services/native_sheet_hydration_service.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../core/services/user_friendly_error_handler.dart';
 import '../../../core/services/settings_service.dart';
-import '../../../core/widgets/error_boundary.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/conduit_input_styles.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -32,10 +31,11 @@ import '../../../core/utils/debug_logger.dart';
 import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/adaptive_toolbar_components.dart';
 import '../../../shared/widgets/chrome_gradient_fade.dart';
+import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/conduit_loading.dart';
 import '../../../shared/widgets/measure_size.dart';
 import '../../../shared/widgets/middle_ellipsis_text.dart';
-import '../../../shared/widgets/responsive_drawer_layout.dart';
+import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/sheet_handle.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../../shared/widgets/themed_sheets.dart';
@@ -49,15 +49,20 @@ import '../../chat/widgets/file_attachment_widget.dart';
 import '../../chat/widgets/modern_chat_input.dart';
 import '../../chat/widgets/server_file_picker_sheet.dart';
 import '../../chat/voice_call/presentation/voice_call_launcher.dart';
+import '../../hermes/models/hermes_config.dart';
+import '../../hermes/providers/hermes_providers.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../providers/conversation_selection_provider.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/folder_icon.dart';
 
-typedef FolderPastedAttachmentUploader =
-    Future<void> Function(LocalAttachment attachment, int fileSize);
-typedef FolderPastedAttachmentRollback =
-    Future<void> Function(LocalAttachment attachment);
+typedef FolderPastedAttachmentUploader = Future<void> Function(
+  LocalAttachment attachment,
+  int fileSize,
+);
+typedef FolderPastedAttachmentRollback = Future<void> Function(
+  LocalAttachment attachment,
+);
 
 @visibleForTesting
 Future<void> acceptFolderPastedAttachments({
@@ -142,21 +147,15 @@ class _FolderPageState extends ConsumerState<FolderPage> {
     Folder? folder,
   ) {
     final tintColor = context.conduitTheme.textPrimary;
-    final textScaler = MediaQuery.textScalerOf(context);
-    final controlExtent = conduitScaledControlExtent(context);
-    final toolbarHeight = conduitAdaptiveToolbarHeightOf(context);
     final hasOverflowMenu = folder != null;
-    const leadingGap = kConduitAdaptiveToolbarLeadingGap;
     final maxModelWidth = resolveConduitAdaptiveLeadingPillWidth(
       context,
       trailingActionCount: hasOverflowMenu ? 3 : 2,
-      maxWidth: kConduitAdaptiveToolbarMaxPillWidth,
+      maxWidth: kConduitAdaptiveToolbarMaxModelSelectorWidth,
     );
-    final leading = _buildFolderToolbarLeading(
+    final title = _buildFolderToolbarTitle(
       context: context,
       l10n: l10n,
-      tintColor: tintColor,
-      leadingGap: leadingGap,
       maxModelWidth: maxModelWidth,
     );
     final isTemporary = ref.watch(temporaryChatEnabledProvider);
@@ -182,7 +181,6 @@ class _FolderPageState extends ConsumerState<FolderPage> {
             iosSymbol: 'ellipsis',
             accessibilityLabel: l10n.more,
             tintColor: tintColor,
-            symbolSize: kConduitNativeToolbarSymbolExtent,
             items: menuItems,
             onSelected: onMenuSelected,
           );
@@ -191,14 +189,12 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         iosSymbol: isTemporary ? 'eye.slash' : 'eye',
         accessibilityLabel: l10n.temporaryChat,
         tintColor: isTemporary ? Colors.blue : tintColor,
-        symbolSize: kConduitNativeVisibilitySymbolExtent,
         onPressed: _toggleTemporaryChat,
       ),
       ConduitNativeToolbarAction(
         iosSymbol: 'square.and.pencil',
         accessibilityLabel: l10n.newChat,
         tintColor: tintColor,
-        symbolSize: kConduitNativeToolbarSymbolExtent,
         onPressed: _handleNewChat,
       ),
       ?nativeMenuAction,
@@ -207,78 +203,39 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         Platform.isIOS &&
         conduitSupportsNativeGlass() &&
         (folder == null || nativeMenuAction != null);
-    final leadingWidth = resolveConduitAdaptiveToolbarLeadingWidth(
-      pillWidth: maxModelWidth,
-      leadingGap: leadingGap,
-      controlExtent: controlExtent,
-    );
-    final overlayStyle = Theme.of(context).appBarTheme.systemOverlayStyle;
-    final scaledLeading = ConduitSystemTextScaling(
-      textScaler: textScaler,
-      child: leading,
-    );
-    final scaledActions = [
-      for (final action in actions)
-        ConduitSystemTextScaling(textScaler: textScaler, child: action),
-    ];
-
-    return AdaptiveAppBar(
-      useNativeToolbar: false,
+    return buildConduitCenteredAdaptiveAppBar(
+      context: context,
       tintColor: tintColor,
-      cupertinoNavigationBar: ConduitAdaptiveCupertinoNavigationBar(
-        textScaler: textScaler,
-        leading: leading,
-        trailing: useNativeActionGroup
-            ? ConduitNativeToolbarActionGroup(actions: nativeActions)
-            : Row(mainAxisSize: MainAxisSize.min, children: actions),
-        systemOverlayStyle: overlayStyle,
+      leading: ConduitAdaptiveAppBarIconButton(
+        key: const ValueKey<String>('folder-page-drawer-button'),
+        icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
+        iosSymbol: 'line.3.horizontal',
+        onPressed: _toggleDrawer,
+        iconColor: tintColor,
       ),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        elevation: Elevation.none,
-        scrolledUnderElevation: Elevation.none,
-        toolbarHeight: toolbarHeight,
-        systemOverlayStyle: overlayStyle,
-        centerTitle: false,
-        titleSpacing: Spacing.sm,
-        leadingWidth: leadingWidth,
-        leading: scaledLeading,
-        actions: scaledActions,
-      ),
+      title: title,
+      actions: actions,
+      cupertinoTrailing: useNativeActionGroup
+          ? ConduitNativeToolbarActionGroup(actions: nativeActions)
+          : Row(mainAxisSize: MainAxisSize.min, children: actions),
+      centerTitle: false,
     );
   }
 
-  Widget _buildFolderToolbarLeading({
+  Widget _buildFolderToolbarTitle({
     required BuildContext context,
     required AppLocalizations l10n,
-    required Color tintColor,
-    required double leadingGap,
     required double maxModelWidth,
   }) {
     final label = _formatModelDisplayName(
       ref.watch(selectedModelProvider)?.name ?? l10n.chooseModel,
     );
 
-    return buildConduitAdaptiveToolbarLeadingRow(
-      children: [
-        ConduitAdaptiveAppBarIconButton(
-          key: const ValueKey<String>('folder-page-drawer-button'),
-          icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
-          onPressed: _toggleDrawer,
-          iconColor: tintColor,
-        ),
-        SizedBox(width: leadingGap),
-        ConduitAdaptiveAppBarModelSelector(
-          key: const ValueKey<String>('folder-page-model-selector'),
-          label: label,
-          maxWidth: maxModelWidth,
-          useMiddleEllipsis: false,
-          onPressed: _showModelSelector,
-        ),
-      ],
+    return ConduitAdaptiveAppBarModelSelector(
+      key: const ValueKey<String>('folder-page-model-selector'),
+      label: label,
+      maxWidth: maxModelWidth,
+      onPressed: _showModelSelector,
     );
   }
 
@@ -436,7 +393,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
   }
 
   void _toggleDrawer() {
-    final layout = ResponsiveDrawerLayout.of(context);
+    final layout = SidebarDrawerControllerScope.maybeOf(context);
     if (layout == null) {
       return;
     }
@@ -648,6 +605,9 @@ class _FolderPageState extends ConsumerState<FolderPage> {
       final attachments = await fileService.pickFiles(
         allowedExtensions: localFilePickerExtensionsForModel(
           ref.read(selectedModelProvider),
+          desktopHermes:
+              ref.read(hermesConfigProvider).mode ==
+              HermesBackendMode.desktopGateway,
         ),
       );
       if (attachments.isEmpty) {
@@ -853,9 +813,8 @@ class _FolderPageState extends ConsumerState<FolderPage> {
       final message = error is StateError
           ? error.message.toString()
           : AppLocalizations.of(context)!.errorMessage;
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -1306,13 +1265,11 @@ class _FolderPageState extends ConsumerState<FolderPage> {
       orElse: () => null,
     );
 
-    return ErrorBoundary(
-      child: AdaptiveRouteShell(
-        backgroundColor: context.conduitTheme.surfaceBackground,
-        extendBodyBehindAppBar: true,
-        appBar: _buildAdaptiveAppBar(context, l10n, folder),
-        body: _buildBody(context, foldersAsync),
-      ),
+    return AdaptiveRouteShell(
+      backgroundColor: context.conduitTheme.surfaceBackground,
+      extendBodyBehindAppBar: true,
+      appBar: _buildAdaptiveAppBar(context, l10n, folder),
+      body: _buildBody(context, foldersAsync),
     );
   }
 
@@ -1505,6 +1462,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
                   foldersEnabled: true,
                   folders: folders,
                 ),
+                previewBuilder: buildConversationTileContextPreview,
                 child: ConversationTile(
                   key: ValueKey<String>('folder-chat-${conversation.id}'),
                   title: conversation.title.isEmpty
@@ -1914,9 +1872,14 @@ class _FolderEditSheetState extends ConsumerState<_FolderEditSheet> {
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.maybeOf(context)
+        ?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _selectIcon(String? alias) {
+    if (_selectedIconAlias == alias) return;
+    ConduitHaptics.selectionClick();
+    setState(() => _selectedIconAlias = alias);
   }
 
   @override
@@ -2000,9 +1963,7 @@ class _FolderEditSheetState extends ConsumerState<_FolderEditSheet> {
                   ],
                 ),
                 selected: _selectedIconAlias == null,
-                onSelected: _isSaving
-                    ? null
-                    : (_) => setState(() => _selectedIconAlias = null),
+                onSelected: _isSaving ? null : (_) => _selectIcon(null),
               ),
               for (final option in folderIconOptions)
                 ChoiceChip(
@@ -2021,8 +1982,7 @@ class _FolderEditSheetState extends ConsumerState<_FolderEditSheet> {
                   selected: _selectedIconAlias == option.alias,
                   onSelected: _isSaving
                       ? null
-                      : (_) =>
-                            setState(() => _selectedIconAlias = option.alias),
+                      : (_) => _selectIcon(option.alias),
                 ),
             ],
           ),
@@ -2030,20 +1990,16 @@ class _FolderEditSheetState extends ConsumerState<_FolderEditSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
+              ConduitTextButton(
                 onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-                child: Text(l10n.cancel),
+                text: l10n.cancel,
               ),
               const SizedBox(width: Spacing.sm),
-              FilledButton(
+              ConduitButton(
                 onPressed: _isSaving ? null : _save,
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.save),
+                text: l10n.save,
+                isCompact: true,
+                isLoading: _isSaving,
               ),
             ],
           ),
@@ -2129,9 +2085,8 @@ class _FolderSystemPromptSheetState
     final l10n = AppLocalizations.of(context)!;
     final api = ref.read(apiServiceProvider);
     if (api == null) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(l10n.errorMessage)));
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(l10n.errorMessage)));
       return;
     }
 
@@ -2163,9 +2118,8 @@ class _FolderSystemPromptSheetState
         return;
       }
       setState(() => _isSaving = false);
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(l10n.errorMessage)));
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(l10n.errorMessage)));
     }
   }
 
@@ -2205,20 +2159,16 @@ class _FolderSystemPromptSheetState
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
+              ConduitTextButton(
                 onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
-                child: Text(l10n.cancel),
+                text: l10n.cancel,
               ),
               const SizedBox(width: Spacing.sm),
-              FilledButton(
+              ConduitButton(
                 onPressed: _isSaving ? null : _save,
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.save),
+                text: l10n.save,
+                isCompact: true,
+                isLoading: _isSaving,
               ),
             ],
           ),

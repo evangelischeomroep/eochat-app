@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:go_router/go_router.dart';
@@ -14,11 +12,12 @@ import '../../../core/auth/webview_cookie_helper.dart';
 import '../../../core/auth/webview_origin.dart';
 import '../../../core/models/server_config.dart';
 import '../../../core/utils/debug_logger.dart';
-import '../../../core/widgets/error_boundary.dart';
 import '../../../shared/theme/theme_extensions.dart';
-import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/conduit_components.dart';
+
 import 'package:conduit/l10n/app_localizations.dart';
+
+import '../../../shared/widgets/connection_components.dart';
 
 /// Whether a proxy page is allowed to expose cookies or localStorage tokens.
 @visibleForTesting
@@ -618,12 +617,9 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
   Future<void> _initializeWebView() async {
     if (!isWebViewSupported) {
       if (!mounted) return;
-      final l10n = AppLocalizations.of(context);
+      final l10n = AppLocalizations.of(context)!;
       setState(() {
-        _error =
-            l10n?.proxyAuthPlatformNotSupported ??
-            'Proxy authentication requires a mobile device. '
-                'Please authenticate through a browser first.';
+        _error = l10n.proxyAuthPlatformNotSupported;
         _isLoading = false;
       });
       return;
@@ -643,9 +639,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
     if (!mounted) return;
     if (!webViewDataReady) {
       setState(() {
-        _error =
-            'The previous web sign-in session could not be cleared. '
-            'Please retry.';
+        _error = AppLocalizations.of(context)!.pleaseCheckConnection;
         _isLoading = false;
         _shouldRenderWebView = false;
       });
@@ -675,19 +669,9 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
       );
       if (!mounted) return;
       setState(() {
-        _error = 'The sign-in page could not be loaded. Please retry.';
+        _error = AppLocalizations.of(context)!.pleaseCheckConnection;
         _isLoading = false;
       });
-    }
-  }
-
-  String _buildUserAgent() {
-    if (!kIsWeb && Platform.isIOS) {
-      return 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) '
-          'AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
-    } else {
-      return 'Mozilla/5.0 (Linux; Android 14) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
     }
   }
 
@@ -846,7 +830,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
         return;
       }
       setState(() {
-        _error = 'The sign-in page URL could not be verified. Please retry.';
+        _error = AppLocalizations.of(context)!.proxyServerVerificationFailed;
         _isLoading = false;
       });
       return;
@@ -857,7 +841,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
         return;
       }
       setState(() {
-        _error = 'The sign-in page URL could not be verified. Please retry.';
+        _error = AppLocalizations.of(context)!.proxyServerVerificationFailed;
         _isLoading = false;
       });
       return;
@@ -885,7 +869,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
     final document = _documentFence.committedDocument;
     if (document == null) {
       setState(() {
-        _error = 'The sign-in page could not be verified. Please retry.';
+        _error = AppLocalizations.of(context)!.proxyServerVerificationFailed;
         _isLoading = false;
       });
       return;
@@ -1036,9 +1020,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
             data: {'errorType': captureError.runtimeType.toString()},
           );
           setState(() {
-            _error =
-                'The proxy sign-in session could not be captured. '
-                'Please retry or continue manually.';
+            _error = AppLocalizations.of(context)!.proxyManualSignInRequired;
           });
         }
       } else {
@@ -1548,7 +1530,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
       );
       if (!mounted) return;
       setState(() {
-        _error = 'The sign-in page could not be reloaded. Please retry.';
+        _error = AppLocalizations.of(context)!.pleaseCheckConnection;
         _isLoading = false;
       });
     }
@@ -1568,39 +1550,28 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
       );
       if (!mounted) return;
       setState(() {
-        _error =
-            'The proxy sign-in session could not be captured. '
-            'Please retry or continue manually.';
+        _error = AppLocalizations.of(context)!.proxyManualSignInRequired;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
-    return ErrorBoundary(
-      child: AdaptiveRouteShell(
-        backgroundColor: context.conduitTheme.surfaceBackground,
-        extendBodyBehindAppBar: true,
-        appBar: AdaptiveAppBar(
-          title: l10n?.proxyAuthentication ?? 'Proxy Authentication',
-          actions: [
-            if (_controller != null)
-              AdaptiveAppBarAction(
-                iosSymbol: 'arrow.clockwise',
-                icon: Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
-                onPressed: _refresh,
-              ),
-          ],
-        ),
-        bodySafeArea: true,
-        body: _buildBody(l10n),
-      ),
+    return ConnectionWebAuthScaffold(
+      title: l10n.proxyAuthentication,
+      backLabel: l10n.back,
+      onBack: () => context.pop(),
+      onRefresh: _controller == null ? null : _refresh,
+      bottomChrome: _error == null && _shouldRenderWebView
+          ? _buildHelpBanner(l10n)
+          : null,
+      body: _buildBody(l10n),
     );
   }
 
-  Widget _buildBody(AppLocalizations? l10n) {
+  Widget _buildBody(AppLocalizations l10n) {
     if (_error != null) {
       return _buildErrorState(l10n);
     }
@@ -1616,7 +1587,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
           initialSettings: InAppWebViewSettings(
             javaScriptEnabled: true,
             useShouldOverrideUrlLoading: true,
-            userAgent: _buildUserAgent(),
+            sharedCookiesEnabled: true,
           ),
           onWebViewCreated: (controller) {
             if (mounted) {
@@ -1650,13 +1621,11 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
           shouldOverrideUrlLoading: _onNavigationRequest,
         ),
         if (_isLoading) _buildLoadingOverlay(l10n),
-        // Help text and manual continue button at the bottom
-        Positioned(left: 0, right: 0, bottom: 0, child: _buildHelpBanner(l10n)),
       ],
     );
   }
 
-  Widget _buildHelpBanner(AppLocalizations? l10n) {
+  Widget _buildHelpBanner(AppLocalizations l10n) {
     return Container(
       padding: const EdgeInsets.all(Spacing.md),
       decoration: BoxDecoration(
@@ -1681,10 +1650,8 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
               const SizedBox(width: Spacing.sm),
               Expanded(
                 child: Text(
-                  l10n?.proxyAuthHelpTextSimple ??
-                      'Sign in through your proxy. Once authenticated, '
-                          'tap Continue to proceed to sign in.',
-                  style: context.conduitTheme.bodySmall?.copyWith(
+                  l10n.proxyAuthHelpTextSimple,
+                  style: context.conduitTheme.bodyMedium?.copyWith(
                     color: context.conduitTheme.textSecondary,
                   ),
                 ),
@@ -1695,7 +1662,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
           SizedBox(
             width: double.infinity,
             child: ConduitButton(
-              text: l10n?.continueButton ?? 'Continue',
+              text: l10n.continueButton,
               icon: Platform.isIOS
                   ? CupertinoIcons.arrow_right
                   : Icons.arrow_forward,
@@ -1707,7 +1674,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
     );
   }
 
-  Widget _buildLoadingState(AppLocalizations? l10n) {
+  Widget _buildLoadingState(AppLocalizations l10n) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1715,7 +1682,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
           const CircularProgressIndicator.adaptive(),
           const SizedBox(height: Spacing.lg),
           Text(
-            l10n?.proxyAuthLoading ?? 'Loading authentication page...',
+            l10n.proxyAuthLoading,
             style: context.conduitTheme.bodyMedium?.copyWith(
               color: context.conduitTheme.textSecondary,
             ),
@@ -1725,7 +1692,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
     );
   }
 
-  Widget _buildLoadingOverlay(AppLocalizations? l10n) {
+  Widget _buildLoadingOverlay(AppLocalizations l10n) {
     return Positioned.fill(
       child: Container(
         color: context.conduitTheme.surfaceBackground.withValues(alpha: 0.8),
@@ -1736,7 +1703,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
               const CircularProgressIndicator.adaptive(),
               const SizedBox(height: Spacing.lg),
               Text(
-                l10n?.proxyAuthLoading ?? 'Loading...',
+                l10n.proxyAuthLoading,
                 style: context.conduitTheme.bodyMedium?.copyWith(
                   color: context.conduitTheme.textSecondary,
                 ),
@@ -1748,7 +1715,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
     );
   }
 
-  Widget _buildErrorState(AppLocalizations? l10n) {
+  Widget _buildErrorState(AppLocalizations l10n) {
     return Padding(
       padding: const EdgeInsets.all(Spacing.pagePadding),
       child: Center(
@@ -1764,7 +1731,7 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
             ),
             const SizedBox(height: Spacing.lg),
             Text(
-              l10n?.proxyAuthFailed ?? 'Authentication failed',
+              l10n.proxyAuthFailed,
               style: context.conduitTheme.headingMedium,
               textAlign: TextAlign.center,
             ),
@@ -1778,13 +1745,13 @@ class _ProxyAuthPageState extends ConsumerState<ProxyAuthPage> {
             ),
             const SizedBox(height: Spacing.xl),
             ConduitButton(
-              text: l10n?.retry ?? 'Retry',
+              text: l10n.retry,
               icon: Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
               onPressed: _refresh,
             ),
             const SizedBox(height: Spacing.md),
             ConduitButton(
-              text: l10n?.back ?? 'Back',
+              text: l10n.back,
               icon: Platform.isIOS ? CupertinoIcons.back : Icons.arrow_back,
               onPressed: () => context.pop(const ProxyAuthResult.failed()),
               isSecondary: true,

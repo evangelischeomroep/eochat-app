@@ -3,7 +3,6 @@
 final class PreferenceKeys {
   static const String reduceMotion = 'reduce_motion';
   static const String animationSpeed = 'animation_speed';
-  static const String hapticFeedback = 'haptic_feedback';
   static const String disableHapticsWhileStreaming =
       'disable_haptics_while_streaming';
   static const String highContrast = 'high_contrast';
@@ -14,6 +13,7 @@ final class PreferenceKeys {
   static const String voiceLocaleId = 'voice_locale_id';
   static const String voiceHoldToTalk = 'voice_hold_to_talk';
   static const String voiceAutoSendFinal = 'voice_auto_send_final';
+  static const String voiceBargeInEnabled = 'voice_barge_in_enabled';
   static const String voiceSttPreference = 'voice_stt_preference';
   static const String voiceSttLanguageCode = 'voice_stt_language_code';
   static const String socketTransportMode = 'socket_transport_mode';
@@ -67,12 +67,21 @@ final class PreferenceKeys {
   // long-term memory session key are secrets and live in SecureCredentialStorage.
   static const String hermesEnabled = 'hermes_enabled_v1';
   static const String hermesBaseUrl = 'hermes_base_url_v1';
+  static const String hermesBackendMode = 'hermes_backend_mode_v1';
+  static const String hermesDesktopAuthKind = 'hermes_desktop_auth_kind_v1';
+  static const String hermesDesktopProfile = 'hermes_desktop_profile_v1';
+  static const String hermesAllowSelfSignedCertificates =
+      'hermes_allow_self_signed_certificates_v1';
   static const String hermesLocalDocumentTrust =
       'hermes_local_document_trust_v1';
   static const String hermesLocalDocumentTrustPrincipal =
       'hermes_local_document_trust_principal_v1';
   static const String hermesMixedSessionBindingTrust =
       'hermes_mixed_session_binding_trust_v1';
+  static const String hermesPendingDesktopDecisions =
+      'hermes_pending_desktop_decisions_v1';
+  static const String hermesDashboardCookieIdentities =
+      'hermes_dashboard_cookie_identities_v1';
 
   /// Which backend onboarding completed against
   /// ('owui' | 'direct' | 'hermes' | unset).
@@ -101,7 +110,11 @@ final class PreferenceKeys {
   static const String notesListShowPinned = 'notes_list_show_pinned';
   static const String notesListShowRecent = 'notes_list_show_recent';
 
+  /// Bots section visibility in the sidebar Hermes tab.
+  static const String hermesShowBots = 'hermes_show_bots';
+
   static const String sidebarActiveTab = 'sidebar_active_tab';
+  static const String sidebarTabletWidth = 'sidebar_tablet_width_v1';
   static const String serverFeatureAvailability =
       'server_feature_availability_v1';
 

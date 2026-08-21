@@ -1,25 +1,54 @@
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/services/haptic_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_scroll_physics.dart';
 import '../../../shared/widgets/conduit_loading.dart';
-import '../../../shared/widgets/responsive_drawer_layout.dart';
+import '../../../shared/widgets/sidebar_layout_contract.dart';
+import '../../navigation/providers/sidebar_tab_scroll_registry.dart';
+import '../../navigation/models/sidebar_navigation_model.dart';
+import '../../navigation/widgets/chats_drawer.dart'
+    show sidebarSectionDisclosureIcon;
+import '../../navigation/widgets/drawer_section_notifiers.dart';
+import '../models/hermes_bot.dart';
 import '../models/hermes_session.dart';
 import '../providers/hermes_providers.dart';
+import 'hermes_bot_tile.dart';
 import 'hermes_jobs_sheet.dart';
 import 'hermes_session_tile.dart';
 
 /// Sidebar tab listing the user's Hermes server-side conversations, with one
 /// compact entry point for scheduled agents when the server exposes jobs.
-class HermesSessionsTab extends ConsumerWidget {
+class HermesSessionsTab extends ConsumerStatefulWidget {
   const HermesSessionsTab({super.key, this.showBottomNavigationBar = true});
 
   final bool showBottomNavigationBar;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HermesSessionsTab> createState() => _HermesSessionsTabState();
+}
+
+class _HermesSessionsTabState extends ConsumerState<HermesSessionsTab>
+    with SidebarTabScrollRegistration<HermesSessionsTab> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  SidebarTabId get sidebarTabId => SidebarTabId.hermes;
+
+  @override
+  ScrollController get sidebarScrollController => _scrollController;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final caps = ref.watch(hermesCapabilitiesProvider).asData?.value;
     final showJobs = caps?.jobs ?? true;
     final sessionsAsync = ref.watch(hermesSessionsProvider);
@@ -28,36 +57,75 @@ class HermesSessionsTab extends ConsumerWidget {
     // so InkWell / IconButton / CustomizationTile work inside this tab.
     // Top/bottom insets + the refresh edge offset mirror the Chats tab so the
     // content clears the native sidebar chrome and bottom tab bar.
+    final scroll = CustomScrollView(
+      controller: _scrollController,
+      primary: false,
+      physics: platformAlwaysScrollablePhysics(context),
+      slivers: [
+        SliverToBoxAdapter(
+          child: SizedBox(height: sidebarTabContentTopPadding(context)),
+        ),
+        ..._botSlivers(context, ref.watch(hermesBotsProvider).asData?.value),
+        if (showJobs) const SliverToBoxAdapter(child: _ScheduledAgentsTile()),
+        ..._sessionSlivers(context, sessionsAsync),
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: sidebarTabContentBottomPadding(
+              context,
+              includeNativeBottomBar: widget.showBottomNavigationBar,
+            ),
+          ),
+        ),
+      ],
+    );
+    final refreshable = ConduitRefreshIndicator(
+      edgeOffset: sidebarRefreshIndicatorEdgeOffset(context),
+      onRefresh: () async {
+        if (showJobs) ref.invalidate(hermesJobsProvider);
+        ref.invalidate(hermesBotsProvider);
+        ref.invalidate(hermesSessionsProvider);
+        await ref.read(hermesSessionsProvider.future);
+      },
+      child: scroll,
+    );
+    final primary = PrimaryScrollController(
+      controller: _scrollController,
+      child: refreshable,
+    );
     return Material(
       type: MaterialType.transparency,
-      child: ConduitRefreshIndicator(
-        edgeOffset: sidebarRefreshIndicatorEdgeOffset(context),
-        onRefresh: () async {
-          if (showJobs) ref.invalidate(hermesJobsProvider);
-          ref.invalidate(hermesSessionsProvider);
-          await ref.read(hermesSessionsProvider.future);
-        },
-        child: CustomScrollView(
-          physics: platformAlwaysScrollablePhysics(context),
-          slivers: [
-            SliverToBoxAdapter(
-              child: SizedBox(height: sidebarTabContentTopPadding(context)),
-            ),
-            if (showJobs)
-              const SliverToBoxAdapter(child: _ScheduledAgentsTile()),
-            ..._sessionSlivers(context, sessionsAsync),
-            SliverToBoxAdapter(
-              child: SizedBox(
-                height: sidebarTabContentBottomPadding(
-                  context,
-                  includeNativeBottomBar: showBottomNavigationBar,
-                ),
-              ),
-            ),
-          ],
+      child: context.usesCupertinoChrome
+          ? CupertinoScrollbar(controller: _scrollController, child: primary)
+          : Scrollbar(controller: _scrollController, child: primary),
+    );
+  }
+
+  /// The Bot Mode roster, above everything else. Absent entirely on gateways
+  /// without Bot Mode, which report no bots.
+  List<Widget> _botSlivers(BuildContext context, List<HermesBot>? bots) {
+    if (bots == null || bots.isEmpty) return const [];
+    final expanded = ref.watch(hermesShowBotsProvider);
+    return [
+      SliverToBoxAdapter(
+        child: _SectionHeader(
+          title: AppLocalizations.of(context)!.hermesBotsTitle,
+          count: bots.length,
+          expanded: expanded,
+          onToggle: () {
+            ConduitHaptics.selectionClick();
+            ref.read(hermesShowBotsProvider.notifier).toggle();
+          },
         ),
       ),
-    );
+      if (expanded)
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+          sliver: SliverList.builder(
+            itemCount: bots.length,
+            itemBuilder: (context, index) => HermesBotTile(bot: bots[index]),
+          ),
+        ),
+    ];
   }
 
   List<Widget> _sessionSlivers(
@@ -88,10 +156,10 @@ class HermesSessionsTab extends ConsumerWidget {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Spacing.sm,
-              vertical: Spacing.xs,
-            ),
+            // The shared conversation tile supplies the 4.0.3 Hermes 8pt row
+            // gutter. Keep list padding vertical to avoid doubling that inset
+            // only in this tab.
+            padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
             sliver: SliverList.builder(
               itemCount: sessions.length,
               itemBuilder: (context, index) =>
@@ -219,7 +287,7 @@ class _ScheduledAgentsTile extends ConsumerWidget {
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: AppTypography.captionStyle.copyWith(
+                      style: AppTypography.bodySmallStyle.copyWith(
                         color: theme.textSecondary,
                       ),
                     ),
@@ -262,10 +330,19 @@ class _ScheduledAgentsTile extends ConsumerWidget {
 
 /// Section header with an optional count badge.
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.count});
+  const _SectionHeader({
+    required this.title,
+    this.count,
+    this.expanded,
+    this.onToggle,
+  });
 
   final String title;
   final int? count;
+
+  /// Disclosure state; null renders a plain, non-collapsible header.
+  final bool? expanded;
+  final VoidCallback? onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -275,7 +352,7 @@ class _SectionHeader extends StatelessWidget {
       fontWeight: FontWeight.w700,
     );
 
-    return Padding(
+    final header = Padding(
       padding: const EdgeInsets.fromLTRB(
         Spacing.md,
         Spacing.md,
@@ -287,6 +364,14 @@ class _SectionHeader extends StatelessWidget {
           Expanded(
             child: Row(
               children: [
+                if (expanded != null) ...[
+                  Icon(
+                    sidebarSectionDisclosureIcon(expanded!),
+                    color: theme.iconSecondary,
+                    size: IconSize.listItem,
+                  ),
+                  const SizedBox(width: Spacing.xxs),
+                ],
                 Text(title, style: titleStyle),
                 if (count != null) ...[
                   const SizedBox(width: Spacing.sm),
@@ -303,6 +388,13 @@ class _SectionHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+
+    if (onToggle == null) return header;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onToggle,
+      child: header,
     );
   }
 }

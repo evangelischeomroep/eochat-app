@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_tex/flutter_tex.dart';
 
-import '../../jovial_svg_image.dart';
+import '../../horizontal_gesture_ownership.dart';
 import 'latex_rendering_server.dart';
 
 /// Extracts LaTeX expressions before markdown parsing and
@@ -103,6 +103,11 @@ class LatexPreprocessor {
   /// Use [splitOnPlaceholders] during rendering to recover
   /// the original LaTeX content.
   String extract(String content) {
+    // Every delimiter starts with '$' or '\'; skip the four full regex passes
+    // for the common all-prose case.
+    if (!content.contains(r'$') && !content.contains('\\')) {
+      return content;
+    }
     var result = content;
 
     // Extract \[...\] block LaTeX.
@@ -227,13 +232,17 @@ class LatexPreprocessor {
         loadingWidgetBuilder: (_) => _buildLatexFallback(tex, textStyle),
         errorWidgetBuilder: (_, _) => _buildLatexFallback(tex, textStyle),
         formulaWidgetBuilder: (context, svg) {
-          final scaledFontSize = MediaQuery.textScalerOf(
-            context,
-          ).scale(baseFontSize);
+          final scaledFontSize = MediaQuery.textScalerOf(context)
+              .scale(baseFontSize);
           final height = _svgExToPixels(svg, scaledFontSize);
           return ColorFiltered(
             colorFilter: ColorFilter.mode(color, BlendMode.srcATop),
-            child: JovialSvgImage.string(svg, height: height),
+            child: SvgPicture.string(
+              svg,
+              height: height,
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+            ),
           );
         },
       );
@@ -257,9 +266,16 @@ class LatexPreprocessor {
 
   static Widget _wrapLatexWidget(Widget child, {required bool isBlock}) {
     if (!isBlock) return child;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: child,
+    return HorizontalScrollGestureBoundary(
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Center(child: child),
+          ),
+        ),
+      ),
     );
   }
 

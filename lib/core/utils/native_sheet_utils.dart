@@ -1,6 +1,7 @@
 import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../shared/utils/locale_display_formatters.dart';
 import '../models/model.dart';
 import '../models/server_memory.dart';
 import '../models/socket_health.dart';
@@ -77,18 +78,18 @@ NativeSheetDetailConfig buildNativeLoadingDetail({
   return NativeSheetDetailConfig(
     id: id,
     title: title,
-    subtitle: subtitle ?? l10n.loadingShort,
+    subtitle: subtitle,
     items: [buildNativeLoadingItem(l10n, id: '$id-loading')],
   );
 }
 
 class NativeAudioSheetParts {
   const NativeAudioSheetParts({
-    required this.mainItems,
+    required this.mainSections,
     required this.voicePickerDetail,
   });
 
-  final List<NativeSheetItemConfig> mainItems;
+  final List<NativeSheetSectionConfig> mainSections;
   final NativeSheetDetailConfig voicePickerDetail;
 }
 
@@ -186,7 +187,6 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
   final speechRateSlider = NativeSheetItemConfig(
     id: 'tts-speech-rate',
     title: l10n.ttsSpeechRate,
-    subtitle: '${(appSettings.ttsSpeechRate * 100).round()}%',
     sfSymbol: 'gauge.with.dots.needle.67percent',
     kind: NativeSheetItemKind.slider,
     value: appSettings.ttsSpeechRate,
@@ -226,7 +226,10 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
   );
 
   return NativeAudioSheetParts(
-    mainItems: [...sttItems, ...ttsItems],
+    mainSections: [
+      NativeSheetSectionConfig(items: sttItems),
+      NativeSheetSectionConfig(items: ttsItems),
+    ],
     voicePickerDetail: voicePickerDetail,
   );
 }
@@ -451,7 +454,6 @@ List<NativeSheetDetailConfig> buildNativeModelPromptLoadingDetails(
       NativeSheetDetailConfig(
         id: 'model-prompt:${Uri.encodeComponent(model.id)}',
         title: l10n.modelSystemPromptTitle(model.name),
-        subtitle: l10n.loadingShort,
         items: [
           buildNativeLoadingItem(
             l10n,
@@ -472,6 +474,8 @@ String nativeLanguageLabel(AppLocalizations l10n, String code) {
       return l10n.czech;
     case 'sk':
       return l10n.slovak;
+    case 'pl':
+      return l10n.polish;
     case 'de':
       return l10n.deutsch;
     case 'fr':
@@ -500,6 +504,7 @@ String nativeLanguageLabel(AppLocalizations l10n, String code) {
       if (normalized == 'ja') return l10n.japanese;
       if (normalized == 'cs') return l10n.czech;
       if (normalized == 'sk') return l10n.slovak;
+      if (normalized == 'pl') return l10n.polish;
       return l10n.system;
   }
 }
@@ -512,6 +517,7 @@ List<NativeSheetOptionConfig> nativeLanguageDropdownOptions(
     NativeSheetOptionConfig(id: 'en', label: l10n.english),
     NativeSheetOptionConfig(id: 'cs', label: l10n.czech),
     NativeSheetOptionConfig(id: 'sk', label: l10n.slovak),
+    NativeSheetOptionConfig(id: 'pl', label: l10n.polish),
     NativeSheetOptionConfig(id: 'de', label: l10n.deutsch),
     NativeSheetOptionConfig(id: 'es', label: l10n.espanol),
     NativeSheetOptionConfig(id: 'fr', label: l10n.francais),
@@ -628,10 +634,8 @@ String _nativeSocketQualityLabel(AppLocalizations l10n, String quality) {
 String _nativeFormatHeartbeatRelative(
   AppLocalizations l10n,
   DateTime lastHeartbeat,
-) {
-  final diff = DateTime.now().difference(lastHeartbeat);
-  if (diff.inSeconds < 5) return l10n.timeJustNow;
-  if (diff.inSeconds < 60) return l10n.timeSecondsAgo(diff.inSeconds);
-  if (diff.inMinutes < 60) return l10n.timeMinutesAgo(diff.inMinutes);
-  return l10n.timeHoursAgo(diff.inHours);
-}
+) => LocaleDisplayFormatters.relativeTime(
+  l10n,
+  lastHeartbeat,
+  fallbackToDate: false,
+);

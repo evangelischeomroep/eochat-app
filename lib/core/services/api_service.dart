@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:uuid/uuid.dart';
+
 import 'chat_completion_transport.dart';
 import '../models/account_metadata.dart';
 import '../models/backend_config.dart';
@@ -23,6 +25,9 @@ import '../models/server_memory.dart';
 import '../models/server_user_settings.dart';
 import '../models/user.dart';
 import '../network/conduit_user_agent.dart';
+import '../network/same_origin_redirect_interceptor.dart';
+export '../network/same_origin_redirect_interceptor.dart'
+    show isCredentialSafeRedirectTarget, nextSameOriginRedirectRequest;
 import '../../features/workspace/models/workspace_common.dart';
 import '../../features/workspace/models/workspace_knowledge.dart';
 import '../../features/workspace/models/workspace_prompt_command.dart';
@@ -35,6 +40,7 @@ import '../sync/sync_api_client.dart' show SyncTerminalException;
 import 'connectivity_service.dart';
 import '../utils/debug_logger.dart';
 import '../utils/embed_utils.dart';
+import '../utils/openwebui_message_payload.dart';
 import '../utils/json_normalization.dart';
 import '../utils/message_tree_utils.dart' as message_tree;
 import 'conversation_parsing.dart';
@@ -55,34 +61,6 @@ const Set<int> _publicHealthRedirectStatusCodes = {
   HttpStatus.temporaryRedirect,
   HttpStatus.permanentRedirect,
 };
-
-const int _maximumSameOriginRedirectHops = 5;
-const String _sameOriginRedirectHopExtraKey = 'conduit.sameOriginRedirectHops';
-
-int _effectiveHttpPort(Uri uri) {
-  if (uri.hasPort) return uri.port;
-  return uri.scheme.toLowerCase() == 'https' ? 443 : 80;
-}
-
-/// Whether a redirect target may keep this client's credentials: the exact
-/// request origin, or its default-port https upgrade. Cross-origin hops,
-/// scheme downgrades, and port remaps must surface to the caller instead.
-@visibleForTesting
-bool isCredentialSafeRedirectTarget(Uri from, Uri to) {
-  final fromScheme = from.scheme.toLowerCase();
-  final toScheme = to.scheme.toLowerCase();
-  if (toScheme != 'http' && toScheme != 'https') return false;
-  if (to.host.isEmpty || to.host.toLowerCase() != from.host.toLowerCase()) {
-    return false;
-  }
-  if (toScheme == fromScheme) {
-    return _effectiveHttpPort(to) == _effectiveHttpPort(from);
-  }
-  return fromScheme == 'http' &&
-      toScheme == 'https' &&
-      _effectiveHttpPort(from) == 80 &&
-      _effectiveHttpPort(to) == 443;
-}
 
 final class _PublicHealthDeadline {
   _PublicHealthDeadline(this.budget) : _clock = Stopwatch()..start();
@@ -128,12 +106,17 @@ CancelToken _linkedPublicHealthCancelToken(CancelToken parent) {
   return child;
 }
 
-typedef PublicHealthAddressResolver =
-    Future<List<InternetAddress>> Function(String host);
-typedef PublicHealthSocketConnector =
-    Future<ConnectionTask<Socket>> Function(InternetAddress address, int port);
-typedef PublicHealthSocketUpgrader =
-    Future<Socket> Function(Socket socket, String host);
+typedef PublicHealthAddressResolver = Future<List<InternetAddress>> Function(
+  String host,
+);
+typedef PublicHealthSocketConnector = Future<ConnectionTask<Socket>> Function(
+  InternetAddress address,
+  int port,
+);
+typedef PublicHealthSocketUpgrader = Future<Socket> Function(
+  Socket socket,
+  String host,
+);
 
 final class _PublicHealthNat64Prefix {
   const _PublicHealthNat64Prefix(this.bytes, this.length);
@@ -704,112 +687,6 @@ enum HealthCheckResult {
   unreachable,
 }
 
-/// Converts ChatSourceReference list back to OpenWebUI's expected format.
-/// OpenWebUI expects: { source: {...}, document: [...], metadata: [...] }
-/// But ChatSourceReference stores: { id, title, url, snippet, type, metadata }
-List<Map<String, dynamic>> _convertSourcesToOpenWebUIFormat(
-  List<ChatSourceReference> sources,
-) {
-  return sources.map((ref) {
-    final result = <String, dynamic>{};
-
-    // Build the source object
-    final sourceObj = <String, dynamic>{};
-    if (ref.id != null) sourceObj['id'] = ref.id;
-    if (ref.title != null) sourceObj['name'] = ref.title;
-    if (ref.url != null) sourceObj['url'] = ref.url;
-    if (ref.type != null) sourceObj['type'] = ref.type;
-
-    // Extract nested source from metadata if present
-    final metadataSource = ref.metadata?['source'];
-    if (metadataSource is Map) {
-      for (final entry in metadataSource.entries) {
-        sourceObj[entry.key.toString()] ??= entry.value;
-      }
-    }
-
-    if (sourceObj.isNotEmpty) {
-      result['source'] = sourceObj;
-    }
-
-    // Extract documents from metadata or use snippet
-    final documents = ref.metadata?['documents'];
-    if (documents is List && documents.isNotEmpty) {
-      result['document'] = documents;
-    } else if (ref.snippet != null && ref.snippet!.isNotEmpty) {
-      result['document'] = [ref.snippet];
-    }
-
-    // Extract metadata items
-    final metadataItems = ref.metadata?['items'];
-    if (metadataItems is List && metadataItems.isNotEmpty) {
-      result['metadata'] = metadataItems;
-    } else {
-      // Create a basic metadata entry
-      final basicMeta = <String, dynamic>{};
-      if (ref.id != null) basicMeta['source'] = ref.id;
-      if (ref.title != null) basicMeta['name'] = ref.title;
-      if (result['document'] is List) {
-        result['metadata'] = List.generate(
-          (result['document'] as List).length,
-          (_) => Map<String, dynamic>.from(basicMeta),
-        );
-      }
-    }
-
-    // Extract distances if present
-    final distances = ref.metadata?['distances'];
-    if (distances is List && distances.isNotEmpty) {
-      result['distances'] = distances;
-    }
-
-    return result;
-  }).toList();
-}
-
-/// Converts ChatCodeExecution list to OpenWebUI's expected format.
-/// OpenWebUI expects `code_executions` (snake_case) with specific structure.
-/// ChatCodeExecution stores: { id, name, language, code, result, metadata }
-/// OpenWebUI expects: { id, name, code, language?, result?: { error?, output?, files? } }
-List<Map<String, dynamic>> _convertCodeExecutionsToOpenWebUIFormat(
-  List<ChatCodeExecution> executions,
-) {
-  return executions.map((exec) {
-    final result = <String, dynamic>{
-      'id': exec.id,
-      if (exec.name != null) 'name': exec.name,
-      if (exec.code != null) 'code': exec.code,
-      if (exec.language != null) 'language': exec.language,
-    };
-
-    // Convert the result if present
-    if (exec.result != null) {
-      final execResult = <String, dynamic>{};
-      if (exec.result!.output != null) {
-        execResult['output'] = exec.result!.output;
-      }
-      if (exec.result!.error != null) {
-        execResult['error'] = exec.result!.error;
-      }
-      if (exec.result!.files.isNotEmpty) {
-        execResult['files'] = exec.result!.files
-            .map(
-              (f) => <String, dynamic>{
-                if (f.name != null) 'name': f.name,
-                if (f.url != null) 'url': f.url,
-              },
-            )
-            .toList();
-      }
-      if (execResult.isNotEmpty) {
-        result['result'] = execResult;
-      }
-    }
-
-    return result;
-  }).toList();
-}
-
 class ApiService {
   final Dio _dio;
   final ServerConfig serverConfig;
@@ -912,61 +789,9 @@ class ApiService {
     // following was disabled, so safe idempotent hops are replayed here with
     // the target restricted by [isCredentialSafeRedirectTarget].
     _dio.interceptors.add(
-      InterceptorsWrapper(
-        onError: (error, handler) async {
-          final response = error.response;
-          final status = response?.statusCode;
-          if (error.type != DioExceptionType.badResponse ||
-              response == null ||
-              status == null ||
-              !_publicHealthRedirectStatusCodes.contains(status)) {
-            return handler.next(error);
-          }
-          final options = error.requestOptions;
-          final method = options.method.toUpperCase();
-          final convertsToGet =
-              status == HttpStatus.seeOther && method != 'HEAD';
-          if (method != 'GET' && method != 'HEAD' && !convertsToGet) {
-            return handler.next(error);
-          }
-          final locationValue = response.headers.value(
-            HttpHeaders.locationHeader,
-          );
-          final location = locationValue == null
-              ? null
-              : Uri.tryParse(locationValue);
-          if (location == null) return handler.next(error);
-          final target = options.uri.resolveUri(location);
-          final hops =
-              (options.extra[_sameOriginRedirectHopExtraKey] as int?) ?? 0;
-          if (hops >= _maximumSameOriginRedirectHops ||
-              !isCredentialSafeRedirectTarget(options.uri, target)) {
-            return handler.next(error);
-          }
-          options.extra = Map<String, dynamic>.of(options.extra)
-            ..[_sameOriginRedirectHopExtraKey] = hops + 1;
-          // Location carries the complete target including its query; the
-          // original queryParameters must not be re-merged on top of it.
-          options.path = target.toString();
-          options.queryParameters = <String, dynamic>{};
-          if (convertsToGet) {
-            options.method = 'GET';
-            options.data = null;
-            // Stale body headers would make the bodyless GET claim content it
-            // never sends, which the server-side parser rejects.
-            options.headers.removeWhere((name, _) {
-              final normalized = name.toLowerCase();
-              return normalized == Headers.contentLengthHeader ||
-                  normalized == Headers.contentTypeHeader;
-            });
-          }
-          try {
-            final redirected = await _dio.fetch<dynamic>(options);
-            return handler.resolve(redirected);
-          } on DioException catch (redirectError) {
-            return handler.next(redirectError);
-          }
-        },
+      SameOriginRedirectInterceptor(
+        _dio,
+        prepareReplay: _authInterceptor.prepareRedirectReplay,
       ),
     );
 
@@ -1651,7 +1476,9 @@ class ApiService {
       }
 
       _setChatRequestMetadataFormatFromVersion(data['version']);
-      return _enrichBackendConfigWithAudioConfig(BackendConfig.fromJson(data));
+      return await _enrichBackendConfigWithAudioConfig(
+        BackendConfig.fromJson(data),
+      );
     } catch (e) {
       return null;
     }
@@ -1674,7 +1501,7 @@ class ApiService {
         return null;
       }
       _setChatRequestMetadataFormatFromVersion(jsonMap['version']);
-      return _enrichBackendConfigWithAudioConfig(
+      return await _enrichBackendConfigWithAudioConfig(
         BackendConfig.fromJson(jsonMap),
       );
     } on DioException catch (e, stackTrace) {
@@ -2215,7 +2042,7 @@ class ApiService {
         scope: scope,
         data: {'code': response.statusCode},
       );
-      return _parseConversationSummaryPayload(
+      return await _parseConversationSummaryPayload(
         regular: (!pinned && !archived) ? response.data : const <dynamic>[],
         pinned: pinned ? response.data : const <dynamic>[],
         archived: archived ? response.data : const <dynamic>[],
@@ -2678,26 +2505,6 @@ class ApiService {
   // Parse OpenWebUI message format to our ChatMessage format
   // Build ordered messages list from Open‑WebUI history using parent chain to currentId
   // ===== Helpers to synthesize tool-call details blocks for UI parsing =====
-  List<Map<String, dynamic>>? _sanitizeFilesForWebUI(
-    List<Map<String, dynamic>>? files,
-  ) {
-    if (files == null || files.isEmpty) {
-      return null;
-    }
-    final sanitized = <Map<String, dynamic>>[];
-    for (final entry in files) {
-      final safe = <String, dynamic>{};
-      for (final MapEntry(:key, :value) in entry.entries) {
-        if (value == null) continue;
-        safe[key.toString()] = value;
-      }
-      if (safe.isNotEmpty) {
-        sanitized.add(safe);
-      }
-    }
-    return sanitized.isNotEmpty ? sanitized : null;
-  }
-
   List<String>? _sanitizeEmbedsForWebUI(List<Map<String, dynamic>>? embeds) {
     return sanitizeEmbedsForWebUi(embeds);
   }
@@ -2746,8 +2553,8 @@ class ApiService {
         if (msg.role == 'user' && model != null) 'models': [model],
         if (msg.attachmentIds != null && msg.attachmentIds!.isNotEmpty)
           'attachment_ids': List<String>.from(msg.attachmentIds!),
-        if (_sanitizeFilesForWebUI(msg.files) != null)
-          'files': _sanitizeFilesForWebUI(msg.files),
+        if (sanitizeFilesForWebUi(msg.files) != null)
+          'files': sanitizeFilesForWebUi(msg.files),
         'embeds': ?sanitizedEmbeds,
         // Assistant message extended fields
         if (msg.statusHistory.isNotEmpty)
@@ -2755,11 +2562,11 @@ class ApiService {
         if (msg.followUps.isNotEmpty)
           'followUps': List<String>.from(msg.followUps),
         if (msg.codeExecutions.isNotEmpty)
-          'code_executions': _convertCodeExecutionsToOpenWebUIFormat(
+          'code_executions': convertCodeExecutionsToOpenWebUIFormat(
             msg.codeExecutions,
           ),
         if (msg.sources.isNotEmpty)
-          'sources': _convertSourcesToOpenWebUIFormat(msg.sources),
+          'sources': convertSourcesToOpenWebUIFormat(msg.sources),
         if (msg.usage != null) 'usage': msg.usage,
         // Preserve error field for OpenWebUI compatibility
         if (msg.error != null) 'error': msg.error!.toJson(),
@@ -2788,8 +2595,8 @@ class ApiService {
         if (msg.role == 'user' && model != null) 'models': [model],
         if (msg.attachmentIds != null && msg.attachmentIds!.isNotEmpty)
           'attachment_ids': List<String>.from(msg.attachmentIds!),
-        if (_sanitizeFilesForWebUI(msg.files) != null)
-          'files': _sanitizeFilesForWebUI(msg.files),
+        if (sanitizeFilesForWebUi(msg.files) != null)
+          'files': sanitizeFilesForWebUi(msg.files),
         'embeds': ?sanitizedEmbeds,
         // Assistant message extended fields
         if (msg.statusHistory.isNotEmpty)
@@ -2797,11 +2604,11 @@ class ApiService {
         if (msg.followUps.isNotEmpty)
           'followUps': List<String>.from(msg.followUps),
         if (msg.codeExecutions.isNotEmpty)
-          'code_executions': _convertCodeExecutionsToOpenWebUIFormat(
+          'code_executions': convertCodeExecutionsToOpenWebUIFormat(
             msg.codeExecutions,
           ),
         if (msg.sources.isNotEmpty)
-          'sources': _convertSourcesToOpenWebUIFormat(msg.sources),
+          'sources': convertSourcesToOpenWebUIFormat(msg.sources),
         if (msg.usage != null) 'usage': msg.usage,
         // Preserve error field for OpenWebUI compatibility
         if (msg.error != null) 'error': msg.error!.toJson(),
@@ -2882,7 +2689,7 @@ class ApiService {
 
       // Use the properly formatted files array for WebUI display
       // The msg.files array already contains all attachments in the correct format
-      final sanitizedFiles = _sanitizeFilesForWebUI(msg.files);
+      final sanitizedFiles = sanitizeFilesForWebUi(msg.files);
       final sanitizedEmbeds = _sanitizeEmbedsForWebUI(msg.embeds);
 
       // Determine parent id: allow explicit parent override via metadata
@@ -2922,12 +2729,12 @@ class ApiService {
         if (msg.followUps.isNotEmpty)
           'followUps': List<String>.from(msg.followUps),
         if (msg.codeExecutions.isNotEmpty)
-          'code_executions': _convertCodeExecutionsToOpenWebUIFormat(
+          'code_executions': convertCodeExecutionsToOpenWebUIFormat(
             msg.codeExecutions,
           ),
         // Convert sources back to OpenWebUI format (with document array)
         if (msg.sources.isNotEmpty)
-          'sources': _convertSourcesToOpenWebUIFormat(msg.sources),
+          'sources': convertSourcesToOpenWebUIFormat(msg.sources),
         // Include usage statistics for persistence (issue #274)
         if (msg.usage != null) 'usage': msg.usage,
         // Preserve error field for OpenWebUI compatibility
@@ -2940,7 +2747,7 @@ class ApiService {
       }
 
       // Use the same properly formatted files array for messages array
-      final sanitizedArrayFiles = _sanitizeFilesForWebUI(msg.files);
+      final sanitizedArrayFiles = sanitizeFilesForWebUi(msg.files);
 
       messagesArray.add({
         'id': messageId,
@@ -2965,12 +2772,12 @@ class ApiService {
         if (msg.followUps.isNotEmpty)
           'followUps': List<String>.from(msg.followUps),
         if (msg.codeExecutions.isNotEmpty)
-          'code_executions': _convertCodeExecutionsToOpenWebUIFormat(
+          'code_executions': convertCodeExecutionsToOpenWebUIFormat(
             msg.codeExecutions,
           ),
         // Convert sources back to OpenWebUI format (with document array)
         if (msg.sources.isNotEmpty)
-          'sources': _convertSourcesToOpenWebUIFormat(msg.sources),
+          'sources': convertSourcesToOpenWebUIFormat(msg.sources),
         // Include usage statistics for persistence (issue #274)
         if (msg.usage != null) 'usage': msg.usage,
         // Preserve error field for OpenWebUI compatibility
@@ -3000,7 +2807,7 @@ class ApiService {
               if (ver.model != null) 'modelName': ver.model,
               'modelIdx': 0,
               'done': true,
-              if (ver.files != null) 'files': _sanitizeFilesForWebUI(ver.files),
+              if (ver.files != null) 'files': sanitizeFilesForWebUi(ver.files),
               if (ver.output != null) 'output': ver.output,
               if (_sanitizeEmbedsForWebUI(ver.embeds) != null)
                 'embeds': _sanitizeEmbedsForWebUI(ver.embeds),
@@ -3008,12 +2815,12 @@ class ApiService {
               if (ver.followUps.isNotEmpty)
                 'followUps': List<String>.from(ver.followUps),
               if (ver.codeExecutions.isNotEmpty)
-                'code_executions': _convertCodeExecutionsToOpenWebUIFormat(
+                'code_executions': convertCodeExecutionsToOpenWebUIFormat(
                   ver.codeExecutions,
                 ),
               // Convert sources back to OpenWebUI format (with document array)
               if (ver.sources.isNotEmpty)
-                'sources': _convertSourcesToOpenWebUIFormat(ver.sources),
+                'sources': convertSourcesToOpenWebUIFormat(ver.sources),
               // Preserve error field for OpenWebUI compatibility
               if (ver.error != null) 'error': ver.error!.toJson(),
             };
@@ -4713,9 +4520,9 @@ class ApiService {
       '/api/v1/knowledge/$id/files/pending',
       queryParameters: const {'stream': false},
     );
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspacePendingFile.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspacePendingFile.fromJson)
+        .toList(growable: false);
   }
 
   Future<WorkspaceKnowledgeDetail?> attachWorkspaceKnowledgeFile(
@@ -6227,9 +6034,9 @@ class ApiService {
 
   Future<List<WorkspaceModelDetail>> exportWorkspaceModels() async {
     final response = await _dio.get('/api/v1/models/export');
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspaceModelSummary.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspaceModelSummary.fromJson)
+        .toList(growable: false);
   }
 
   Future<bool> importWorkspaceModels(List<Map<String, dynamic>> models) async {
@@ -6242,9 +6049,9 @@ class ApiService {
 
   Future<List<WorkspaceModelDetail>> syncWorkspaceModels() async {
     final response = await _dio.post('/api/v1/models/sync');
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspaceModelSummary.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspaceModelSummary.fromJson)
+        .toList(growable: false);
   }
 
   Future<List<String>> getWorkspaceModelTags() async {
@@ -6257,9 +6064,9 @@ class ApiService {
   /// distinct from the user-facing `/models/list`).
   Future<List<WorkspaceModelSummary>> getWorkspaceBaseModels() async {
     final response = await _dio.get('/api/v1/models/base');
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspaceModelSummary.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspaceModelSummary.fromJson)
+        .toList(growable: false);
   }
 
   /// Fetches a model's profile image bytes from the dedicated
@@ -6377,9 +6184,9 @@ class ApiService {
 
   Future<List<WorkspaceSkillDetail>> exportWorkspaceSkills() async {
     final response = await _dio.get('/api/v1/skills/export');
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspaceSkillSummary.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspaceSkillSummary.fromJson)
+        .toList(growable: false);
   }
 
   Future<WorkspaceSkillDetail?> toggleWorkspaceSkill(String id) async {
@@ -6410,9 +6217,9 @@ class ApiService {
 
   Future<List<WorkspacePrincipalPreview>> getWorkspaceGroups() async {
     final response = await _dio.get('/api/v1/groups/');
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspacePrincipalPreview.group).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspacePrincipalPreview.group)
+        .toList(growable: false);
   }
 
   // Prompts
@@ -6581,9 +6388,9 @@ class ApiService {
       '/api/v1/prompts/id/$id/history',
       queryParameters: {'page': page < 0 ? 0 : page},
     );
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspacePromptHistoryEntry.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspacePromptHistoryEntry.fromJson)
+        .toList(growable: false);
   }
 
   Future<WorkspacePromptHistoryEntry> getWorkspacePromptHistoryEntry(
@@ -6694,9 +6501,9 @@ class ApiService {
 
   Future<List<WorkspaceToolSummary>> getWorkspaceTools() async {
     final response = await _dio.get('/api/v1/tools/list');
-    return workspaceJsonList(
-      response.data,
-    ).map(WorkspaceToolSummary.fromJson).toList(growable: false);
+    return workspaceJsonList(response.data)
+        .map(WorkspaceToolSummary.fromJson)
+        .toList(growable: false);
   }
 
   Future<List<Map<String, dynamic>>> getFunctions() async {
@@ -8851,12 +8658,12 @@ class ApiService {
 
       final data = response.data;
       if (data is List) {
-        return _normalizeList(data, debugLabel: 'parse_message_search');
+        return await _normalizeList(data, debugLabel: 'parse_message_search');
       }
       if (data is Map<String, dynamic>) {
         final list = (data['items'] ?? data['results'] ?? data['messages']);
         if (list is List) {
-          return _normalizeList(
+          return await _normalizeList(
             list,
             debugLabel: 'parse_message_search_wrapped',
           );
@@ -9274,8 +9081,7 @@ $content
   }) async {
     _traceApi('Enhancing note content with AI, model: $modelId');
 
-    const systemPrompt =
-        '''Enhance existing notes using the content's primary language. Your task is to make the notes more useful and comprehensive.
+    const systemPrompt = '''Enhance existing notes using the content's primary language. Your task is to make the notes more useful and comprehensive.
 
 # Output Format
 

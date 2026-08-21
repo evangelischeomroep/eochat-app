@@ -1,0 +1,23 @@
+{
+  "notes": [
+    {
+      "version": "4.1.0",
+      "title": "Co nowego",
+      "intro": "Cześć! Hermes może korzystać z Desktop Gateway, a boty są na pasku bocznym. Przebudowałem listy i panele, i ogarnąłem kilka błędów, które zbyt długo tam siedziały.",
+      "bullets": [
+        {
+          "text": "Hermes Bot Mode: połącz Desktop Gateway, wybierz bota na pasku bocznym, a kolejne odpowiedzi dzielą jeden nagłówek.",
+          "icon": "hermes"
+        },
+        {
+          "text": "Natywne zgrupowane listy, szkło na iOS 26, czcionki systemowe i pasek boczny na tablecie, którego szerokość możesz przeciągać.",
+          "icon": "polish"
+        },
+        {
+          "text": "Mniej przycięć podczas streamowania. LaTeX naprawdę się rysuje. Głos nie odpowiada już sam sobie. Polski jest na liście języków.",
+          "icon": "direct"
+        }
+      ]
+    }
+  ]
+}

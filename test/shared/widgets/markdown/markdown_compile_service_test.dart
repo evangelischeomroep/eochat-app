@@ -424,6 +424,16 @@ void main() {
       );
     });
 
+    test('preserves matrix separators and underbraces in block latex', () {
+      const formula =
+          r'\underbrace{-i\hbar c\,\boldsymbol{\alpha}\cdot\nabla\psi}_{\text{crossed out}}'
+          r'\qquad\begin{pmatrix}1&0\\0&-1\end{pmatrix}';
+      final document = compilePreparedMarkdownSync('\$\$$formula\$\$');
+
+      expect(document.blockLatexExpressions.values.single, formula);
+      expect(_collectLatexSegments(document.nodes).single.tex, formula);
+    });
+
     test('does not treat currency text as latex', () {
       final document = compilePreparedMarkdownSync(
         r'Plain currency text like $65,539 USD is about ~$42.6 million.',
@@ -650,48 +660,42 @@ void main() {
     },
   );
 
-  test(
-    'prepareContent falls back to sync when the async prepare backend fails',
-    () async {
-      MarkdownPrepareExecutionPath? executionPath;
-      final service = MarkdownCompileService(
-        workerManager: WorkerManager(),
-        debugOnPrepareExecution: (path) => executionPath = path,
-        debugPrepareContentOverride: (content, streaming) async {
-          throw StateError(
-            'prepare backend failed: streaming=$streaming length=${content.length}',
-          );
-        },
-      );
-      addTearDown(service.dispose);
+  test('prepareContent falls back to sync when the async prepare backend fails', () async {
+    MarkdownPrepareExecutionPath? executionPath;
+    final service = MarkdownCompileService(
+      workerManager: WorkerManager(),
+      debugOnPrepareExecution: (path) => executionPath = path,
+      debugPrepareContentOverride: (content, streaming) async {
+        throw StateError(
+          'prepare backend failed: streaming=$streaming length=${content.length}',
+        );
+      },
+    );
+    addTearDown(service.dispose);
 
-      final longPrefix = List<String>.filled(220, 'stream chunk').join(' ');
-      final content = [
-        longPrefix,
-        '<details type="tool_calls" name="search">',
-        '<summary>Tool Executed</summary>',
-        '{"q":"cats"}',
-      ].join('\n\n');
+    final longPrefix = List<String>.filled(220, 'stream chunk').join(' ');
+    final content = [
+      longPrefix,
+      '<details type="tool_calls" name="search">',
+      '<summary>Tool Executed</summary>',
+      '{"q":"cats"}',
+    ].join('\n\n');
 
-      expect(
-        service.shouldPrepareSynchronously(content, widgetTest: false),
-        isFalse,
-      );
+    expect(
+      service.shouldPrepareSynchronously(content, widgetTest: false),
+      isFalse,
+    );
 
-      final prepared = await service.prepareContent(
-        content,
-        streaming: true,
-        allowSynchronous: true,
-        widgetTest: false,
-      );
+    final prepared = await service.prepareContent(
+      content,
+      streaming: true,
+      allowSynchronous: true,
+      widgetTest: false,
+    );
 
-      expect(
-        prepared,
-        equals(prepareMarkdownContent(content, streaming: true)),
-      );
-      expect(executionPath, MarkdownPrepareExecutionPath.fallbackSync);
-    },
-  );
+    expect(prepared, equals(prepareMarkdownContent(content, streaming: true)));
+    expect(executionPath, MarkdownPrepareExecutionPath.fallbackSync);
+  });
 
   test(
     'compilePreparedBatch preserves order and dedupes cache entries',
@@ -782,9 +786,8 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     check(service.preparedInputs).deepEquals(contents);
-    check(
-      service.batchCalls.map((batch) => batch.length),
-    ).deepEquals([8, 8, 1]);
+    check(service.batchCalls.map((batch) => batch.length))
+        .deepEquals([8, 8, 1]);
   });
 
   test('prewarmContents yields before admitting the next raw batch', () async {

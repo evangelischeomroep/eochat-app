@@ -11,8 +11,10 @@ import '../../tools/providers/tools_providers.dart';
 import '../models/terminal_models.dart';
 import '../services/terminal_service.dart';
 
-typedef TerminalChannelConnector =
-    WebSocketChannel Function(Uri uri, {required TerminalServerKind kind});
+typedef TerminalChannelConnector = WebSocketChannel Function(
+  Uri uri, {
+  required TerminalServerKind kind,
+});
 
 final terminalServiceProvider = Provider<TerminalService?>((ref) {
   final api = ref.watch(apiServiceProvider);
@@ -256,4 +258,21 @@ class TerminalSidebarPanelNotifier extends Notifier<TerminalSidebarPanel> {
 final terminalSidebarPanelProvider =
     NotifierProvider<TerminalSidebarPanelNotifier, TerminalSidebarPanel>(
       TerminalSidebarPanelNotifier.new,
+    );
+
+class TerminalDisplayFileNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void show(String path) {
+    state = null;
+    state = path;
+  }
+
+  void clear() => state = null;
+}
+
+final terminalDisplayFileProvider =
+    NotifierProvider<TerminalDisplayFileNotifier, String?>(
+      TerminalDisplayFileNotifier.new,
     );

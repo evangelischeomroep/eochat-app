@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
@@ -97,7 +99,16 @@ List<T> _mergeById<T>(
 }
 
 void _syncModels(Ref ref) {
-  ref.invalidate(modelsProvider);
+  unawaited(
+    ref.read(modelsProvider.notifier).refresh().onError((error, stackTrace) {
+      DebugLogger.error(
+        'refresh-failed',
+        scope: 'workspace/models',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }),
+  );
 }
 
 void _syncKnowledge(Ref ref) {
@@ -112,7 +123,7 @@ void _syncPrompts(Ref ref) {
 
 void _syncSkills(Ref ref) {
   // Model metadata can contain skill relationships, so refresh resolved models.
-  ref.invalidate(modelsProvider);
+  _syncModels(ref);
 }
 
 @Riverpod(keepAlive: true)

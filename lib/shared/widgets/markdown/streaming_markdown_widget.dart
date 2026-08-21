@@ -1,11 +1,12 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../utils/ask_conduit_context_menu.dart';
-import '../responsive_drawer_layout.dart';
+import '../horizontal_gesture_ownership.dart';
 import 'compiled_markdown_document.dart';
 import 'markdown_config.dart';
 import 'markdown_compile_service.dart';
@@ -163,6 +164,13 @@ class _StreamingMarkdownWidgetState
   final GlobalKey _markdownContentKey = GlobalKey();
   final Map<String, CompiledMarkdownDocument> _displayPartDocumentCache =
       <String, CompiledMarkdownDocument>{};
+  // buildMarkdownDisplayParts re-derives one sub-document per root block and
+  // deep-compares each against the cache — O(whole message) string work. The
+  // widget rebuilds far more often than the compiled document changes (shell
+  // rebuilds, fade frames), so memoize the split by document identity.
+  CompiledMarkdownDocument? _displayPartsSourceDocument;
+  bool _displayPartsWereStreaming = false;
+  List<MarkdownDisplayPart>? _displayPartsMemo;
   // Unique per-instance prefix used when no stateScopeId is supplied, so two
   // scope-less StreamingMarkdownWidgets on the same route don't share
   // PageStorage keys (markdown_compile_service reuses block ids across unrelated
@@ -423,6 +431,8 @@ class _StreamingMarkdownWidgetState
   @override
   void didHaveMemoryPressure() {
     _displayPartDocumentCache.clear();
+    _displayPartsSourceDocument = null;
+    _displayPartsMemo = null;
     _compileService.handleMemoryPressure();
   }
 
@@ -603,6 +613,12 @@ class _StreamingMarkdownWidgetState
         generation != _snapshotGeneration ||
         widget.isStreaming ||
         widget.content != content) {
+      // A stale refresh must not leave the pending flag set forever: when no
+      // newer settled snapshot is queued to clear it, a blank snapshot would
+      // otherwise render an indefinite loading skeleton.
+      if (mounted && _pendingSettledSnapshot == null) {
+        _settledPreparationPending = false;
+      }
       return;
     }
 
@@ -749,7 +765,7 @@ class _StreamingMarkdownWidgetState
       return result;
     }
 
-    return DrawerOpenGestureExclusion(
+    return HorizontalGestureExclusion(
       child: SelectionArea(
         contextMenuBuilder: (context, selectableRegionState) {
           return buildAskConduitSelectionAreaContextMenu(
@@ -762,17 +778,28 @@ class _StreamingMarkdownWidgetState
         onSelectionChanged: (content) {
           _selectedText = content?.plainText;
         },
-        child: DrawerOpenGesturePriority(child: result),
+        child: PrioritizedHorizontalGesture(child: result),
       ),
     );
   }
 
   Widget _buildMarkdownDisplayParts(CompiledMarkdownDocument document) {
-    final parts = buildMarkdownDisplayParts(
-      document,
-      isStreaming: widget.isStreaming,
-    );
-    if (parts.isEmpty) {
+    var stableParts = _displayPartsMemo;
+    if (stableParts == null ||
+        !identical(document, _displayPartsSourceDocument) ||
+        widget.isStreaming != _displayPartsWereStreaming) {
+      final parts = buildMarkdownDisplayParts(
+        document,
+        isStreaming: widget.isStreaming,
+      );
+      stableParts = parts.isEmpty
+          ? const <MarkdownDisplayPart>[]
+          : _reuseStableDisplayPartDocuments(parts);
+      _displayPartsSourceDocument = document;
+      _displayPartsWereStreaming = widget.isStreaming;
+      _displayPartsMemo = stableParts;
+    }
+    if (stableParts.isEmpty) {
       _displayPartDocumentCache.clear();
       return _buildMarkdownWithCitations(
         document: document,
@@ -782,7 +809,6 @@ class _StreamingMarkdownWidgetState
         trimLastBlockBottomPadding: true,
       );
     }
-    final stableParts = _reuseStableDisplayPartDocuments(parts);
 
     return Column(
       mainAxisSize: MainAxisSize.min,

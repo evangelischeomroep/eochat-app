@@ -1,12 +1,12 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/services/navigation_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
-import '../../../shared/widgets/adaptive_route_shell.dart';
+import '../../../shared/widgets/utility_components.dart';
 
 /// First-run screen letting a fresh install choose its backend: a self-hosted
 /// Open WebUI, direct model APIs, or a Hermes Agent.
@@ -15,157 +15,90 @@ class BackendChooserPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context)!;
-    final safePadding = MediaQuery.of(context).padding;
+    final theme = context.conduitTheme;
 
-    return AdaptiveRouteShell(
-      backgroundColor: theme.surfaceBackground,
-      body: SingleChildScrollView(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding: EdgeInsets.only(
-                left: Spacing.pagePadding,
-                right: Spacing.pagePadding,
-                top: safePadding.top + Spacing.xxl,
-                bottom: Spacing.xxl,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    l10n.backendChooserWelcome,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.headlineLargeStyle.copyWith(
-                      color: theme.textPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.sm),
-                  Text(
-                    l10n.backendChooserPrompt,
-                    textAlign: TextAlign.center,
-                    style: AppTypography.bodyMediumStyle.copyWith(
-                      color: theme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.xxl),
-                  _ChooserCard(
-                    leading: const _ProviderLogo(
-                      assetName: 'assets/icons/open_webui.png',
-                      kind: _ProviderLogoKind.openWebUI,
-                    ),
-                    title: l10n.backendChooserOpenWebUITitle,
-                    subtitle: l10n.backendChooserOpenWebUISubtitle,
-                    onTap: () => context.go(Routes.serverConnection),
-                  ),
-                  const SizedBox(height: Spacing.md),
-                  _ChooserCard(
-                    leading: const _DirectConnectionIcon(),
-                    title: l10n.backendChooserDirectTitle,
-                    subtitle: l10n.backendChooserDirectSubtitle,
-                    onTap: () => context.go(
-                      '${Routes.directConnections}?onboarding=true',
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.md),
-                  _ChooserCard(
-                    leading: const _ProviderLogo(
-                      assetName: 'assets/icons/hermes_agent.png',
-                      kind: _ProviderLogoKind.hermes,
-                    ),
-                    title: l10n.backendChooserHermesTitle,
-                    subtitle: l10n.backendChooserHermesSubtitle,
-                    onTap: () => context.go(Routes.hermesSettings, extra: true),
-                  ),
-                ],
+    return UtilityPageScaffold.auth(
+      title: l10n.backendChooserWelcome,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+            child: Text(
+              l10n.backendChooserPrompt,
+              style: AppTypography.bodyMediumStyle.copyWith(
+                color: theme.textSecondary,
               ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ChooserCard extends StatelessWidget {
-  const _ChooserCard({
-    required this.leading,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final Widget leading;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.conduitTheme;
-
-    return Semantics(
-      label: '$title. $subtitle',
-      button: true,
-      onTap: onTap,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppBorderRadius.card),
-          child: Container(
-            padding: const EdgeInsets.all(Spacing.lg),
-            decoration: BoxDecoration(
-              color: theme.cardBackground,
-              borderRadius: BorderRadius.circular(AppBorderRadius.card),
-              border: Border.all(color: theme.cardBorder),
-            ),
-            child: Row(
+          const SizedBox(height: Spacing.sm),
+          InsetGroupedSection(
+            padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+            flat: true,
+            child: Column(
               children: [
-                leading,
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: AppTypography.standard.copyWith(
-                          color: theme.textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: Spacing.xxs),
-                      Text(
-                        subtitle,
-                        style: AppTypography.bodySmallStyle.copyWith(
-                          color: theme.textSecondary,
-                        ),
-                      ),
-                    ],
+                UtilitySelectionRow(
+                  leading: const _ProviderLogo(
+                    assetName: 'assets/icons/open_webui.png',
+                    kind: _ProviderLogoKind.openWebUI,
+                  ),
+                  title: l10n.backendChooserOpenWebUITitle,
+                  subtitle: l10n.backendChooserOpenWebUISubtitle,
+                  selected: false,
+                  showDivider: true,
+                  showSelectionIndicator: false,
+                  trailing: _chooserChevron(context),
+                  onTap: () => context.go(Routes.serverConnection),
+                ),
+                UtilitySelectionRow(
+                  leading: const _DirectConnectionIcon(),
+                  title: l10n.backendChooserDirectTitle,
+                  subtitle: l10n.backendChooserDirectSubtitle,
+                  selected: false,
+                  showDivider: true,
+                  showSelectionIndicator: false,
+                  trailing: _chooserChevron(context),
+                  onTap: () => context.goNamed(
+                    RouteNames.directConnections,
+                    queryParameters: const {'onboarding': 'true'},
                   ),
                 ),
-                Icon(
-                  context.usesCupertinoChrome
-                      ? CupertinoIcons.chevron_forward
-                      : Icons.chevron_right,
-                  color: theme.iconSecondary,
-                  size: IconSize.small,
+                UtilitySelectionRow(
+                  leading: const _ProviderLogo(
+                    assetName: 'assets/icons/hermes_agent.png',
+                    kind: _ProviderLogoKind.hermes,
+                  ),
+                  title: l10n.backendChooserHermesTitle,
+                  subtitle: l10n.backendChooserHermesSubtitle,
+                  selected: false,
+                  showSelectionIndicator: false,
+                  trailing: _chooserChevron(context),
+                  onTap: () => context.go(Routes.hermesSettings, extra: true),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
+Widget _chooserChevron(BuildContext context) => Icon(
+  context.usesCupertinoChrome
+      ? CupertinoIcons.chevron_forward
+      : Icons.chevron_right,
+  color: context.conduitTheme.iconSecondary,
+  size: IconSize.small,
+);
+
 enum _ProviderLogoKind { openWebUI, hermes }
+
+/// Matches the 40x40 icon-badge footprint used by `SettingsIconBadge` and the
+/// Cupertino leading slot in `UtilitySelectionRow`; a larger box gets squeezed
+/// into 40 there, which crops the edges off a full-bleed logo.
+const double _providerLogoSize = 40;
 
 class _ProviderLogo extends StatelessWidget {
   const _ProviderLogo({required this.assetName, required this.kind});
@@ -182,8 +115,8 @@ class _ProviderLogo extends StatelessWidget {
         borderRadius: BorderRadius.circular(AppBorderRadius.md),
         child: Image.asset(
           assetName,
-          width: TouchTarget.minimum,
-          height: TouchTarget.minimum,
+          width: _providerLogoSize,
+          height: _providerLogoSize,
           fit: BoxFit.cover,
           filterQuality: FilterQuality.medium,
           excludeFromSemantics: true,
@@ -192,8 +125,8 @@ class _ProviderLogo extends StatelessWidget {
     }
 
     return Container(
-      width: TouchTarget.minimum,
-      height: TouchTarget.minimum,
+      width: _providerLogoSize,
+      height: _providerLogoSize,
       padding: const EdgeInsets.all(Spacing.xs),
       decoration: BoxDecoration(
         color: theme.surfaceContainerHighest,
@@ -219,8 +152,8 @@ class _DirectConnectionIcon extends StatelessWidget {
     final theme = context.conduitTheme;
 
     return Container(
-      width: TouchTarget.minimum,
-      height: TouchTarget.minimum,
+      width: _providerLogoSize,
+      height: _providerLogoSize,
       decoration: BoxDecoration(
         color: theme.buttonPrimary.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppBorderRadius.md),

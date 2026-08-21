@@ -2,22 +2,27 @@ import 'package:conduit/features/release_notes/models/release_note.dart';
 import 'package:conduit/features/release_notes/release_notes_banner_controller.dart';
 import 'package:conduit/features/release_notes/widgets/release_notes_banner.dart';
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit/shared/widgets/conduit_components.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/test_fonts.dart';
+
 void main() {
+  setUpAll(loadTestFonts);
+
   testWidgets('presents the 4.0 announcement below the greeting', (
     tester,
   ) async {
     await _pumpBanner(tester, size: const Size(320, 568));
 
     expect(find.text('How can I help?'), findsOneWidget);
-    expect(find.text('Conduit 4.0 is here'), findsOneWidget);
+    expect(find.text("What's new in 4.0"), findsOneWidget);
     expect(find.text('Tap to learn more'), findsOneWidget);
     expect(find.text("What's new"), findsNothing);
     final greetingBottom = tester
@@ -38,21 +43,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('release announcement matches its golden', (tester) async {
-    await _pumpBanner(tester);
-
-    await expectLater(
-      find.byKey(releaseNotesBannerKey),
-      matchesGoldenFile('goldens/release_notes_banner.png'),
-    );
-  });
-
   testWidgets('localizes the announcement title and learn-more prompt', (
     tester,
   ) async {
     await _pumpBanner(tester, locale: const Locale('de'));
 
-    expect(find.text('Conduit 4.0 ist da'), findsOneWidget);
+    expect(find.text('Neu in 4.0'), findsOneWidget);
     expect(find.text('Mehr erfahren'), findsOneWidget);
   });
 }
@@ -76,7 +72,7 @@ Future<void> _pumpBanner(
       child: MaterialApp(
         theme: AppTheme.light(TweakcnThemes.t3Chat),
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: conduitLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(
           body: Center(

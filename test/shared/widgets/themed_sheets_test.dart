@@ -4,68 +4,104 @@ import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit/shared/utils/adaptive_glass.dart';
 import 'package:conduit/shared/widgets/adaptive_toolbar_components.dart';
 import 'package:conduit/shared/widgets/conduit_components.dart';
+import 'package:conduit/shared/widgets/middle_ellipsis_text.dart';
 import 'package:conduit/shared/widgets/themed_sheets.dart';
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:checks/checks.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stupid_simple_sheet/stupid_simple_sheet.dart';
 
 void main() {
-  test(
-    'native SF Symbols keep compact optical sizes inside scaled controls',
-    () {
-      check(kConduitNativeSidebarSymbolExtent).equals(20);
-      check(kConduitNativeToolbarSymbolExtent).equals(22);
-      check(kConduitNativeGroupedToolbarSymbolExtent).equals(22);
-      check(kConduitNativeVisibilitySymbolExtent).equals(18);
-      check(kConduitNativeUtilitySymbolExtent).equals(17);
-      check(kConduitNativePrimarySymbolExtent).equals(17);
-      check(kConduitNativeModelChevronExtent).equals(13);
-      check(
-        kConduitNativeUtilitySymbolExtent,
-      ).isLessThan(kConduitNativeToolbarSymbolExtent);
-      check(kConduitNativeUtilitySymbolExtent).isLessThan(IconSize.large);
-      check(
-        kConduitNativePrimarySymbolExtent,
-      ).equals(kConduitNativeUtilitySymbolExtent);
-    },
-  );
-
-  test('toolbar icons preserve their SF Symbol lookup values', () {
-    check(
-      conduitToolbarSfSymbolForIcon(CupertinoIcons.line_horizontal_3),
-    ).equals('line.3.horizontal');
-    check(
-      conduitToolbarSfSymbolForIcon(Icons.menu),
-    ).equals('line.3.horizontal');
-    check(
-      conduitToolbarSfSymbolForIcon(CupertinoIcons.chevron_back),
-    ).equals('chevron.left');
-    check(
-      conduitToolbarSfSymbolForIcon(CupertinoIcons.create),
-    ).equals('square.and.pencil');
-    check(
-      conduitToolbarSfSymbolForIcon(CupertinoIcons.eye_slash),
-    ).equals('eye.slash');
-    check(
-      conduitToolbarSfSymbolForIcon(Icons.people_outline),
-    ).equals('person.2');
-    check(
-      conduitToolbarSfSymbolForIcon(Icons.circle, iosSymbol: 'ellipsis'),
-    ).equals('ellipsis');
-    check(conduitToolbarSfSymbolForIcon(Icons.delete)).isNull();
+  test('shared chrome uses the standard platform icon extent', () {
+    check(IconSize.appBar).equals(24);
+    check(IconSize.tabBar).equals(20);
+    check(IconSize.large).equals(24);
+    check(const SFSymbol('circle').size).equals(20);
+    check(kConduitModelSelectorChevronExtent).equals(13);
   });
 
-  test('toolbar symbols use optical sizes across shared app bars', () {
-    check(conduitNativeToolbarSymbolExtentFor('line.3.horizontal')).equals(20);
-    check(conduitNativeToolbarSymbolExtentFor('chevron.left')).equals(20);
-    check(conduitNativeToolbarSymbolExtentFor('eye')).equals(18);
-    check(conduitNativeToolbarSymbolExtentFor('eye.slash')).equals(18);
-    check(conduitNativeToolbarSymbolExtentFor('square.and.pencil')).equals(22);
-    check(conduitNativeToolbarSymbolExtentFor('person.2')).equals(22);
-    check(conduitNativeToolbarSymbolExtentFor(null)).equals(22);
+  testWidgets('model selector uses standard text and a compact chevron', (
+    tester,
+  ) async {
+    PlatformUiCapabilities.debugPlatformOverride = TargetPlatform.iOS;
+    PlatformUiCapabilities.debugIOSMajorVersionOverride = 25;
+    PlatformUiCapabilities.debugNativeIOS26Override = false;
+    addTearDown(PlatformUiCapabilities.resetDebugOverrides);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat)
+            .copyWith(platform: TargetPlatform.iOS),
+        home: Scaffold(
+          body: ConduitAdaptiveAppBarModelSelector(
+            label: 'A model with a long standard title',
+            maxWidth: 240,
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+
+    final label = tester.widget<MiddleEllipsisText>(
+      find.byType(MiddleEllipsisText),
+    );
+    check(label.style?.fontSize).equals(17);
+    check(label.style?.fontWeight).equals(FontWeight.w400);
+    final chevron = tester.widget<ConduitSystemAdaptiveIcon>(
+      find.byType(ConduitSystemAdaptiveIcon),
+    );
+    check(chevron.size).equals(kConduitModelSelectorChevronExtent);
+  });
+
+  testWidgets('native model selector leaves typography to UIKit', (
+    tester,
+  ) async {
+    PlatformUiCapabilities.debugPlatformOverride = TargetPlatform.iOS;
+    PlatformUiCapabilities.debugIOSMajorVersionOverride = 26;
+    PlatformUiCapabilities.debugNativeIOS26Override = true;
+    addTearDown(PlatformUiCapabilities.resetDebugOverrides);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat)
+            .copyWith(platform: TargetPlatform.iOS),
+        home: Scaffold(
+          body: ConduitAdaptiveAppBarModelSelector(
+            label: 'Inkling',
+            maxWidth: 240,
+            onPressed: () {},
+          ),
+        ),
+      ),
+    );
+
+    final button = tester.widget<CNButton>(find.byType(CNButton));
+    check(button.icon?.size).equals(kConduitModelSelectorChevronExtent);
+    check(button.config.labelFontSize).isNull();
+    check(button.config.labelFontWeight).isNull();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 500));
+  });
+
+  test('toolbar icons preserve their SF Symbol lookup values', () {
+    check(conduitToolbarSfSymbolForIcon(CupertinoIcons.line_horizontal_3))
+        .equals('line.3.horizontal');
+    check(conduitToolbarSfSymbolForIcon(Icons.menu))
+        .equals('line.3.horizontal');
+    check(conduitToolbarSfSymbolForIcon(CupertinoIcons.chevron_back))
+        .equals('chevron.left');
+    check(conduitToolbarSfSymbolForIcon(CupertinoIcons.create))
+        .equals('square.and.pencil');
+    check(conduitToolbarSfSymbolForIcon(CupertinoIcons.eye_slash))
+        .equals('eye.slash');
+    check(conduitToolbarSfSymbolForIcon(Icons.people_outline))
+        .equals('person.2');
+    check(conduitToolbarSfSymbolForIcon(Icons.circle, iosSymbol: 'ellipsis'))
+        .equals('ellipsis');
+    check(conduitToolbarSfSymbolForIcon(Icons.delete)).isNull();
   });
 
   test('native model-selector labels remain on one line within their cap', () {
@@ -99,9 +135,8 @@ void main() {
     check(longLabel).contains('…');
     check(longLabel.contains('\n')).isFalse();
     check(longLabel.length).isLessThan('google/gemma-4-31b-it'.length);
-    check(
-      conduitNativeModelSelectorSymbol(showChevron: true),
-    ).equals('chevron.down');
+    check(conduitNativeModelSelectorSymbol(showChevron: true))
+        .equals('chevron.down');
     check(conduitNativeModelSelectorSymbol(showChevron: false)).isNull();
   });
 
@@ -131,15 +166,14 @@ void main() {
 
     check(params['label']).equals(label);
     check(params['label'] == bounded).isFalse();
+    check(params.containsKey('symbolSize')).isFalse();
   });
 
   test('native model-selector title follows Dynamic Type', () {
-    check(
-      resolveConduitNativeModelTitleFontSize(TextScaler.noScaling),
-    ).equals(17);
-    check(
-      resolveConduitNativeModelTitleFontSize(const TextScaler.linear(2)),
-    ).equals(34);
+    check(resolveConduitNativeModelTitleFontSize(TextScaler.noScaling))
+        .equals(17);
+    check(resolveConduitNativeModelTitleFontSize(const TextScaler.linear(2)))
+        .equals(34);
   });
 
   test('native model-selector semantics expose only valid activation', () {
@@ -237,9 +271,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light(
-          TweakcnThemes.t3Chat,
-        ).copyWith(platform: TargetPlatform.iOS),
+        theme: AppTheme.light(TweakcnThemes.t3Chat)
+            .copyWith(platform: TargetPlatform.iOS),
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
@@ -273,9 +306,8 @@ void main() {
   ) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light(
-          TweakcnThemes.t3Chat,
-        ).copyWith(platform: TargetPlatform.android),
+        theme: AppTheme.light(TweakcnThemes.t3Chat)
+            .copyWith(platform: TargetPlatform.android),
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
@@ -315,9 +347,8 @@ void main() {
       (tester) async {
         await tester.pumpWidget(
           MaterialApp(
-            theme: AppTheme.light(
-              TweakcnThemes.t3Chat,
-            ).copyWith(platform: entry.key),
+            theme: AppTheme.light(TweakcnThemes.t3Chat)
+                .copyWith(platform: entry.key),
             home: Builder(
               builder: (context) => MediaQuery(
                 data: MediaQuery.of(context).copyWith(disableAnimations: true),
@@ -497,9 +528,8 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light(
-          TweakcnThemes.t3Chat,
-        ).copyWith(platform: TargetPlatform.iOS),
+        theme: AppTheme.light(TweakcnThemes.t3Chat)
+            .copyWith(platform: TargetPlatform.iOS),
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
@@ -650,11 +680,9 @@ void main() {
     final usesOpaqueFallback = conduitUsesOpaqueGlassFallback();
     if (usesOpaqueFallback) {
       expect(find.byType(AdaptiveButton), findsNothing);
-      expect(find.byType(FloatingAppBarIconButton), findsOneWidget);
       expect(find.byType(FloatingAppBarButton), findsNWidgets(2));
     } else {
       expect(find.byType(AdaptiveButton), findsNWidgets(2));
-      expect(find.byType(FloatingAppBarIconButton), findsNothing);
       expect(find.byType(FloatingAppBarButton), findsNothing);
     }
 
@@ -662,7 +690,6 @@ void main() {
     await tester.pumpAndSettle();
 
     if (usesOpaqueFallback) {
-      expect(find.byType(FloatingAppBarIconButton), findsOneWidget);
       expect(find.byType(FloatingAppBarButton), findsNWidgets(2));
     } else {
       expect(find.byType(AdaptiveButton), findsNothing);
@@ -709,9 +736,8 @@ void main() {
       );
 
       check(resolveConduitSystemControlScale(TextScaler.noScaling)).equals(1);
-      check(
-        resolveConduitSystemControlScale(systemTextScaler),
-      ).equals(kConduitMaximumSystemControlScale);
+      check(resolveConduitSystemControlScale(systemTextScaler))
+          .equals(kConduitMaximumSystemControlScale);
       check(navigationBar.preferredSize.height).equals(72);
       check(observedTextSize).equals(51);
       check(observedBoldText).isTrue();
@@ -729,6 +755,131 @@ void main() {
       check(icon.shadows).isNotNull().isNotEmpty();
     },
   );
+
+  testWidgets('centered route chrome keeps the title in the middle slot', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(TweakcnThemes.t3Chat),
+        home: Builder(
+          builder: (context) {
+            final adaptiveAppBar = buildConduitCenteredAdaptiveAppBar(
+              context: context,
+              tintColor: Colors.black,
+              leading: const SizedBox.square(
+                key: ValueKey<String>('centered-leading'),
+                dimension: TouchTarget.minimum,
+              ),
+              title: const SizedBox(
+                key: ValueKey<String>('centered-title'),
+                width: 120,
+                height: TouchTarget.minimum,
+              ),
+              actions: const [
+                SizedBox.square(
+                  key: ValueKey<String>('centered-action'),
+                  dimension: TouchTarget.minimum,
+                ),
+              ],
+            );
+            return Scaffold(
+              appBar: adaptiveAppBar.appBar,
+              body: const SizedBox.expand(),
+            );
+          },
+        ),
+      ),
+    );
+
+    final appBar = tester.widget<AppBar>(find.byType(AppBar));
+    check(appBar.centerTitle).equals(true);
+    expect(
+      find.descendant(
+        of: find.byWidget(appBar.title!),
+        matching: find.byKey(const ValueKey<String>('centered-title')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byWidget(appBar.leading!),
+        matching: find.byKey(const ValueKey<String>('centered-leading')),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Cupertino route chrome centers without overlapping actions', (
+    tester,
+  ) async {
+    const titleKey = ValueKey<String>('cupertino-centered-title');
+    const trailingKey = ValueKey<String>('cupertino-centered-trailing');
+    await tester.pumpWidget(
+      const CupertinoApp(
+        home: CupertinoPageScaffold(
+          navigationBar: ConduitAdaptiveCupertinoNavigationBar(
+            textScaler: TextScaler.noScaling,
+            leading: SizedBox.square(dimension: TouchTarget.minimum),
+            middle: SizedBox(
+              key: titleKey,
+              width: 140,
+              height: TouchTarget.minimum,
+            ),
+            trailing: SizedBox(
+              key: trailingKey,
+              width: 96,
+              height: TouchTarget.minimum,
+            ),
+          ),
+          child: SizedBox.expand(),
+        ),
+      ),
+    );
+
+    final titleRect = tester.getRect(find.byKey(titleKey));
+    final trailingRect = tester.getRect(find.byKey(trailingKey));
+    expect(titleRect.right + Spacing.sm, lessThanOrEqualTo(trailingRect.left));
+    final viewportWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(titleRect.center.dx, closeTo(viewportWidth / 2, 45));
+  });
+
+  testWidgets('Cupertino route chrome can lead-align an interactive title', (
+    tester,
+  ) async {
+    const titleKey = ValueKey<String>('cupertino-leading-title');
+    const trailingKey = ValueKey<String>('cupertino-leading-trailing');
+    await tester.pumpWidget(
+      const CupertinoApp(
+        home: CupertinoPageScaffold(
+          navigationBar: ConduitAdaptiveCupertinoNavigationBar(
+            textScaler: TextScaler.noScaling,
+            centerMiddle: false,
+            leading: SizedBox.square(dimension: TouchTarget.minimum),
+            middle: SizedBox(
+              key: titleKey,
+              width: 260,
+              height: TouchTarget.minimum,
+            ),
+            trailing: SizedBox(
+              key: trailingKey,
+              width: 96,
+              height: TouchTarget.minimum,
+            ),
+          ),
+          child: SizedBox.expand(),
+        ),
+      ),
+    );
+
+    final titleRect = tester.getRect(find.byKey(titleKey));
+    final trailingRect = tester.getRect(find.byKey(trailingKey));
+    final viewportWidth =
+        tester.view.physicalSize.width / tester.view.devicePixelRatio;
+    expect(titleRect.center.dx, lessThan(viewportWidth / 2));
+    expect(titleRect.right + Spacing.sm, lessThanOrEqualTo(trailingRect.left));
+  });
 
   testWidgets(
     'root sheets remove persistent overlay chrome before presenting',

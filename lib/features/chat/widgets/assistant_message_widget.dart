@@ -1,28 +1,28 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:dio/dio.dart' show CancelToken;
+
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/markdown/streaming_markdown_widget.dart';
 import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
 import '../../../core/models/chat_message.dart';
-import '../../../core/providers/app_providers.dart'
-    show activeConversationProvider;
 import '../../../shared/widgets/markdown/markdown_preprocessor.dart';
 import '../providers/text_to_speech_provider.dart';
 import '../providers/queued_completion_provider.dart';
 import '../providers/streaming_haptic_memory.dart';
-import '../../hermes/providers/hermes_providers.dart';
-import '../../hermes/services/hermes_run_transport.dart';
-import '../../hermes/widgets/hermes_approval_card.dart';
+import '../../hermes/widgets/hermes_message_interactions.dart';
 import 'enhanced_image_attachment.dart';
+
 import 'package:conduit/l10n/app_localizations.dart';
+
 import 'enhanced_attachment.dart';
+
 import 'package:conduit/shared/widgets/chat_action_button.dart';
+
 import '../../../shared/widgets/model_avatar.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/middle_ellipsis_text.dart';
@@ -30,15 +30,12 @@ import '../../../shared/widgets/web_content_embed.dart';
 import '../providers/chat_providers.dart'
     show
         chatComposerTextInsertionTargetId,
-        captureHermesApprovalProjectionStateUpdater,
-        chatMessagesProvider,
-        hermesRunKeyForConversation,
         isChatStreamingProvider,
         sendMessageWithContainer,
         streamingContentProvider;
 import '../../../shared/utils/external_link_launcher.dart';
 import '../../../core/utils/debug_logger.dart';
-import '../../../core/services/platform_service.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/utils/embed_utils.dart';
 import 'sources/openwebui_sources.dart';
@@ -63,15 +60,6 @@ final _ttsDetailsPattern = RegExp(
 // Handle both URL formats: /api/v1/files/{id} and /api/v1/files/{id}/content
 final _fileIdPattern = RegExp(r'/api/v1/files/([^/]+)(?:/content)?$');
 
-typedef _HermesApprovalBinding = ({
-  HermesRunKey runKey,
-  Object generationToken,
-  CancelToken cancelToken,
-  String messageId,
-  String runId,
-  String approvalId,
-});
-
 class AssistantMessageWidget extends ConsumerStatefulWidget {
   final dynamic message;
   final bool isStreaming;
@@ -79,6 +67,26 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
   final bool animateOnMount;
   final String? modelName;
   final String? modelIconUrl;
+
+  /// Whether to paint the avatar + model name above this response.
+  ///
+  /// False for a row that continues the response above it (a Hermes turn can
+  /// emit several assistant messages), so one logical answer shows one header.
+  final bool showModelHeader;
+
+  /// Whether to paint the completion action bar below this response.
+  ///
+  /// The counterpart to [showModelHeader]: within one grouped response the
+  /// header sits on the first row and the bar on the last, so a single answer
+  /// shows one of each. Sources and the version chip still render on their own
+  /// row when this is false — only the buttons move.
+  final bool showActionBar;
+
+  /// Supplies the full text of the grouped response for read-aloud.
+  ///
+  /// Called at tap time, not during build, so a row never has to observe its
+  /// siblings. Null means this row speaks its own content.
+  final String Function()? resolveGroupedResponseText;
   final List<String?> versionModelNames;
   final List<String?> versionModelIconUrls;
   final bool suppressStreamingHaptics;
@@ -103,6 +111,9 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
     this.animateOnMount = true,
     this.modelName,
     this.modelIconUrl,
+    this.showModelHeader = true,
+    this.showActionBar = true,
+    this.resolveGroupedResponseText,
     this.versionModelNames = const <String?>[],
     this.versionModelIconUrls = const <String?>[],
     this.suppressStreamingHaptics = false,
@@ -334,6 +345,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
     // Rebuild cached avatar if model name or icon changes
     if (messageChanged ||
+        oldWidget.showModelHeader != widget.showModelHeader ||
         oldWidget.modelName != widget.modelName ||
         oldWidget.modelIconUrl != widget.modelIconUrl ||
         oldWidget.versionModelNames != widget.versionModelNames ||
@@ -611,7 +623,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       return;
     }
 
-    final speechText = await _buildTtsPlainTextOnDemand(_displayedContent);
+    // A grouped response is one answer, so read it whole rather than stopping
+    // at this row's share of it.
+    final rawText =
+        widget.resolveGroupedResponseText?.call() ?? _displayedContent;
+    final speechText = await _buildTtsPlainTextOnDemand(rawText);
     if (!mounted || speechText.trim().isEmpty) {
       return;
     }
@@ -705,9 +721,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final we = ttsState.wordEndInSentence;
 
     final baseStyle =
-        Theme.of(
-          context,
-        ).textTheme.bodyMedium?.copyWith(color: theme.textPrimary) ??
+        Theme.of(context).textTheme.bodyMedium
+            ?.copyWith(color: theme.textPrimary) ??
         AppTypography.bodyMediumStyle.copyWith(color: theme.textPrimary);
     final highlightStyle = baseStyle.copyWith(
       backgroundColor: theme.buttonPrimary.withValues(alpha: 0.25),
@@ -792,6 +807,18 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final theme = context.conduitTheme;
     final modelName = _resolveActiveModelName();
     final iconUrl = _resolveActiveModelIconUrl();
+    // Grouped continuation: the response above already named this model. A
+    // selected historical version can carry a DIFFERENT model, though, and
+    // that identity was never shown above — so only stay silent while the
+    // active identity still matches the one the group header announced.
+    if (!widget.showModelHeader &&
+        modelName == widget.modelName?.trim() &&
+        iconUrl == widget.modelIconUrl) {
+      _cachedAvatar = null;
+      _cachedAvatarModelName = modelName;
+      _cachedAvatarIconUrl = iconUrl;
+      return;
+    }
     if (_cachedAvatar != null &&
         _cachedAvatarModelName == modelName &&
         _cachedAvatarIconUrl == iconUrl) {
@@ -917,11 +944,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
   /// Fires a single haptic impulse if streaming haptics are enabled.
   void _streamingHaptic(HapticType type) {
-    final enabled = _streamingHapticsAllowed;
-    PlatformService.hapticFeedbackWithSettings(
-      type: type,
-      hapticEnabled: enabled,
-    );
+    if (_streamingHapticsAllowed) ConduitHaptics.trigger(type);
   }
 
   bool get _streamingHapticsAllowed =>
@@ -1024,211 +1047,6 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     return _buildDocumentationMessage();
   }
 
-  /// Renders the Hermes human-approval gate when the assistant message is
-  /// paused awaiting a decision. Returns an empty box otherwise.
-  Widget _buildHermesApprovalCard() {
-    final approval = widget.message.metadata?['hermesApproval'];
-    if (approval is! Map) return const SizedBox.shrink();
-
-    final rawRunId = approval['runId'];
-    final runId = rawRunId is String ? rawRunId : null;
-    final rawApprovalId = approval['approvalId'];
-    final approvalId = rawApprovalId is String ? rawApprovalId : null;
-    final rawMessageId = widget.message.id;
-    final messageId = rawMessageId is String ? rawMessageId : null;
-    final activeConversation = ref.read(activeConversationProvider);
-    final runKey = activeConversation == null || messageId == null
-        ? null
-        : hermesRunKeyForConversation(
-            ref,
-            conversation: activeConversation,
-            assistantMessageId: messageId,
-          );
-    final registry = ref.read(hermesRunRegistryProvider);
-    final generationToken = runKey == null || runId == null
-        ? null
-        : registry.generationTokenFor(runKey, runId: runId);
-    final cancelToken =
-        runKey == null || runId == null || generationToken == null
-        ? null
-        : registry.cancelTokenForGeneration(
-            runKey,
-            generationToken: generationToken,
-            runId: runId,
-          );
-    if (widget.message.metadata?['transport'] != kHermesTransport ||
-        runId == null ||
-        approvalId == null ||
-        messageId == null ||
-        runKey == null ||
-        generationToken == null ||
-        cancelToken == null) {
-      return const SizedBox.shrink();
-    }
-    final binding = (
-      runKey: runKey,
-      generationToken: generationToken,
-      cancelToken: cancelToken,
-      messageId: messageId,
-      runId: runId,
-      approvalId: approvalId,
-    );
-
-    // Belt-and-suspenders: hide the gate if the server doesn't support approval.
-    final caps = ref.watch(hermesCapabilitiesProvider).asData?.value;
-    if (caps != null && !caps.runApproval) return const SizedBox.shrink();
-
-    final rawState = approval['state'];
-    final stateStr = rawState is String ? rawState : 'pending';
-    final state = switch (stateStr) {
-      'resolving' => HermesApprovalState.resolving,
-      'approved' => HermesApprovalState.approved,
-      'denied' => HermesApprovalState.denied,
-      _ => HermesApprovalState.pending,
-    };
-
-    return HermesApprovalCard(
-      state: state,
-      summary: approval['summary'] is String
-          ? approval['summary'] as String
-          : null,
-      onDecision: (approved) => _resolveHermesApproval(approved, binding),
-    );
-  }
-
-  Future<void> _resolveHermesApproval(
-    bool approved,
-    _HermesApprovalBinding binding,
-  ) async {
-    final approvalId = binding.approvalId;
-    final runId = binding.runId;
-    final messageId = binding.messageId;
-    final activeConversation = ref.read(activeConversationProvider);
-    final runKey = activeConversation == null
-        ? null
-        : hermesRunKeyForConversation(
-            ref,
-            conversation: activeConversation,
-            assistantMessageId: messageId,
-          );
-    final registry = ref.read(hermesRunRegistryProvider);
-    if (runKey == null) {
-      return;
-    }
-
-    // The callback belongs to the generation that rendered this card. A chat
-    // id remap may move that exact generation to a new key, but a same-key
-    // replacement must never let the stale button capture its newer token.
-    if (!registry.ownsGeneration(
-      binding.runKey,
-      generationToken: binding.generationToken,
-      runId: runId,
-    )) {
-      if (runKey == binding.runKey ||
-          !registry.ownsGeneration(
-            runKey,
-            generationToken: binding.generationToken,
-            runId: runId,
-          )) {
-        return;
-      }
-    }
-
-    final messagesNotifier = ref.read(chatMessagesProvider.notifier);
-    final updateProjectionState = captureHermesApprovalProjectionStateUpdater(
-      ref,
-      cancelToken: binding.cancelToken,
-      messageId: messageId,
-      runId: runId,
-      approvalId: approvalId,
-    );
-
-    bool setApprovalState(String next, {required String expectedState}) {
-      final projectionUpdate = updateProjectionState(
-        expectedState: expectedState,
-        nextState: next,
-      );
-      if (projectionUpdate.found && !projectionUpdate.changed) return false;
-
-      final currentConversation = mounted
-          ? ref.read(activeConversationProvider)
-          : null;
-      final currentRunKey = currentConversation == null
-          ? null
-          : hermesRunKeyForConversation(
-              ref,
-              conversation: currentConversation,
-              assistantMessageId: messageId,
-            );
-      final visibleOwnsGeneration =
-          currentRunKey != null &&
-          (projectionUpdate.found
-              ? currentRunKey == projectionUpdate.key
-              : registry.ownsGeneration(
-                  currentRunKey,
-                  generationToken: binding.generationToken,
-                  runId: runId,
-                ));
-      var visibleChanged = false;
-      if (visibleOwnsGeneration) {
-        messagesNotifier.updateMessageById(messageId, (m) {
-          if (m.id != messageId ||
-              m.metadata?['transport'] != kHermesTransport) {
-            return m;
-          }
-          final meta = Map<String, dynamic>.from(m.metadata ?? const {});
-          final current = meta['hermesApproval'];
-          if (current is! Map ||
-              current['approvalId'] != approvalId ||
-              current['runId'] != runId ||
-              (current['state'] ?? 'pending') != expectedState) {
-            return m;
-          }
-          meta['hermesApproval'] = {
-            ...current.cast<String, dynamic>(),
-            'state': next,
-          };
-          visibleChanged = true;
-          return m.copyWith(metadata: meta);
-        });
-      }
-      // Real chat dispatches always have a projection. The visible-only
-      // fallback preserves narrow widget seams while retaining the registry
-      // generation CAS above.
-      return projectionUpdate.found ? projectionUpdate.changed : visibleChanged;
-    }
-
-    // If Hermes was disabled/invalidated between display and tap, the service is
-    // null and `?.resolveApproval` would silently no-op while the UI claimed
-    // success — leaving the server-side run blocked. Keep the gate decidable.
-    final service = ref.read(hermesApiServiceProvider);
-    if (service == null) {
-      DebugLogger.warning('approval-no-service', scope: 'chat/hermes_approval');
-      return;
-    }
-
-    if (!setApprovalState('resolving', expectedState: 'pending')) return;
-    try {
-      await service.resolveApproval(
-        runId,
-        approvalId: approvalId,
-        approved: approved,
-      );
-    } catch (_) {
-      // Surface failure by returning the gate to a decidable state.
-      DebugLogger.error(
-        'approval-resolve-failed',
-        scope: 'chat/hermes_approval',
-      );
-      setApprovalState('pending', expectedState: 'resolving');
-      return;
-    }
-    setApprovalState(
-      approved ? 'approved' : 'denied',
-      expectedState: 'resolving',
-    );
-  }
-
   Widget _buildDocumentationMessage() {
     widget.debugOnShellBuild?.call();
     final displayStatusHistory = filterVisibleStatusUpdates(
@@ -1273,7 +1091,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         ? contentSources
         : const <ChatSourceReference>[];
     final footer = shouldBuildActionFooter
-        ? _buildFooterBar(activeSources: activeSources)
+        ? _buildFooterBar(
+            activeSources: activeSources,
+            includeActions: widget.showActionBar,
+          )
         : null;
 
     final content = Container(
@@ -1331,7 +1152,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                     activeSources: contentSources,
                   ),
 
-                _buildHermesApprovalCard(),
+                if (_chatMessage case final message?)
+                  HermesMessageInteractions(message: message),
 
                 if (showQueuedRecoveryBanner) ...[
                   const SizedBox(height: Spacing.sm),
@@ -1355,7 +1177,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           ),
 
           // Footer slot: keep completion actions inside the message while the
-          // running turn indicator is owned by the timeline.
+          // running turn indicator is owned by the timeline. The plain action
+          // row is extent-matched to the timeline's typing indicator (16+32
+          // vs 16+28+4) so the settle swap does not shift the
+          // bottom-anchored viewport; see settle_height_test.dart.
           if (!hasQueuedCompletion)
             AnimatedSwitcher(
               // The running indicator is owned by the timeline footer now, so
@@ -1498,9 +1323,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                     const SizedBox(height: 2),
                     Text(
                       message,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: conduitTheme.textSecondary,
-                      ),
+                      style: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(color: conduitTheme.textSecondary),
                     ),
                   ],
                 ),
@@ -1512,39 +1336,18 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
             spacing: Spacing.xs,
             runSpacing: Spacing.xs,
             children: [
-              TextButton.icon(
+              ConduitButton(
                 onPressed: () => _retryQueuedCompletion(info),
-                icon: Icon(
-                  Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
-                  size: 16,
-                ),
-                label: Text(l10n.retry),
-                style: TextButton.styleFrom(
-                  foregroundColor: accentColor,
-                  minimumSize: const Size(0, 34),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Spacing.sm,
-                    vertical: 6,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+                text: l10n.retry,
+                icon: Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
+                isCompact: true,
               ),
-              TextButton.icon(
+              ConduitButton(
                 onPressed: () => _cancelQueuedCompletion(info),
-                icon: Icon(
-                  Platform.isIOS ? CupertinoIcons.xmark : Icons.close,
-                  size: 16,
-                ),
-                label: Text(l10n.cancel),
-                style: TextButton.styleFrom(
-                  foregroundColor: conduitTheme.textSecondary,
-                  minimumSize: const Size(0, 34),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Spacing.sm,
-                    vertical: 6,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+                text: l10n.cancel,
+                icon: Platform.isIOS ? CupertinoIcons.xmark : Icons.close,
+                isCompact: true,
+                isSecondary: true,
               ),
             ],
           ),
@@ -2003,17 +1806,23 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     );
   }
 
-  Widget? _buildFooterBar({required List<ChatSourceReference> activeSources}) {
+  Widget? _buildFooterBar({
+    required List<ChatSourceReference> activeSources,
+    required bool includeActions,
+  }) {
     const maxInlineActions = 3;
-    final actions = _buildFooterActions();
+    // A row that does not own its grouped response's bar still shows its own
+    // sources and version chip; only the buttons collapse onto the last row.
+    final actions = includeActions
+        ? _buildFooterActions()
+        : const <_AssistantFooterAction>[];
     final forcedOverflowActions = actions
         .where((action) => action.id == 'delete')
         .toList(growable: false);
     final inlineCandidateActions = actions
         .where((action) => action.id != 'delete')
         .toList(growable: false);
-    final visibleActions = actions
-        .where((action) => action.id != 'delete')
+    final visibleActions = inlineCandidateActions
         .take(maxInlineActions)
         .toList(growable: false);
     final overflowActions = [
@@ -2074,6 +1883,24 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     );
   }
 
+  // The error heuristics are four full-content scans; the footer rebuilds far
+  // more often than the content changes, so memoize by string identity.
+  String? _errorScanContent;
+  bool _errorScanResult = false;
+
+  bool get _displayedContentLooksLikeError {
+    final content = _displayedContent;
+    if (!identical(_errorScanContent, content)) {
+      _errorScanContent = content;
+      _errorScanResult =
+          content.contains('⚠️') ||
+          content.contains('Error') ||
+          content.contains('timeout') ||
+          content.contains('retry options');
+    }
+    return _errorScanResult;
+  }
+
   List<_AssistantFooterAction> _buildFooterActions() {
     final l10n = AppLocalizations.of(context)!;
     final ttsState = ref.read(textToSpeechControllerProvider);
@@ -2082,12 +1909,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final messageId = _messageId;
     final activeError = _getActiveError();
     final hasErrorField = activeError != null;
-    final isErrorMessage =
-        hasErrorField ||
-        _displayedContent.contains('⚠️') ||
-        _displayedContent.contains('Error') ||
-        _displayedContent.contains('timeout') ||
-        _displayedContent.contains('retry options');
+    final isErrorMessage = hasErrorField || _displayedContentLooksLikeError;
 
     final isActiveMessage = ttsState.activeMessageId == messageId;
     final isSpeaking =
@@ -2254,49 +2076,46 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final l10n = AppLocalizations.of(context)!;
     final theme = context.conduitTheme;
 
-    return AdaptivePopupMenuButton.widget<String>(
-      items: overflowActions
-          .map(
-            (action) => AdaptivePopupMenuItem<String>(
-              value: action.id,
-              label: action.label,
-              icon: Platform.isIOS ? action.sfSymbol : action.icon,
-              enabled: action.onTap != null,
-            ),
-          )
-          .toList(growable: false),
-      onSelected: (_, entry) {
-        final selectedId = entry.value;
-        if (selectedId == null) {
-          return;
-        }
-        for (final action in overflowActions) {
-          if (action.id == selectedId) {
-            action.onTap?.call();
-            return;
-          }
-        }
-      },
-      buttonStyle: PopupButtonStyle.plain,
-      child: AdaptiveTooltip(
-        message: l10n.more,
-        waitDuration: const Duration(milliseconds: 600),
-        child: Semantics(
-          button: true,
-          label: l10n.more,
-          child: SizedBox(
-            width: 32,
-            height: 32,
-            child: Center(
-              child: Icon(
-                Platform.isIOS
-                    ? CupertinoIcons.ellipsis
-                    : Icons.more_horiz_rounded,
-                size: IconSize.sm,
-                color: theme.textPrimary.withValues(alpha: 0.8),
-              ),
-            ),
-          ),
+    return AdaptiveTooltip(
+      message: l10n.more,
+      waitDuration: const Duration(milliseconds: 600),
+      child: Semantics(
+        button: true,
+        label: l10n.more,
+        child: AdaptivePopupMenuButton.icon<String>(
+          key: const ValueKey<String>('assistant-response-overflow-button'),
+          icon: PlatformUiCapabilities.isIOS
+              ? 'ellipsis'
+              : Icons.more_horiz_rounded,
+          items: overflowActions
+              .map(
+                (action) => AdaptivePopupMenuItem<String>(
+                  value: action.id,
+                  label: action.label,
+                  icon: PlatformUiCapabilities.isIOS
+                      ? action.sfSymbol
+                      : action.icon,
+                  enabled: action.onTap != null,
+                  isDestructive: action.id == 'delete',
+                ),
+              )
+              .toList(growable: false),
+          onSelected: (_, entry) {
+            final selectedId = entry.value;
+            if (selectedId == null) {
+              return;
+            }
+            for (final action in overflowActions) {
+              if (action.id == selectedId) {
+                action.onTap?.call();
+                return;
+              }
+            }
+          },
+          tint: theme.textPrimary.withValues(alpha: 0.8),
+          size: 32,
+          iconSize: IconSize.sm,
+          buttonStyle: PopupButtonStyle.plain,
         ),
       ),
     );

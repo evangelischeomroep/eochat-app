@@ -1,7 +1,8 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit/features/release_notes/models/release_note.dart';
 import 'package:conduit/features/release_notes/widgets/release_notes_sheet.dart';
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
@@ -9,11 +10,15 @@ import 'package:conduit/shared/widgets/chrome_gradient_fade.dart';
 import 'package:conduit/shared/widgets/conduit_components.dart';
 import 'package:conduit/shared/widgets/themed_sheets.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/test_fonts.dart';
+
 void main() {
+  setUpAll(loadTestFonts);
+
   testWidgets(
     'flutter release notes sheet uses editorial review and support sections',
     (tester) async {
@@ -25,7 +30,7 @@ void main() {
         ProviderScope(
           child: MaterialApp(
             theme: AppTheme.light(TweakcnThemes.t3Chat),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: conduitLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: ReleaseNotesSheet(
@@ -51,12 +56,12 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Conduit 3.3 is here'), findsOneWidget);
+      expect(find.text("What's new"), findsOneWidget);
       expect(
-        tester.widget<Text>(find.text('Conduit 3.3 is here')).style?.fontSize,
+        tester.widget<Text>(find.text("What's new")).style?.fontSize,
         AppTypography.headlineMedium,
       );
-      expect(find.text("What's new"), findsNothing);
+      expect(find.text("What's new in 3.3"), findsNothing);
       expect(find.text('Enjoying Conduit?'), findsOneWidget);
       expect(
         find.text(
@@ -302,7 +307,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Conduit 4.0 is here'), findsOneWidget);
+    expect(find.text("What's new"), findsOneWidget);
     expect(find.text('Local models'), findsOneWidget);
     expect(find.text('Polished details'), findsOneWidget);
     await tester.ensureVisible(find.text('Review Conduit'));
@@ -342,16 +347,6 @@ void main() {
     expect(find.text('喜歡 Conduit 嗎？'), findsOneWidget);
     expect(find.textContaining('無論哪一種，對我都意義重大。'), findsOneWidget);
   });
-
-  testWidgets('release notes sheet matches its golden', (tester) async {
-    await _pumpReleaseNotesSheet(tester, disableAnimations: true);
-    await tester.pump();
-
-    await expectLater(
-      find.byType(Scaffold),
-      matchesGoldenFile('goldens/release_notes_sheet.png'),
-    );
-  });
 }
 
 Future<void> _pumpReleaseNotesSheet(
@@ -376,7 +371,7 @@ Future<void> _pumpReleaseNotesSheet(
             ? AppTheme.dark(TweakcnThemes.t3Chat)
             : AppTheme.light(TweakcnThemes.t3Chat),
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: conduitLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) {

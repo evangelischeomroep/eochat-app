@@ -1,8 +1,8 @@
 import 'dart:io' show Platform;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../l10n/app_localizations.dart';
@@ -167,6 +167,20 @@ class _ExpandedVoicePanel extends ConsumerWidget {
                             ? CupertinoIcons.mic_fill
                             : Icons.mic_rounded),
                   onPressed: controller.toggleMute,
+                ),
+                const SizedBox(width: Spacing.sm),
+                _CircleAction(
+                  tooltip: snapshot.isSpeakerphoneEnabled
+                      ? l10n.voiceCallSpeakerOff
+                      : l10n.voiceCallSpeakerOn,
+                  icon: snapshot.isSpeakerphoneEnabled
+                      ? (Platform.isIOS
+                            ? CupertinoIcons.speaker_3_fill
+                            : Icons.volume_up_rounded)
+                      : (Platform.isIOS
+                            ? CupertinoIcons.speaker_1
+                            : Icons.volume_down_rounded),
+                  onPressed: controller.toggleSpeakerphone,
                 ),
                 const SizedBox(width: Spacing.sm),
                 _CircleAction(

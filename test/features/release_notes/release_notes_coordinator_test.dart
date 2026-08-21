@@ -13,8 +13,9 @@ import 'package:conduit/features/release_notes/release_notes_bootstrap.dart';
 import 'package:conduit/features/release_notes/release_notes_coordinator.dart';
 import 'package:conduit/features/release_notes/widgets/release_notes_banner.dart';
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -106,7 +107,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Conduit 4.0 is here'), findsOneWidget);
+    expect(find.text("What's new in 4.0"), findsOneWidget);
     expect(find.text("What's new"), findsNothing);
     expect(find.text('Welcome to Conduit 4.0.'), findsNothing);
   });
@@ -130,7 +131,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Conduit 4.0 is here'), findsOneWidget);
+    expect(find.text("What's new in 4.0"), findsOneWidget);
     expect(
       PreferencesStore.getString(PreferenceKeys.lastSeenReleaseVersion),
       '4.0.1',
@@ -157,7 +158,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Conduit 3.3 is here'), findsOneWidget);
+      expect(find.text("What's new in 3.3"), findsOneWidget);
       expect(find.text("What's new"), findsNothing);
     });
   }
@@ -193,7 +194,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Conduit 3.3 is here'), findsOneWidget);
+    expect(find.text("What's new in 3.3"), findsOneWidget);
     expect(find.text("What's new"), findsNothing);
     expect(find.text('Hi, this update is bundled with the app.'), findsNothing);
     expect(find.text('Done'), findsNothing);
@@ -220,7 +221,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(releaseNotesBannerKey), findsOneWidget);
-    expect(find.text('Conduit 3.3 is here'), findsOneWidget);
+    expect(find.text("What's new in 3.3"), findsOneWidget);
     expect(find.text("What's new"), findsNothing);
     expect(find.text('Done'), findsNothing);
     expect(
@@ -267,7 +268,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(releaseNotesBannerKey), findsOneWidget);
-    expect(find.text('Conduit 3.3 is here'), findsOneWidget);
+    expect(find.text("What's new in 3.3"), findsOneWidget);
     expect(find.text('Hi, this update is bundled with the app.'), findsNothing);
   });
 
@@ -360,14 +361,15 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.text('Conduit 3.3 is here'), findsOneWidget);
+    expect(find.text("What's new in 3.3"), findsOneWidget);
     expect(find.text("What's new"), findsNothing);
     expect(find.text('Buy Me a Coffee'), findsNothing);
 
     await tester.tap(find.byKey(releaseNotesBannerKey));
     await tester.pumpAndSettle();
 
-    expect(find.text('Conduit 3.3 is here'), findsNWidgets(2));
+    expect(find.text("What's new in 3.3"), findsOneWidget);
+    expect(find.text("What's new"), findsOneWidget);
     expect(find.text('Buy Me a Coffee'), findsOneWidget);
     expect(find.text('GitHub Sponsors'), findsNothing);
 
@@ -494,7 +496,7 @@ Widget _app({
     theme: ThemeData(platform: platform),
     locale: locale,
     navigatorKey: NavigationService.navigatorKey,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: conduitLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: home,
   );

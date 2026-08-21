@@ -21,17 +21,19 @@ import 'package:conduit/features/auth/providers/unified_auth_providers.dart';
 import 'package:conduit/features/chat/providers/chat_providers.dart';
 import 'package:conduit/features/chat/providers/context_attachments_provider.dart';
 import 'package:conduit/features/chat/services/file_attachment_service.dart';
+import 'package:conduit/features/chat/views/chat_page.dart';
 import 'package:conduit/features/chat/widgets/modern_chat_input.dart';
 import 'package:conduit/features/navigation/views/folder_page.dart';
 import 'package:conduit/features/tools/providers/tools_providers.dart';
 import 'package:conduit/core/database/daos/outbox_dao.dart';
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/utils/conversation_context_menu.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -201,6 +203,33 @@ void main() {
     );
     expect(
       find.byKey(const ValueKey<String>('folder-page-overflow-button')),
+      findsOneWidget,
+    );
+    final appBar = tester.widget<AppBar>(find.byType(AppBar).first);
+    expect(appBar.centerTitle, isFalse);
+    expect(
+      find.descendant(
+        of: find.byWidget(appBar.title!),
+        matching: find.byKey(
+          const ValueKey<String>('folder-page-model-selector'),
+        ),
+      ),
+      findsOneWidget,
+    );
+    final selector = find.byKey(
+      const ValueKey<String>('folder-page-model-selector'),
+    );
+    expect(
+      tester.getCenter(selector).dx,
+      lessThan(tester.getSize(find.byType(Scaffold).first).width / 2),
+    );
+    expect(
+      find.descendant(
+        of: find.byWidget(appBar.leading!),
+        matching: find.byKey(
+          const ValueKey<String>('folder-page-drawer-button'),
+        ),
+      ),
       findsOneWidget,
     );
     expect(
@@ -603,9 +632,8 @@ void main() {
       folders: const [Folder(id: 'work', name: 'Work')],
       conversations: [conversation],
       extraOverrides: [
-        folderConversationSummariesProvider(
-          'work',
-        ).overrideWith((ref) async => [conversation]),
+        folderConversationSummariesProvider('work')
+            .overrideWith((ref) async => [conversation]),
         loadConversationProvider(scopedId).overrideWith((ref) async {
           loadCalls += 1;
           return full;
@@ -634,6 +662,48 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     ErrorWidget.builder = originalErrorWidgetBuilder;
     FlutterError.onError = originalFlutterErrorOnError;
+  });
+
+  testWidgets('chat page mount defers the initial transcript reset', (
+    tester,
+  ) async {
+    final timestamp = DateTime(2026, 1, 1);
+    final message = ChatMessage(
+      id: 'assistant-1',
+      role: 'assistant',
+      content: 'Hi',
+      timestamp: timestamp,
+    );
+    final active = Conversation(
+      id: 'folder-chat-1',
+      title: 'Folder Chat',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      folderId: 'work',
+      messages: [message],
+    );
+    final container = _createContainer(
+      activeConversation: active,
+      initialMessages: [message],
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          localizationsDelegates: conduitLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const ChatPage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(tester.takeException(), isNull);
+    expect(container.read(chatTranscriptPagingProvider).loadedCount, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    container.dispose();
   });
 
   testWidgets(
@@ -679,12 +749,10 @@ void main() {
         folders: const [Folder(id: 'work', name: 'Work')],
         conversations: [conversation],
         extraOverrides: [
-          folderConversationSummariesProvider(
-            'work',
-          ).overrideWith((ref) async => [conversation]),
-          loadConversationProvider(
-            scopedId,
-          ).overrideWith((ref) => loadGate.future),
+          folderConversationSummariesProvider('work')
+              .overrideWith((ref) async => [conversation]),
+          loadConversationProvider(scopedId)
+              .overrideWith((ref) => loadGate.future),
         ],
       );
       addTearDown(container.dispose);
@@ -767,12 +835,10 @@ void main() {
       ],
       conversations: [conversation],
       extraOverrides: [
-        folderConversationSummariesProvider(
-          'work',
-        ).overrideWith((ref) async => [conversation]),
-        folderConversationSummariesProvider(
-          'other',
-        ).overrideWith((ref) async => const <Conversation>[]),
+        folderConversationSummariesProvider('work')
+            .overrideWith((ref) async => [conversation]),
+        folderConversationSummariesProvider('other')
+            .overrideWith((ref) async => const <Conversation>[]),
         loadConversationProvider(scopedId).overrideWith((ref) {
           loadCalls += 1;
           return loadGate.future;
@@ -910,7 +976,7 @@ Widget _buildHarnessFromContainer(
     container: container,
     child: MaterialApp.router(
       theme: AppTheme.light(TweakcnThemes.t3Chat),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: conduitLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
     ),

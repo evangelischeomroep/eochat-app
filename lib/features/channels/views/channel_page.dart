@@ -3,9 +3,9 @@ import 'dart:developer' as developer;
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
@@ -14,6 +14,7 @@ import '../../../core/models/channel.dart';
 import '../../../core/models/channel_message.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
+import '../../../core/services/haptic_service.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../core/utils/model_icon_utils.dart';
@@ -24,9 +25,10 @@ import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/adaptive_toolbar_components.dart';
 import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/widgets/chrome_gradient_fade.dart';
+import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/measure_size.dart';
 import '../../../shared/widgets/model_avatar.dart';
-import '../../../shared/widgets/responsive_drawer_layout.dart';
+import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../../shared/widgets/themed_sheets.dart';
 import '../../../shared/widgets/user_avatar.dart';
@@ -344,9 +346,8 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
       }
       final l10n = AppLocalizations.of(context);
       if (l10n != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n.channelSendError)));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(l10n.channelSendError)));
       }
     } finally {
       if (mounted && operationGeneration == _operationGeneration) {
@@ -363,7 +364,6 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
   /// with file, photo, and camera actions.
   Widget _buildAttachmentButton(double size, {String? parentMessageId}) {
     final l10n = AppLocalizations.of(context);
-    final theme = context.conduitTheme;
 
     return AdaptivePopupMenuButton.widget<String>(
       items: [
@@ -387,18 +387,14 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
         entry.value as String,
         parentMessageId: parentMessageId,
       ),
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: theme.surfaceContainerHighest,
-          border: Border.all(color: theme.cardBorder, width: BorderWidth.thin),
-        ),
+      child: SizedBox.square(
+        dimension: size,
         child: Icon(
           Platform.isIOS ? CupertinoIcons.add : Icons.add,
           size: IconSize.large,
-          color: theme.textPrimary.withValues(alpha: Alpha.strong),
+          color: context.conduitTheme.textPrimary.withValues(
+            alpha: Alpha.strong,
+          ),
         ),
       ),
     );
@@ -1129,7 +1125,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
     required double maxWidth,
   }) {
     final label = channel?.name ?? '';
-    final textStyle = conduitAdaptiveToolbarPillTextStyle(context);
+    final textStyle = conduitAdaptiveToolbarLeadingTitleTextStyle(context);
     final controlExtent = conduitScaledControlExtent(context);
     final iconExtent = conduitScaledIconExtent(context, IconSize.appBar);
     final leadingIcon = channel?.isPrivate == true
@@ -1231,7 +1227,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
   }
 
   void _toggleDrawer() {
-    ResponsiveDrawerLayout.of(context)?.toggle();
+    SidebarDrawerControllerScope.maybeOf(context)?.toggle();
   }
 
   AdaptiveAppBar _buildAdaptiveChannelAppBar(
@@ -1240,9 +1236,6 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
     Channel? channel,
     AppLocalizations? l10n,
   ) {
-    final textScaler = MediaQuery.textScalerOf(context);
-    final controlExtent = conduitScaledControlExtent(context);
-    final toolbarHeight = conduitAdaptiveToolbarHeightOf(context);
     final memberCount = channel?.userCount;
     final maxTitleWidth = resolveConduitAdaptiveLeadingPillWidth(
       context,
@@ -1250,18 +1243,6 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
       maxWidth: kConduitAdaptiveToolbarMaxPillWidth,
     );
     final tintColor = theme.textPrimary;
-    const leadingGap = kConduitAdaptiveToolbarLeadingGap;
-    final leading = buildConduitAdaptiveToolbarLeadingRow(
-      children: [
-        ConduitAdaptiveAppBarIconButton(
-          icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
-          onPressed: _toggleDrawer,
-          iconColor: tintColor,
-        ),
-        const SizedBox(width: leadingGap),
-        _buildChannelTitlePill(context, channel, maxWidth: maxTitleWidth),
-      ],
-    );
     final menuItems = _buildChannelToolbarMenuItems(l10n);
     void onMenuSelected(String action) =>
         _handleChannelToolbarSelection(action, channel);
@@ -1276,7 +1257,6 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
       accessibilityLabel:
           l10n?.more ?? MaterialLocalizations.of(context).moreButtonTooltip,
       tintColor: tintColor,
-      symbolSize: kConduitNativeToolbarSymbolExtent,
       items: menuItems,
       onSelected: onMenuSelected,
     );
@@ -1292,52 +1272,25 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
               l10n?.channelMembersTitle(memberCount) ??
               'Members ($memberCount)',
           tintColor: tintColor,
-          symbolSize: kConduitNativeToolbarSymbolExtent,
           onPressed: _showMemberList,
         ),
       ?nativeMenuAction,
     ];
-    final overlayStyle = Theme.of(context).appBarTheme.systemOverlayStyle;
-
-    final scaledLeading = ConduitSystemTextScaling(
-      textScaler: textScaler,
-      child: leading,
-    );
-    final scaledActions = [
-      for (final action in actions)
-        ConduitSystemTextScaling(textScaler: textScaler, child: action),
-    ];
-
-    return AdaptiveAppBar(
-      useNativeToolbar: false,
+    return buildConduitCenteredAdaptiveAppBar(
+      context: context,
       tintColor: tintColor,
-      cupertinoNavigationBar: ConduitAdaptiveCupertinoNavigationBar(
-        textScaler: textScaler,
-        leading: leading,
-        trailing: useNativeActionGroup
-            ? ConduitNativeToolbarActionGroup(actions: nativeActions)
-            : Row(mainAxisSize: MainAxisSize.min, children: actions),
-        systemOverlayStyle: overlayStyle,
+      leading: ConduitAdaptiveAppBarIconButton(
+        icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
+        iosSymbol: 'line.3.horizontal',
+        onPressed: _toggleDrawer,
+        iconColor: tintColor,
       ),
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.transparent,
-        elevation: Elevation.none,
-        scrolledUnderElevation: Elevation.none,
-        toolbarHeight: toolbarHeight,
-        systemOverlayStyle: overlayStyle,
-        centerTitle: false,
-        titleSpacing: Spacing.sm,
-        leadingWidth: resolveConduitAdaptiveToolbarLeadingWidth(
-          pillWidth: maxTitleWidth,
-          leadingGap: leadingGap,
-          controlExtent: controlExtent,
-        ),
-        leading: scaledLeading,
-        actions: scaledActions,
-      ),
+      title: _buildChannelTitlePill(context, channel, maxWidth: maxTitleWidth),
+      actions: actions,
+      cupertinoTrailing: useNativeActionGroup
+          ? ConduitNativeToolbarActionGroup(actions: nativeActions)
+          : Row(mainAxisSize: MainAxisSize.min, children: actions),
+      centerTitle: false,
     );
   }
 
@@ -1579,15 +1532,13 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.close,
-                          size: 16,
-                          color: theme.textSecondary,
-                        ),
+                      ConduitIconButton(
+                        icon: Icons.close,
+                        iconColor: theme.textSecondary,
+                        tooltip: MaterialLocalizations.of(context)
+                            .closeButtonTooltip,
                         onPressed: _clearReplyTo,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                        isCompact: true,
                       ),
                     ],
                   ),
@@ -1959,13 +1910,17 @@ class _MessageBubble extends StatelessWidget {
                             onSubmitted: (_) => onSubmitEdit?.call(),
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.check, size: 18),
+                        ConduitIconButton(
+                          icon: Icons.check,
+                          tooltip: AppLocalizations.of(context)!.save,
                           onPressed: onSubmitEdit,
+                          isCompact: true,
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, size: 18),
+                        ConduitIconButton(
+                          icon: Icons.close,
+                          tooltip: AppLocalizations.of(context)!.cancel,
                           onPressed: onCancelEdit,
+                          isCompact: true,
                         ),
                       ],
                     )
@@ -2093,7 +2048,10 @@ class _MessageBubble extends StatelessWidget {
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            onPressed: () => onReactionTap(reaction.name),
+            onPressed: () {
+              ConduitHaptics.selectionClick();
+              onReactionTap(reaction.name);
+            },
           );
         }).toList(),
       ),

@@ -1,18 +1,20 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/model.dart';
 import '../../../core/services/ios_native_dropdown_bridge.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/settings_service.dart';
+import '../../../core/utils/debug_logger.dart';
 import '../../../core/utils/tts_voice_utils.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/theme/tweakcn_themes.dart';
+import '../../../shared/widgets/adaptive_selection_sheet.dart';
 import '../../tools/providers/tools_providers.dart';
 import '../../../core/models/tool.dart';
 import '../../../shared/widgets/conduit_components.dart';
@@ -25,6 +27,7 @@ import '../widgets/adaptive_segmented_selector.dart';
 import '../widgets/customization_tile.dart';
 import '../widgets/expandable_card.dart';
 import '../widgets/settings_page_scaffold.dart';
+import '../../../shared/widgets/utility_components.dart';
 import '../widgets/socket_health_card.dart';
 import '../widgets/stt_language_picker.dart';
 
@@ -83,13 +86,15 @@ class AppCustomizationPage extends ConsumerWidget {
           themeMode,
           themeDescription,
           activeTheme,
-          settings,
-          showQuickPills: hasOpenWebUiAccount,
         ),
         _sectionGap,
         _buildLanguageSection(context, ref, currentLanguageCode, languageLabel),
       ],
       AppCustomizationSection.chat => <Widget>[
+        if (hasOpenWebUiAccount) ...[
+          _buildQuickPillsSection(context, ref, settings),
+          _sectionGap,
+        ],
         _buildChatSection(context, ref, settings),
         if (hasOpenWebUiAccount) ...[
           _sectionGap,
@@ -103,7 +108,7 @@ class AppCustomizationPage extends ConsumerWidget {
       ],
     };
 
-    return SettingsPageScaffold(title: title, children: children);
+    return UtilityPageScaffold.settings(title: title, children: children);
   }
 
   Widget _buildThemesDropdownSection(
@@ -112,24 +117,28 @@ class AppCustomizationPage extends ConsumerWidget {
     ThemeMode themeMode,
     String themeDescription,
     TweakcnThemeDefinition activeTheme,
-    AppSettings settings, {
-    required bool showQuickPills,
-  }) {
+  ) {
+    final theme = context.conduitTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: AppLocalizations.of(context)!.display),
-        const SizedBox(height: Spacing.sm),
-        ExpandableCard(
-          title: AppLocalizations.of(context)!.darkMode,
-          subtitle: themeDescription,
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.moon_stars,
-            android: Icons.dark_mode,
-          ),
+        InsetGroupedSection(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text(
+                AppLocalizations.of(context)!.colorScheme,
+                style: theme.bodyMedium?.copyWith(
+                  color: theme.textPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: Spacing.xxs),
+              Text(
+                themeDescription,
+                style: theme.bodySmall?.copyWith(color: theme.textSecondary),
+              ),
+              const SizedBox(height: Spacing.sm),
               ThemeModeSegmentedControl(
                 value: themeMode,
                 onChanged: (mode) {
@@ -139,12 +148,10 @@ class AppCustomizationPage extends ConsumerWidget {
             ],
           ),
         ),
-        const SizedBox(height: Spacing.md),
-        _buildPaletteSelector(context, ref, activeTheme),
-        if (showQuickPills) ...[
-          const SizedBox(height: Spacing.md),
-          _buildQuickPillsSection(context, ref, settings),
-        ],
+        const SizedBox(height: Spacing.sm),
+        InsetGroupedList(
+          children: [_buildPaletteSelector(context, ref, activeTheme)],
+        ),
       ],
     );
   }
@@ -160,34 +167,36 @@ class AppCustomizationPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: AppLocalizations.of(context)!.appLanguage),
-        const SizedBox(height: Spacing.sm),
-        CustomizationTile(
-          leading: _buildIconBadge(
-            context,
-            UiUtils.platformIcon(
-              ios: CupertinoIcons.globe,
-              android: Icons.language,
+        InsetGroupedList(
+          children: [
+            UtilityRow(
+              leading: _buildIconBadge(
+                context,
+                UiUtils.platformIcon(
+                  ios: CupertinoIcons.globe,
+                  android: Icons.language,
+                ),
+                color: theme.buttonPrimary,
+              ),
+              title: AppLocalizations.of(context)!.appLanguage,
+              subtitle: languageLabel,
+              onTap: () async {
+                final selected = await _showLanguageSelector(
+                  context,
+                  currentLanguageTag,
+                );
+                if (selected == null) return;
+                if (selected == 'system') {
+                  await ref.read(appLocaleProvider.notifier).setLocale(null);
+                } else {
+                  final parsed = _parseLocaleTag(selected);
+                  await ref
+                      .read(appLocaleProvider.notifier)
+                      .setLocale(parsed ?? Locale(selected));
+                }
+              },
             ),
-            color: theme.buttonPrimary,
-          ),
-          title: AppLocalizations.of(context)!.appLanguage,
-          subtitle: languageLabel,
-          onTap: () async {
-            final selected = await _showLanguageSelector(
-              context,
-              currentLanguageTag,
-            );
-            if (selected == null) return;
-            if (selected == 'system') {
-              await ref.read(appLocaleProvider.notifier).setLocale(null);
-            } else {
-              final parsed = _parseLocaleTag(selected);
-              await ref
-                  .read(appLocaleProvider.notifier)
-                  .setLocale(parsed ?? Locale(selected));
-            }
-          },
+          ],
         ),
       ],
     );
@@ -201,7 +210,7 @@ class AppCustomizationPage extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = context.conduitTheme;
 
-    return CustomizationTile(
+    return UtilityRow(
       leading: _buildIconBadge(
         context,
         UiUtils.platformIcon(
@@ -308,55 +317,50 @@ class AppCustomizationPage extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ConduitCard(
-            padding: EdgeInsets.zero,
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(AppBorderRadius.card),
-              clipBehavior: Clip.antiAlias,
-              child: Theme(
-                data: Theme.of(context).copyWith(
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < options.length; i++) ...[
-                      AdaptiveListTile(
-                        leading: Icon(options[i].icon, size: IconSize.small),
-                        title: Text(
-                          options[i].label,
-                          style: context.conduitTheme.bodyMedium?.copyWith(
-                            color: context.conduitTheme.sidebarForeground,
-                          ),
+          // These rows sit directly on the enclosing disclosure section's
+          // grouped surface; a nested card here would stack surface on surface.
+          Material(
+            color: Colors.transparent,
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Column(
+                children: [
+                  for (var i = 0; i < options.length; i++) ...[
+                    AdaptiveListTile(
+                      leading: Icon(options[i].icon, size: IconSize.small),
+                      title: Text(
+                        options[i].label,
+                        style: AppTypography.bodyMediumStyle.copyWith(
+                          color: context.conduitTheme.textPrimary,
                         ),
-                        trailing: Checkbox.adaptive(
-                          value: selected.contains(options[i].id),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          onChanged:
-                              (selectedCount < maxPills ||
-                                  selected.contains(options[i].id))
-                              ? (_) => toggle(options[i].id)
-                              : null,
-                        ),
-                        onTap:
+                      ),
+                      trailing: Checkbox.adaptive(
+                        value: selected.contains(options[i].id),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        onChanged:
                             (selectedCount < maxPills ||
                                 selected.contains(options[i].id))
-                            ? () => toggle(options[i].id)
+                            ? (_) => toggle(options[i].id)
                             : null,
                       ),
-                      if (i != options.length - 1)
-                        Divider(
-                          height: 1,
-                          color: Theme.of(
-                            context,
-                          ).dividerColor.withValues(alpha: 0.2),
-                        ),
-                    ],
+                      onTap:
+                          (selectedCount < maxPills ||
+                              selected.contains(options[i].id))
+                          ? () => toggle(options[i].id)
+                          : null,
+                    ),
+                    if (i != options.length - 1)
+                      Divider(
+                        height: BorderWidth.thin,
+                        thickness: BorderWidth.thin,
+                        color: context.conduitTheme.dividerColor,
+                      ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
@@ -402,8 +406,6 @@ class AppCustomizationPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: l10n.chatSettings),
-        const SizedBox(height: Spacing.sm),
         CustomizationTile(
           leading: _buildIconBadge(
             context,
@@ -483,8 +485,6 @@ class AppCustomizationPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: l10n.settingsDataAndConnection),
-        const SizedBox(height: Spacing.sm),
         CustomizationTile(
           leading: _buildIconBadge(
             context,
@@ -549,7 +549,7 @@ class AppCustomizationPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: l10n.advancedPromptOverrides),
+        SettingsSectionHeader(title: l10n.advancedPromptOverrides),
         const SizedBox(height: Spacing.sm),
         ExpandableCard(
           title: l10n.modelSystemPrompts,
@@ -658,9 +658,7 @@ class AppCustomizationPage extends ConsumerWidget {
       padding: const EdgeInsets.all(Spacing.md),
       child: Text(
         text,
-        style: theme.bodyMedium?.copyWith(
-          color: theme.sidebarForeground.withValues(alpha: 0.75),
-        ),
+        style: theme.bodySmall?.copyWith(color: theme.textSecondary),
       ),
     );
   }
@@ -713,7 +711,19 @@ class AppCustomizationPage extends ConsumerWidget {
       onSave: (value) async {
         await api.updateModelSystemPrompt(model.id, value);
       },
-      afterSave: () => ref.invalidate(modelsProvider),
+      afterSave: () => unawaited(
+        ref.read(modelsProvider.notifier).refresh().onError((
+          error,
+          stackTrace,
+        ) {
+          DebugLogger.error(
+            'refresh-failed',
+            scope: 'settings/models',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }),
+      ),
     );
   }
 
@@ -784,7 +794,7 @@ class AppCustomizationPage extends ConsumerWidget {
       return;
     }
 
-    await showSettingsSheet<void>(
+    await showAdaptiveSelectionSheet<void>(
       context: context,
       builder: (sheetContext) => _ServerPromptEditorSheet(
         title: title,
@@ -836,13 +846,9 @@ class AppCustomizationPage extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionHeader(title: AppLocalizations.of(context)!.connectionHealth),
-        const SizedBox(height: Spacing.sm),
-        SocketHealthCard(socketService: socketService),
-      ],
+    return SocketHealthCard(
+      socketService: socketService,
+      title: AppLocalizations.of(context)!.connectionHealth,
     );
   }
 
@@ -881,10 +887,10 @@ class AppCustomizationPage extends ConsumerWidget {
       ),
     ];
 
-    await showSettingsSheet<void>(
+    await showAdaptiveSelectionSheet<void>(
       context: context,
       builder: (sheetContext) {
-        return SettingsSelectorSheet(
+        return AdaptiveSelectionSheet(
           title: l10n.androidAssistantTitle,
           description: l10n.androidAssistantDescription,
           itemCount: options.length,
@@ -894,7 +900,7 @@ class AppCustomizationPage extends ConsumerWidget {
           itemBuilder: (context, index) {
             final option = options[index];
             final selected = settings.androidAssistantTrigger == option.value;
-            return SettingsSelectorTile(
+            return AdaptiveSelectionTile(
               title: option.label,
               selected: selected,
               onTap: () {
@@ -948,10 +954,8 @@ class AppCustomizationPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: l10n.sttSettings),
-        const SizedBox(height: Spacing.sm),
-        ConduitCard(
-          padding: const EdgeInsets.all(Spacing.md),
+        InsetGroupedSection(
+          title: l10n.sttSettings,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -970,7 +974,7 @@ class AppCustomizationPage extends ConsumerWidget {
                     child: Text(
                       l10n.sttEngineLabel,
                       style: theme.bodyMedium?.copyWith(
-                        color: theme.sidebarForeground,
+                        color: theme.textPrimary,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1014,9 +1018,7 @@ class AppCustomizationPage extends ConsumerWidget {
                   key: ValueKey<String>(
                     'stt-desc-${settings.sttPreference.name}',
                   ),
-                  style: theme.bodyMedium?.copyWith(
-                    color: theme.sidebarForeground.withValues(alpha: 0.9),
-                  ),
+                  style: theme.bodySmall?.copyWith(color: theme.textSecondary),
                 ),
               ),
               if (warnings.isNotEmpty) ...[
@@ -1051,7 +1053,7 @@ class AppCustomizationPage extends ConsumerWidget {
                           Text(
                             l10n.sttSilenceDuration,
                             style: theme.bodyMedium?.copyWith(
-                              color: theme.sidebarForeground,
+                              color: theme.textPrimary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1059,9 +1061,7 @@ class AppCustomizationPage extends ConsumerWidget {
                           Text(
                             '${settings.voiceSilenceDuration}ms',
                             style: theme.bodySmall?.copyWith(
-                              color: theme.sidebarForeground.withValues(
-                                alpha: 0.7,
-                              ),
+                              color: theme.textSecondary,
                             ),
                           ),
                         ],
@@ -1092,9 +1092,7 @@ class AppCustomizationPage extends ConsumerWidget {
                 ),
                 Text(
                   l10n.sttSilenceDurationDescription,
-                  style: theme.bodySmall?.copyWith(
-                    color: theme.sidebarForeground.withValues(alpha: 0.7),
-                  ),
+                  style: theme.bodySmall?.copyWith(color: theme.textSecondary),
                 ),
               ],
             ],
@@ -1111,52 +1109,20 @@ class AppCustomizationPage extends ConsumerWidget {
   ) {
     final theme = context.conduitTheme;
     final l10n = AppLocalizations.of(context)!;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => showSttLanguagePickerSheet(context, ref, settings),
-      child: Row(
-        children: [
-          _buildIconBadge(
-            context,
-            UiUtils.platformIcon(
-              ios: CupertinoIcons.globe,
-              android: Icons.language,
-            ),
-            color: theme.buttonPrimary,
-          ),
-          const SizedBox(width: Spacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.sttTranscriptionLanguage,
-                  style: theme.bodyMedium?.copyWith(
-                    color: theme.sidebarForeground,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: Spacing.xs),
-                Text(
-                  sttLanguageSubtitle(l10n, settings),
-                  style: theme.bodySmall?.copyWith(
-                    color: theme.sidebarForeground.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-          Icon(
-            UiUtils.platformIcon(
-              ios: CupertinoIcons.chevron_right,
-              android: Icons.chevron_right,
-            ),
-            color: theme.iconSecondary,
-            size: IconSize.small,
-          ),
-        ],
+    return UtilityRow(
+      padding: EdgeInsets.zero,
+      leading: _buildIconBadge(
+        context,
+        UiUtils.platformIcon(
+          ios: CupertinoIcons.globe,
+          android: Icons.language,
+        ),
+        color: theme.buttonPrimary,
       ),
+      title: l10n.sttTranscriptionLanguage,
+      subtitle: sttLanguageSubtitle(l10n, settings),
+      showChevron: true,
+      onTap: () => showSttLanguagePickerSheet(context, ref, settings),
     );
   }
 
@@ -1190,10 +1156,8 @@ class AppCustomizationPage extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionHeader(title: l10n.ttsSettings),
-        const SizedBox(height: Spacing.sm),
-        ConduitCard(
-          padding: const EdgeInsets.all(Spacing.md),
+        InsetGroupedSection(
+          title: l10n.ttsSettings,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1211,7 +1175,7 @@ class AppCustomizationPage extends ConsumerWidget {
                   Text(
                     l10n.ttsEngineLabel,
                     style: theme.bodyMedium?.copyWith(
-                      color: theme.sidebarForeground,
+                      color: theme.textPrimary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1247,9 +1211,7 @@ class AppCustomizationPage extends ConsumerWidget {
                 child: Text(
                   ttsDescription,
                   key: ValueKey<String>('tts-desc-${settings.ttsEngine.name}'),
-                  style: theme.bodyMedium?.copyWith(
-                    color: theme.sidebarForeground.withValues(alpha: 0.9),
-                  ),
+                  style: theme.bodySmall?.copyWith(color: theme.textSecondary),
                 ),
               ),
               if (warnings.isNotEmpty) ...[
@@ -1393,39 +1355,36 @@ class AppCustomizationPage extends ConsumerWidget {
     required ValueChanged<double> onChanged,
   }) {
     final theme = context.conduitTheme;
-    return ConduitCard(
-      padding: const EdgeInsets.all(Spacing.md),
+    return InsetGroupedSection(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              _buildIconBadge(context, icon, color: theme.buttonPrimary),
-              const SizedBox(width: Spacing.sm),
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.bodyMedium?.copyWith(
-                    color: theme.sidebarForeground,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+          UtilityRow(
+            leading: _buildIconBadge(context, icon, color: theme.buttonPrimary),
+            title: title,
+            status: Text(
+              label,
+              style: AppTypography.bodySmallStyle.copyWith(
+                color: theme.textSecondary,
+                fontWeight: FontWeight.w600,
               ),
-              Text(
-                label,
-                style: theme.bodyMedium?.copyWith(
-                  color: theme.sidebarForeground.withValues(alpha: 0.75),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+            ),
           ),
-          AdaptiveSlider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Spacing.md,
+              0,
+              Spacing.md,
+              Spacing.sm,
+            ),
+            child: AdaptiveSlider(
+              value: value,
+              min: min,
+              max: max,
+              divisions: divisions,
+              onChanged: onChanged,
+            ),
           ),
         ],
       ),
@@ -1592,10 +1551,10 @@ class AppCustomizationPage extends ConsumerWidget {
       return;
     }
 
-    showSettingsSheet<void>(
+    showAdaptiveSelectionSheet<void>(
       context: context,
       builder: (BuildContext sheetContext) {
-        return SettingsSelectorSheet(
+        return AdaptiveSelectionSheet(
           title: l10n.ttsSelectVoice,
           itemCount: entries.length,
           initialChildSize: 0.7,
@@ -1623,7 +1582,7 @@ class AppCustomizationPage extends ConsumerWidget {
 
             final option = entry.option;
             if (option == null) {
-              return SettingsSelectorTile(
+              return AdaptiveSelectionTile(
                 title: l10n.ttsSystemDefault,
                 selected: selectedOptionId == ttsSystemDefaultVoiceId,
                 onTap: () async {
@@ -1639,7 +1598,7 @@ class AppCustomizationPage extends ConsumerWidget {
               );
             }
 
-            return SettingsSelectorTile(
+            return AdaptiveSelectionTile(
               title: option.label,
               subtitle: option.subtitle,
               selected: option.id == selectedOptionId,
@@ -1712,6 +1671,8 @@ class AppCustomizationPage extends ConsumerWidget {
         return AppLocalizations.of(context)!.czech;
       case 'sk':
         return AppLocalizations.of(context)!.slovak;
+      case 'pl':
+        return AppLocalizations.of(context)!.polish;
       case 'de':
         return AppLocalizations.of(context)!.deutsch;
       case 'fr':
@@ -1750,6 +1711,9 @@ class AppCustomizationPage extends ConsumerWidget {
         }
         if (normalizedCode == 'sk') {
           return AppLocalizations.of(context)!.slovak;
+        }
+        if (normalizedCode == 'pl') {
+          return AppLocalizations.of(context)!.polish;
         }
         return AppLocalizations.of(context)!.system;
     }
@@ -1822,10 +1786,10 @@ class AppCustomizationPage extends ConsumerWidget {
       return;
     }
 
-    await showSettingsSheet<void>(
+    await showAdaptiveSelectionSheet<void>(
       context: context,
       builder: (sheetContext) {
-        return SettingsSelectorSheet(
+        return AdaptiveSelectionSheet(
           title: l10n.transportMode,
           itemCount: options.length,
           initialChildSize: 0.42,
@@ -1834,7 +1798,7 @@ class AppCustomizationPage extends ConsumerWidget {
           itemBuilder: (context, index) {
             final option = options[index];
             final selected = current == option.value;
-            return SettingsSelectorTile(
+            return AdaptiveSelectionTile(
               title: option.title,
               subtitle: option.subtitle,
               selected: selected,
@@ -1940,10 +1904,10 @@ class AppCustomizationPage extends ConsumerWidget {
       return;
     }
 
-    await showSettingsSheet<void>(
+    await showAdaptiveSelectionSheet<void>(
       context: context,
       builder: (sheetContext) {
-        return SettingsSelectorSheet(
+        return AdaptiveSelectionSheet(
           title: l10n.themePalette,
           itemCount: palettes.length,
           initialChildSize: 0.66,
@@ -1951,7 +1915,7 @@ class AppCustomizationPage extends ConsumerWidget {
           maxChildSize: 0.86,
           itemBuilder: (context, index) {
             final palette = palettes[index];
-            return SettingsSelectorTile(
+            return AdaptiveSelectionTile(
               title: palette.label(l10n),
               subtitle: palette.description(l10n),
               selected: palette.id == activePaletteId,
@@ -1987,6 +1951,7 @@ class AppCustomizationPage extends ConsumerWidget {
       (value: 'en', label: l10n.english),
       (value: 'cs', label: l10n.czech),
       (value: 'sk', label: l10n.slovak),
+      (value: 'pl', label: l10n.polish),
       (value: 'de', label: l10n.deutsch),
       (value: 'es', label: l10n.espanol),
       (value: 'fr', label: l10n.francais),
@@ -2028,10 +1993,10 @@ class AppCustomizationPage extends ConsumerWidget {
       return null;
     }
 
-    return showSettingsSheet<String>(
+    return showAdaptiveSelectionSheet<String>(
       context: context,
       builder: (sheetContext) {
-        return SettingsSelectorSheet(
+        return AdaptiveSelectionSheet(
           title: AppLocalizations.of(sheetContext)!.appLanguage,
           itemCount: options.length,
           initialChildSize: 0.72,
@@ -2039,7 +2004,7 @@ class AppCustomizationPage extends ConsumerWidget {
           maxChildSize: 0.86,
           itemBuilder: (context, index) {
             final option = options[index];
-            return SettingsSelectorTile(
+            return AdaptiveSelectionTile(
               title: option.label,
               selected: normalizedCurrent == option.value,
               onTap: () => Navigator.pop(sheetContext, option.value),
@@ -2244,21 +2209,6 @@ class _PaletteColorDot extends StatelessWidget {
           width: BorderWidth.thin,
         ),
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = context.conduitTheme;
-    return Text(
-      title,
-      style: theme.headingSmall?.copyWith(color: theme.sidebarForeground),
     );
   }
 }

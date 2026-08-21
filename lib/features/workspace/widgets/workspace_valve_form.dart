@@ -1,5 +1,5 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'package:conduit/features/workspace/models/workspace_resources.dart';
 import 'package:conduit/l10n/app_localizations.dart';
@@ -117,7 +117,7 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
         padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
         child: Text(
           l10n.workspaceToolValvesEmpty,
-          style: theme.bodySmall?.copyWith(color: theme.textSecondary),
+          style: theme.bodyMedium?.copyWith(color: theme.textSecondary),
         ),
       );
     }
@@ -129,11 +129,7 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
     );
   }
 
-  Widget _field(
-    BuildContext context,
-    AppLocalizations l10n,
-    String property,
-  ) {
+  Widget _field(BuildContext context, AppLocalizations l10n, String property) {
     final theme = context.conduitTheme;
     final spec = _propertySpec(property);
     final title = spec['title']?.toString() ?? property;
@@ -158,7 +154,7 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
                       if (isRequired)
                         TextSpan(
                           text: '  ${l10n.workspaceValveRequired}',
-                          style: theme.caption?.copyWith(
+                          style: theme.bodySmall?.copyWith(
                             color: theme.textSecondary,
                           ),
                         ),
@@ -188,7 +184,7 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
               padding: const EdgeInsets.only(top: Spacing.xxs),
               child: Text(
                 description,
-                style: theme.caption?.copyWith(color: theme.textSecondary),
+                style: theme.bodySmall?.copyWith(color: theme.textSecondary),
               ),
             ),
         ],
@@ -210,9 +206,7 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
 
     if (enumValues is List && enumValues.isNotEmpty) {
       final current = _values[property]?.toString();
-      final hasCurrent = enumValues
-          .map((e) => e.toString())
-          .contains(current);
+      final hasCurrent = enumValues.map((e) => e.toString()).contains(current);
       // KeyedSubtree preserves [controlKey] because AdaptivePopupMenuButton.text
       // does not forward its own `key`. Tapping the subtree hits the trigger.
       return Align(
@@ -231,8 +225,10 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
                 ),
             ],
             onSelected: widget.enabled
-                ? (index, entry) =>
-                      _setValue(property, _enumValueFor(enumValues, entry.value))
+                ? (index, entry) => _setValue(
+                    property,
+                    _enumValueFor(enumValues, entry.value),
+                  )
                 : (_, _) {},
           ),
         ),
@@ -246,7 +242,7 @@ class _WorkspaceValveFormState extends State<WorkspaceValveForm> {
         children: [
           Text(
             current ? l10n.workspaceValveEnabled : l10n.workspaceValveDisabled,
-            style: theme.bodySmall?.copyWith(color: theme.textSecondary),
+            style: theme.bodyMedium?.copyWith(color: theme.textSecondary),
           ),
           AdaptiveSwitch(
             key: controlKey,

@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1354,8 +1354,7 @@ Future<void> _initializeBackgroundStreaming(Ref ref) async {
         'background-refresh-disabled',
         scope: 'startup',
         data: {
-          'message':
-              'Background App Refresh is disabled. Background streaming may be limited.',
+          'message': 'Background App Refresh is disabled. Background streaming may be limited.',
         },
       );
     }
@@ -1372,8 +1371,7 @@ Future<void> _initializeBackgroundStreaming(Ref ref) async {
         'notification-permission-denied',
         scope: 'startup',
         data: {
-          'message':
-              'Notification permission denied. Background streaming notifications will not be shown.',
+          'message': 'Notification permission denied. Background streaming notifications will not be shown.',
         },
       );
     }
@@ -1485,6 +1483,9 @@ class AppStartupFlow extends _$AppStartupFlow {
       if (!_hasAuthenticatedSession()) {
         return;
       }
+      if (keepDefaultModelAutoSelectionAlive) {
+        _keepDefaultModelAutoSelectionAlive();
+      }
       try {
         await ref.read(defaultModelProvider.future);
       } catch (e) {
@@ -1493,10 +1494,6 @@ class AppStartupFlow extends _$AppStartupFlow {
           scope: 'startup',
           data: {'error': e},
         );
-      } finally {
-        if (_hasAuthenticatedSession() && keepDefaultModelAutoSelectionAlive) {
-          _keepDefaultModelAutoSelectionAlive();
-        }
       }
     });
   }

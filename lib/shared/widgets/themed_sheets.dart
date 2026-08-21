@@ -1,9 +1,9 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:stupid_simple_sheet/stupid_simple_sheet.dart';
 
 import '../theme/theme_extensions.dart';
@@ -104,12 +104,12 @@ class ThemedSheets {
     required BuildContext context,
     required WidgetBuilder builder,
   }) {
+    FocusManager.instance.primaryFocus?.unfocus();
     final theme = context.conduitTheme;
     final backgroundColor = theme.surfaceBackground;
     final platform = Theme.of(context).platform;
-    final barrierLabel = MaterialLocalizations.of(
-      context,
-    ).modalBarrierDismissLabel;
+    final barrierLabel = MaterialLocalizations.of(context)
+        .modalBarrierDismissLabel;
     final outline = BorderSide(
       color: theme.dividerColor,
       width: BorderWidth.regular,
@@ -136,10 +136,15 @@ class ThemedSheets {
           shape: platform == TargetPlatform.iOS ? glassShape : plainShape,
           clipBehavior: Clip.antiAlias,
           sheetAnimationStyle: AnimationStyle.noAnimation,
-          builder: (sheetContext) => _SheetCoverageBoundary(
-            coverage: coverage,
-            child: Builder(builder: builder),
-          ),
+          builder: (sheetContext) {
+            final child = _SheetCoverageBoundary(
+              coverage: coverage,
+              child: Builder(builder: builder),
+            );
+            return PlatformUiCapabilities.usesNativeIOS26
+                ? CNSheetGeometryProbe(child: child)
+                : child;
+          },
         ),
       );
     }
@@ -151,6 +156,9 @@ class ThemedSheets {
           coverage: coverage,
           child: Builder(builder: builder),
         );
+        if (PlatformUiCapabilities.usesNativeIOS26) {
+          child = CNSheetGeometryProbe(child: child);
+        }
 
         final Route<T> route;
         if (platform == TargetPlatform.iOS) {
@@ -193,28 +201,51 @@ class ThemedSheets {
     double? elevation,
     Clip? clipBehavior,
   }) {
+    FocusManager.instance.primaryFocus?.unfocus();
     final resolvedShape = shape ?? roundedShapeFor(context);
     return _showTracked<T>(
       context: context,
-      present: (coverage) => showModalBottomSheet<T>(
-        context: context,
-        isScrollControlled: isScrollControlled,
-        useSafeArea: useSafeArea,
-        enableDrag: enableDrag,
-        isDismissible: isDismissible,
-        useRootNavigator: useRootNavigator,
-        backgroundColor: Colors.transparent,
-        barrierColor: barrierColor,
-        routeSettings: routeSettings,
-        constraints: _sheetConstraints(context, constraints),
-        shape: resolvedShape,
-        elevation: elevation,
-        clipBehavior: clipBehavior ?? Clip.antiAlias,
-        builder: (sheetContext) => _SheetCoverageBoundary(
-          coverage: coverage,
-          child: builder(sheetContext),
-        ),
-      ),
+      present: (coverage) {
+        Widget sheetBuilder(BuildContext sheetContext) =>
+            _SheetCoverageBoundary(
+              coverage: coverage,
+              child: builder(sheetContext),
+            );
+        if (PlatformUiCapabilities.usesNativeIOS26) {
+          return CNBottomSheet.show<T>(
+            context: context,
+            isScrollControlled: isScrollControlled,
+            useSafeArea: useSafeArea,
+            enableDrag: enableDrag,
+            isDismissible: isDismissible,
+            useRootNavigator: useRootNavigator,
+            backgroundColor: Colors.transparent,
+            barrierColor: barrierColor,
+            routeSettings: routeSettings,
+            constraints: _sheetConstraints(context, constraints),
+            shape: resolvedShape,
+            elevation: elevation,
+            clipBehavior: clipBehavior ?? Clip.antiAlias,
+            builder: sheetBuilder,
+          );
+        }
+        return showModalBottomSheet<T>(
+          context: context,
+          isScrollControlled: isScrollControlled,
+          useSafeArea: useSafeArea,
+          enableDrag: enableDrag,
+          isDismissible: isDismissible,
+          useRootNavigator: useRootNavigator,
+          backgroundColor: Colors.transparent,
+          barrierColor: barrierColor,
+          routeSettings: routeSettings,
+          constraints: _sheetConstraints(context, constraints),
+          shape: resolvedShape,
+          elevation: elevation,
+          clipBehavior: clipBehavior ?? Clip.antiAlias,
+          builder: sheetBuilder,
+        );
+      },
     );
   }
 
@@ -227,28 +258,62 @@ class ThemedSheets {
     Color? barrierColor,
     RouteSettings? routeSettings,
   }) {
+    FocusManager.instance.primaryFocus?.unfocus();
     return _showTracked<T>(
       context: context,
-      present: (coverage) => showModalBottomSheet<T>(
-        context: context,
-        useRootNavigator: true,
-        isScrollControlled: true,
-        isDismissible: isDismissible,
-        enableDrag: false,
-        barrierColor: barrierColor,
-        routeSettings: routeSettings,
-        backgroundColor: context.conduitTheme.surfaceBackground,
-        shape: roundedShapeFor(context),
-        clipBehavior: Clip.antiAlias,
-        constraints: _sheetConstraints(context, null, capWidth: false),
-        builder: (sheetContext) => _SheetCoverageBoundary(
-          coverage: coverage,
-          child: FractionallySizedBox(
-            heightFactor: DraggableModalSheetSizes.maxChildSize,
-            child: builder(sheetContext),
-          ),
-        ),
-      ),
+      present: (coverage) {
+        Widget sheetBuilder(BuildContext sheetContext) =>
+            _SheetCoverageBoundary(
+              coverage: coverage,
+              child: FractionallySizedBox(
+                heightFactor: DraggableModalSheetSizes.maxChildSize,
+                child: builder(sheetContext),
+              ),
+            );
+        final arguments = (
+          context: context,
+          useRootNavigator: true,
+          isScrollControlled: true,
+          isDismissible: isDismissible,
+          enableDrag: false,
+          barrierColor: barrierColor,
+          routeSettings: routeSettings,
+          backgroundColor: context.conduitTheme.surfaceBackground,
+          shape: roundedShapeFor(context),
+          clipBehavior: Clip.antiAlias,
+          constraints: _sheetConstraints(context, null, capWidth: false),
+        );
+        if (PlatformUiCapabilities.usesNativeIOS26) {
+          return CNBottomSheet.show<T>(
+            context: arguments.context,
+            useRootNavigator: arguments.useRootNavigator,
+            isScrollControlled: arguments.isScrollControlled,
+            isDismissible: arguments.isDismissible,
+            enableDrag: arguments.enableDrag,
+            barrierColor: arguments.barrierColor,
+            routeSettings: arguments.routeSettings,
+            backgroundColor: arguments.backgroundColor,
+            shape: arguments.shape,
+            clipBehavior: arguments.clipBehavior,
+            constraints: arguments.constraints,
+            builder: sheetBuilder,
+          );
+        }
+        return showModalBottomSheet<T>(
+          context: arguments.context,
+          useRootNavigator: arguments.useRootNavigator,
+          isScrollControlled: arguments.isScrollControlled,
+          isDismissible: arguments.isDismissible,
+          enableDrag: arguments.enableDrag,
+          barrierColor: arguments.barrierColor,
+          routeSettings: arguments.routeSettings,
+          backgroundColor: arguments.backgroundColor,
+          shape: arguments.shape,
+          clipBehavior: arguments.clipBehavior,
+          constraints: arguments.constraints,
+          builder: sheetBuilder,
+        );
+      },
     );
   }
 

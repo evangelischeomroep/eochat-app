@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/auth/auth_state_manager.dart';
+import '../../../core/models/model.dart';
 import '../../../core/models/prompt.dart';
 import '../../../core/persistence/persistence_keys.dart';
 import '../../../core/persistence/preferences_store.dart';
@@ -13,20 +16,27 @@ import '../../../core/providers/app_providers.dart'
         activeConversationProvider,
         activeServerProvider,
         incompleteLogoutFenceProvider,
-        reviewerModeProvider;
+        reviewerModeProvider,
+        selectedModelProvider;
 import '../../../core/providers/backend_mode_providers.dart';
 import '../../../core/providers/storage_providers.dart';
 import '../../../core/services/secure_credential_storage.dart';
 import '../../../core/utils/debug_logger.dart';
+import '../models/hermes_bot.dart';
 import '../models/hermes_capabilities.dart';
 import '../models/hermes_config.dart';
 import '../models/hermes_job.dart';
+import '../models/hermes_model.dart';
 import '../models/hermes_session.dart';
 import '../models/hermes_toolset.dart';
 import '../services/hermes_api_service.dart';
+import '../services/hermes_backend_service.dart';
+import '../services/hermes_desktop_api_service.dart';
+import '../services/hermes_dashboard_cookie_store.dart';
 import '../services/hermes_identifier.dart';
 import '../services/hermes_local_document_trust_store.dart';
 import '../services/hermes_message_mapper.dart';
+import '../services/hermes_pending_decision_store.dart';
 import '../services/hermes_session_provenance.dart';
 
 final class _HermesCredentialRollbackFailure implements Exception {
@@ -37,6 +47,35 @@ final class _HermesCredentialRollbackFailure implements Exception {
 
   final Object writeError;
   final StackTrace writeStackTrace;
+}
+
+final class _HermesCredentialSnapshot {
+  const _HermesCredentialSnapshot({this.apiKey, this.sessionKey, this.desktop});
+
+  factory _HermesCredentialSnapshot.fromConfig(HermesConfig config) =>
+      _HermesCredentialSnapshot(
+        apiKey: config.apiKey,
+        sessionKey: config.sessionKey,
+        desktop: config.desktopCredentials,
+      );
+
+  final String? apiKey;
+  final String? sessionKey;
+  final HermesDesktopCredentials? desktop;
+}
+
+final class _HermesCredentialWrites {
+  const _HermesCredentialWrites({
+    required this.apiKey,
+    required this.sessionKey,
+    required this.desktop,
+  });
+
+  final bool apiKey;
+  final bool sessionKey;
+  final bool desktop;
+
+  bool get any => apiKey || sessionKey || desktop;
 }
 
 /// Owns the Hermes config: non-secret fields from shared preferences, secrets
@@ -77,11 +116,42 @@ class HermesConfigController extends Notifier<HermesConfig> {
         PreferencesStore.getBool(PreferenceKeys.hermesEnabled) ?? false;
     final baseUrl =
         PreferencesStore.getString(PreferenceKeys.hermesBaseUrl) ?? '';
+    final mode = HermesBackendMode.values.firstWhere(
+      (value) =>
+          value.name ==
+          PreferencesStore.getString(PreferenceKeys.hermesBackendMode),
+      orElse: () => HermesBackendMode.responsesApi,
+    );
+    final desktopAuthKind = HermesDesktopAuthKind.values.firstWhere(
+      (value) =>
+          value.name ==
+          PreferencesStore.getString(PreferenceKeys.hermesDesktopAuthKind),
+      orElse: () => HermesDesktopAuthKind.legacyToken,
+    );
+    final desktopProfile = PreferencesStore.getString(
+      PreferenceKeys.hermesDesktopProfile,
+    )?.trim();
+    final allowSelfSignedCertificates =
+        PreferencesStore.getBool(
+          PreferenceKeys.hermesAllowSelfSignedCertificates,
+        ) ??
+        false;
     // Secrets load asynchronously and patch the state in once available.
     final hydration = _loadSecrets(epoch);
     _secretsHydration = hydration;
     unawaited(hydration);
-    return HermesConfig(enabled: enabled, baseUrl: baseUrl);
+    return HermesConfig(
+      enabled: enabled,
+      baseUrl: baseUrl,
+      mode: mode,
+      desktopAuthKind: desktopAuthKind,
+      desktopProfile:
+          desktopProfile != null &&
+              HermesConfig.isValidDesktopProfile(desktopProfile)
+          ? desktopProfile
+          : 'default',
+      allowSelfSignedCertificates: allowSelfSignedCertificates,
+    );
   }
 
   SecureCredentialStorage get _secure =>
@@ -91,16 +161,49 @@ class HermesConfigController extends Notifier<HermesConfig> {
     try {
       final apiKey = await _secure.getHermesApiKey();
       final sessionKey = await _secure.getHermesSessionKey();
+      final desktopPayload = await _secure.getHermesDesktopCredentials();
+      HermesDesktopCredentials? desktopCredentials;
+      if (desktopPayload != null) {
+        try {
+          desktopCredentials = HermesDesktopCredentials.fromJson(
+            jsonDecode(desktopPayload),
+          );
+        } on FormatException {
+          DebugLogger.warning(
+            'desktop-credentials-decode-failed',
+            scope: 'hermes/config',
+          );
+        }
+      }
       if (epoch != _secretLoadEpoch || _mutationsBlocked || !ref.mounted) {
         return;
       }
       ref.read(hermesSecretsErrorProvider.notifier).clear();
+      final previousNative = state.desktopCredentials?.nativeTokens;
+      final nextNative = desktopCredentials?.nativeTokens;
+      final transportCredentialsChanged =
+          state.apiKey != apiKey ||
+          state.sessionKey != sessionKey ||
+          state.desktopCredentials?.legacyToken !=
+              desktopCredentials?.legacyToken ||
+          previousNative?.accessToken != nextNative?.accessToken ||
+          previousNative?.refreshToken != nextNative?.refreshToken ||
+          previousNative?.expiresAt != nextNative?.expiresAt ||
+          !mapEquals(state.accessHeaders, desktopCredentials?.accessHeaders);
       state = HermesConfig(
         enabled: state.enabled,
         baseUrl: state.baseUrl,
+        mode: state.mode,
+        desktopAuthKind: state.desktopAuthKind,
+        desktopProfile: state.desktopProfile,
+        allowSelfSignedCertificates: state.allowSelfSignedCertificates,
         apiKey: apiKey,
         sessionKey: sessionKey,
+        desktopCredentials: desktopCredentials,
       );
+      if (transportCredentialsChanged) {
+        ref.read(hermesConnectionGenerationProvider.notifier).bump();
+      }
     } catch (error) {
       if (epoch != _secretLoadEpoch || _mutationsBlocked || !ref.mounted) {
         return;
@@ -124,6 +227,13 @@ class HermesConfigController extends Notifier<HermesConfig> {
     final hydration = _loadSecrets(epoch);
     _secretsHydration = hydration;
     return hydration;
+  }
+
+  /// Waits until the current secure-storage read has settled and surfaces any
+  /// hydration failure before callers snapshot credential-bearing state.
+  Future<void> waitForSecretsHydration() async {
+    await _secretsHydration;
+    _throwIfSecretsUnavailable();
   }
 
   Future<void> setEnabled(bool value) async {
@@ -164,14 +274,57 @@ class HermesConfigController extends Notifier<HermesConfig> {
     );
   }
 
+  /// Rotates the short-lived native token pair without changing connection
+  /// identity or cancelling the turn that triggered the refresh.
+  Future<void> setDesktopNativeTokens(HermesDesktopTokenSet? tokens) {
+    return _serializeMutation(() async {
+      await _secretsHydration;
+      _throwIfSecretsUnavailable();
+      final previous = state.desktopCredentials;
+      final next = HermesDesktopCredentials(
+        legacyToken: previous?.legacyToken,
+        nativeTokens: tokens,
+        accessHeaders: previous?.accessHeaders ?? const {},
+      );
+      await _persistDesktopCredentials(next);
+      state = _withState(desktopCredentials: next);
+    });
+  }
+
+  Future<void> signOutDesktop() => _serializeMutation(() async {
+    await _secretsHydration;
+    _throwIfSecretsUnavailable();
+    await _withRunAdmissionBlocked(() async {
+      await _cancelActiveRuns();
+      final cleared = await HermesDashboardCookieStore.clear(state.baseUrl);
+      if (!cleared) {
+        throw StateError('Hermes dashboard cookies could not be cleared.');
+      }
+      await _persistDesktopCredentials(null);
+      state = _withState(desktopCredentials: null);
+      ref.read(hermesActiveSessionProvider.notifier).set(null);
+      final activeConversation = ref.read(activeConversationProvider);
+      if (isNativeHermesConversation(activeConversation)) {
+        ref.read(activeConversationProvider.notifier).clear();
+      }
+      ref.read(hermesConnectionGenerationProvider.notifier).bump();
+    });
+  });
+
   /// Atomically commits connection edits. Secrets are retained only when the
   /// normalized origin (scheme + host + port) is unchanged.
   Future<void> saveConnection({
     required String baseUrl,
+    HermesBackendMode? mode,
+    HermesDesktopAuthKind? desktopAuthKind,
+    String? desktopProfile,
+    bool? allowSelfSignedCertificates,
     bool apiKeyChanged = false,
     String? apiKey,
     bool sessionKeyChanged = false,
     String? sessionKey,
+    bool desktopCredentialsChanged = false,
+    HermesDesktopCredentials? desktopCredentials,
   }) {
     final trimmedUrl = baseUrl.trim();
     final nextOrigin = connectionOrigin(trimmedUrl);
@@ -180,27 +333,63 @@ class HermesConfigController extends Notifier<HermesConfig> {
         ArgumentError.value(baseUrl, 'baseUrl', 'Use a valid http(s) URL'),
       );
     }
-
     return _serializeMutation(() async {
       // Resolve the one cold-start read before applying edits. This prevents a
       // same-origin save from accidentally replacing not-yet-hydrated secrets
       // with null, while the serialized queue prevents write reordering.
       await _secretsHydration;
       _throwIfSecretsUnavailable();
+      final nextDesktopCredentials = desktopCredentialsChanged
+          ? desktopCredentials
+          : state.desktopCredentials;
+      final headerError = HermesConfig.validateAccessHeaders(
+        nextDesktopCredentials?.accessHeaders ?? const {},
+      );
+      if (headerError != null) throw ArgumentError(headerError);
       final previousBaseUrl = state.baseUrl;
       final originChanged = connectionOrigin(previousBaseUrl) != nextOrigin;
       final endpointChanged =
           connectionEndpoint(previousBaseUrl) != connectionEndpoint(trimmedUrl);
-      final identityChanged = apiKeyChanged || sessionKeyChanged;
-      final serviceWillRotate = state.baseUrl != trimmedUrl || identityChanged;
-      final previousApiKey = state.apiKey;
-      final previousSessionKey = state.sessionKey;
-      var nextApiKey = previousApiKey;
-      var nextSessionKey = previousSessionKey;
+      final nextMode = mode ?? state.mode;
+      final nextDesktopAuthKind = desktopAuthKind ?? state.desktopAuthKind;
+      final nextDesktopProfile = desktopProfile?.trim().isNotEmpty == true
+          ? desktopProfile!.trim()
+          : state.desktopProfile;
+      if (!HermesConfig.isValidDesktopProfile(nextDesktopProfile)) {
+        throw ArgumentError.value(
+          desktopProfile,
+          'desktopProfile',
+          'Use a valid Hermes profile ID',
+        );
+      }
+      final nextAllowSelfSigned =
+          allowSelfSignedCertificates ?? state.allowSelfSignedCertificates;
+      final modeChanged = nextMode != state.mode;
+      final authKindChanged = nextDesktopAuthKind != state.desktopAuthKind;
+      final profileChanged = nextDesktopProfile != state.desktopProfile;
+      final identityChanged =
+          apiKeyChanged ||
+          sessionKeyChanged ||
+          desktopCredentialsChanged ||
+          modeChanged ||
+          authKindChanged ||
+          profileChanged;
+      // A trust change rebuilds the transport without touching credentials, so
+      // it is not an identity change, but active runs still hold the old
+      // client and must be cancelled before the service rotates.
+      final trustChanged =
+          nextAllowSelfSigned != state.allowSelfSignedCertificates;
+      final serviceWillRotate =
+          state.baseUrl != trimmedUrl || identityChanged || trustChanged;
+      final previousCredentials = _HermesCredentialSnapshot.fromConfig(state);
+      var nextApiKey = previousCredentials.apiKey;
+      var nextSessionKey = previousCredentials.sessionKey;
+      var committedDesktopCredentials = nextDesktopCredentials;
 
       if (originChanged) {
         nextApiKey = null;
         nextSessionKey = null;
+        if (!desktopCredentialsChanged) committedDesktopCredentials = null;
       }
 
       if (apiKeyChanged) {
@@ -214,27 +403,19 @@ class HermesConfigController extends Notifier<HermesConfig> {
       }
       final writeApiKey = originChanged || apiKeyChanged;
       final writeSessionKey = originChanged || sessionKeyChanged;
+      final writeDesktopCredentials =
+          originChanged || desktopCredentialsChanged;
+      final credentialWrites = _HermesCredentialWrites(
+        apiKey: writeApiKey,
+        sessionKey: writeSessionKey,
+        desktop: writeDesktopCredentials,
+      );
+      final nextDocumentTrustPrincipal = endpointChanged || identityChanged
+          ? const Uuid().v4()
+          : null;
+      final previousDocumentTrustPrincipal = documentTrustPrincipalId();
 
       Future<void> commitConnectionMutation() async {
-        if (endpointChanged || identityChanged) {
-          // This random, non-secret epoch scopes local document provenance to
-          // one configured principal without persisting a credential verifier.
-          // Rotate before credential mutation so any later failure is
-          // fail-closed. Run admission is already blocked at this point.
-          try {
-            await _pendingDocumentTrustPrincipalWrite;
-          } catch (_) {
-            // A fresh rotation below replaces a failed lazy initialization.
-          }
-          final nextPrincipalId = const Uuid().v4();
-          await PreferencesStore.putChecked(
-            PreferenceKeys.hermesLocalDocumentTrustPrincipal,
-            nextPrincipalId,
-          );
-          _runtimeDocumentTrustPrincipalId = nextPrincipalId;
-          _pendingDocumentTrustPrincipalWrite = null;
-        }
-
         // Secure storage and SharedPreferences cannot participate in one
         // transaction. Remove the endpoint before changing credential identity
         // so a process kill between secret writes can restart only into a
@@ -246,12 +427,13 @@ class HermesConfigController extends Notifier<HermesConfig> {
 
         try {
           await _persistSecretsAtomically(
-            previousApiKey: previousApiKey,
-            previousSessionKey: previousSessionKey,
-            nextApiKey: nextApiKey,
-            nextSessionKey: nextSessionKey,
-            writeApiKey: writeApiKey,
-            writeSessionKey: writeSessionKey,
+            previous: previousCredentials,
+            next: _HermesCredentialSnapshot(
+              apiKey: nextApiKey,
+              sessionKey: nextSessionKey,
+              desktop: committedDesktopCredentials,
+            ),
+            writes: credentialWrites,
           );
         } on _HermesCredentialRollbackFailure catch (failure) {
           // A partially committed secret mutation with a failed rollback must
@@ -262,6 +444,7 @@ class HermesConfigController extends Notifier<HermesConfig> {
           await _quarantineUncertainCredentialMutation(
             clearApiKey: writeApiKey,
             clearSessionKey: writeSessionKey,
+            clearDesktopCredentials: writeDesktopCredentials,
           );
           Error.throwWithStackTrace(
             failure.writeError,
@@ -286,6 +469,7 @@ class HermesConfigController extends Notifier<HermesConfig> {
               await _quarantineUncertainCredentialMutation(
                 clearApiKey: writeApiKey,
                 clearSessionKey: writeSessionKey,
+                clearDesktopCredentials: writeDesktopCredentials,
               );
             }
           }
@@ -305,12 +489,13 @@ class HermesConfigController extends Notifier<HermesConfig> {
           var previousCredentialsRestored = false;
           try {
             await _persistSecretsAtomically(
-              previousApiKey: nextApiKey,
-              previousSessionKey: nextSessionKey,
-              nextApiKey: previousApiKey,
-              nextSessionKey: previousSessionKey,
-              writeApiKey: writeApiKey,
-              writeSessionKey: writeSessionKey,
+              previous: _HermesCredentialSnapshot(
+                apiKey: nextApiKey,
+                sessionKey: nextSessionKey,
+                desktop: committedDesktopCredentials,
+              ),
+              next: previousCredentials,
+              writes: credentialWrites,
             );
             previousCredentialsRestored = true;
           } catch (rollbackError) {
@@ -325,6 +510,9 @@ class HermesConfigController extends Notifier<HermesConfig> {
             try {
               if (writeApiKey) await _persistApiKey(null);
               if (writeSessionKey) await _persistSessionKey(null);
+              if (writeDesktopCredentials) {
+                await _persistDesktopCredentials(null);
+              }
               previousCredentialsRestored = true;
             } catch (clearError) {
               DebugLogger.error(
@@ -349,15 +537,167 @@ class HermesConfigController extends Notifier<HermesConfig> {
               await _quarantineUncertainCredentialMutation(
                 clearApiKey: writeApiKey,
                 clearSessionKey: writeSessionKey,
+                clearDesktopCredentials: writeDesktopCredentials,
               );
             }
           } else {
             await _quarantineUncertainCredentialMutation(
               clearApiKey: writeApiKey,
               clearSessionKey: writeSessionKey,
+              clearDesktopCredentials: writeDesktopCredentials,
             );
           }
           Error.throwWithStackTrace(error, stackTrace);
+        }
+
+        try {
+          await PreferencesStore.putChecked(
+            PreferenceKeys.hermesBackendMode,
+            nextMode.name,
+          );
+          await PreferencesStore.putChecked(
+            PreferenceKeys.hermesDesktopAuthKind,
+            nextDesktopAuthKind.name,
+          );
+          await PreferencesStore.putChecked(
+            PreferenceKeys.hermesDesktopProfile,
+            nextDesktopProfile,
+          );
+          await PreferencesStore.putChecked(
+            PreferenceKeys.hermesAllowSelfSignedCertificates,
+            nextAllowSelfSigned,
+          );
+        } catch (error, stackTrace) {
+          await _quarantineUncertainCredentialMutation(
+            clearApiKey: writeApiKey,
+            clearSessionKey: writeSessionKey,
+            clearDesktopCredentials: writeDesktopCredentials,
+          );
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+
+        if (nextDocumentTrustPrincipal != null) {
+          try {
+            await _pendingDocumentTrustPrincipalWrite;
+          } catch (_) {
+            // The replacement below supersedes a failed lazy initialization.
+          }
+          try {
+            await PreferencesStore.putChecked(
+              PreferenceKeys.hermesLocalDocumentTrustPrincipal,
+              nextDocumentTrustPrincipal,
+            );
+          } catch (error, stackTrace) {
+            try {
+              await _persistSecretsAtomically(
+                previous: _HermesCredentialSnapshot(
+                  apiKey: nextApiKey,
+                  sessionKey: nextSessionKey,
+                  desktop: committedDesktopCredentials,
+                ),
+                next: previousCredentials,
+                writes: credentialWrites,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesBaseUrl,
+                previousBaseUrl,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesBackendMode,
+                state.mode.name,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesDesktopAuthKind,
+                state.desktopAuthKind.name,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesDesktopProfile,
+                state.desktopProfile,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesAllowSelfSignedCertificates,
+                state.allowSelfSignedCertificates,
+              );
+              if (PreferencesStore.getString(
+                    PreferenceKeys.hermesLocalDocumentTrustPrincipal,
+                  ) !=
+                  previousDocumentTrustPrincipal) {
+                await PreferencesStore.putChecked(
+                  PreferenceKeys.hermesLocalDocumentTrustPrincipal,
+                  previousDocumentTrustPrincipal,
+                );
+              }
+              _runtimeDocumentTrustPrincipalId = previousDocumentTrustPrincipal;
+            } catch (_) {
+              await _quarantineUncertainCredentialMutation(
+                clearApiKey: writeApiKey,
+                clearSessionKey: writeSessionKey,
+                clearDesktopCredentials: writeDesktopCredentials,
+              );
+            }
+            Error.throwWithStackTrace(error, stackTrace);
+          }
+          _runtimeDocumentTrustPrincipalId = nextDocumentTrustPrincipal;
+          _pendingDocumentTrustPrincipalWrite = null;
+        }
+
+        if (originChanged && previousBaseUrl.trim().isNotEmpty) {
+          final cleared = await HermesDashboardCookieStore.clear(
+            previousBaseUrl,
+          );
+          if (!cleared) {
+            try {
+              await _persistSecretsAtomically(
+                previous: _HermesCredentialSnapshot(
+                  apiKey: nextApiKey,
+                  sessionKey: nextSessionKey,
+                  desktop: committedDesktopCredentials,
+                ),
+                next: previousCredentials,
+                writes: credentialWrites,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesBaseUrl,
+                previousBaseUrl,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesBackendMode,
+                state.mode.name,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesDesktopAuthKind,
+                state.desktopAuthKind.name,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesDesktopProfile,
+                state.desktopProfile,
+              );
+              await PreferencesStore.putChecked(
+                PreferenceKeys.hermesAllowSelfSignedCertificates,
+                state.allowSelfSignedCertificates,
+              );
+              if (nextDocumentTrustPrincipal != null) {
+                await PreferencesStore.putChecked(
+                  PreferenceKeys.hermesLocalDocumentTrustPrincipal,
+                  previousDocumentTrustPrincipal,
+                );
+                _runtimeDocumentTrustPrincipalId =
+                    previousDocumentTrustPrincipal;
+              }
+            } catch (rollbackError) {
+              DebugLogger.error(
+                'cookie-cleanup-rollback-failed',
+                scope: 'hermes/config',
+                data: {'errorType': rollbackError.runtimeType.toString()},
+              );
+              await _quarantineUncertainCredentialMutation(
+                clearApiKey: writeApiKey,
+                clearSessionKey: writeSessionKey,
+                clearDesktopCredentials: writeDesktopCredentials,
+              );
+            }
+            throw StateError('Hermes dashboard cookies could not be cleared.');
+          }
         }
 
         if (endpointChanged || identityChanged) {
@@ -373,9 +713,32 @@ class HermesConfigController extends Notifier<HermesConfig> {
         state = HermesConfig(
           enabled: state.enabled,
           baseUrl: trimmedUrl,
+          mode: nextMode,
+          desktopAuthKind: nextDesktopAuthKind,
+          desktopProfile: nextDesktopProfile,
+          allowSelfSignedCertificates: nextAllowSelfSigned,
           apiKey: nextApiKey,
           sessionKey: nextSessionKey,
+          desktopCredentials: committedDesktopCredentials,
         );
+        if (identityChanged) {
+          ref.read(hermesConnectionGenerationProvider.notifier).bump();
+        }
+        if ((endpointChanged || identityChanged) &&
+            previousBaseUrl.trim().isNotEmpty) {
+          final previousOrigin = connectionOrigin(previousBaseUrl);
+          if (previousOrigin != null) {
+            try {
+              await HermesPendingDecisionStore.clearOrigin(previousOrigin);
+            } catch (error) {
+              DebugLogger.error(
+                'pending-decision-cleanup-failed',
+                scope: 'hermes/config',
+                data: {'errorType': error.runtimeType.toString()},
+              );
+            }
+          }
+        }
       }
 
       if (serviceWillRotate) {
@@ -466,34 +829,42 @@ class HermesConfigController extends Notifier<HermesConfig> {
   }
 
   Future<void> _persistSecretsAtomically({
-    required String? previousApiKey,
-    required String? previousSessionKey,
-    required String? nextApiKey,
-    required String? nextSessionKey,
-    required bool writeApiKey,
-    required bool writeSessionKey,
+    required _HermesCredentialSnapshot previous,
+    required _HermesCredentialSnapshot next,
+    required _HermesCredentialWrites writes,
   }) async {
-    if (!writeApiKey && !writeSessionKey) return;
+    if (!writes.any) return;
     try {
-      if (writeApiKey) await _persistApiKey(nextApiKey);
-      if (writeSessionKey) await _persistSessionKey(nextSessionKey);
+      if (writes.apiKey) await _persistApiKey(next.apiKey);
+      if (writes.sessionKey) await _persistSessionKey(next.sessionKey);
+      if (writes.desktop) {
+        await _persistDesktopCredentials(next.desktop);
+      }
     } catch (error, stackTrace) {
       // Secure storage has no multi-key transaction. Restore every key touched
       // by this mutation before surfacing the original failure so the old
       // server remains usable when a replacement write only partially lands.
       var rollbackSucceeded = true;
       Object? rollbackError;
-      if (writeApiKey) {
+      if (writes.apiKey) {
         try {
-          await _persistApiKey(previousApiKey);
+          await _persistApiKey(previous.apiKey);
         } catch (error) {
           rollbackSucceeded = false;
           rollbackError ??= error;
         }
       }
-      if (writeSessionKey) {
+      if (writes.sessionKey) {
         try {
-          await _persistSessionKey(previousSessionKey);
+          await _persistSessionKey(previous.sessionKey);
+        } catch (error) {
+          rollbackSucceeded = false;
+          rollbackError ??= error;
+        }
+      }
+      if (writes.desktop) {
+        try {
+          await _persistDesktopCredentials(previous.desktop);
         } catch (error) {
           rollbackSucceeded = false;
           rollbackError ??= error;
@@ -517,6 +888,7 @@ class HermesConfigController extends Notifier<HermesConfig> {
   Future<void> _quarantineUncertainCredentialMutation({
     required bool clearApiKey,
     required bool clearSessionKey,
+    required bool clearDesktopCredentials,
   }) async {
     var endpointQuarantined = false;
     try {
@@ -555,6 +927,18 @@ class HermesConfigController extends Notifier<HermesConfig> {
         );
       }
     }
+    if (!endpointQuarantined && clearDesktopCredentials) {
+      try {
+        await _persistDesktopCredentials(null);
+      } catch (error) {
+        secretsCleared = false;
+        DebugLogger.error(
+          'desktop-credential-quarantine-failed',
+          scope: 'hermes/config',
+          data: {'errorType': error.runtimeType.toString()},
+        );
+      }
+    }
 
     _clearRuntimeConnection();
     if (!endpointQuarantined && !secretsCleared) {
@@ -574,7 +958,13 @@ class HermesConfigController extends Notifier<HermesConfig> {
   }
 
   void _clearRuntimeConnection() {
-    state = HermesConfig(enabled: state.enabled);
+    state = HermesConfig(
+      enabled: state.enabled,
+      mode: state.mode,
+      desktopAuthKind: state.desktopAuthKind,
+      desktopProfile: state.desktopProfile,
+      allowSelfSignedCertificates: state.allowSelfSignedCertificates,
+    );
     ref.read(hermesActiveSessionProvider.notifier).set(null);
     final activeConversation = ref.read(activeConversationProvider);
     if (isNativeHermesConversation(activeConversation)) {
@@ -589,6 +979,11 @@ class HermesConfigController extends Notifier<HermesConfig> {
   Future<void> _persistSessionKey(String? value) => value == null
       ? _secure.deleteHermesSessionKey()
       : _secure.saveHermesSessionKey(value);
+
+  Future<void> _persistDesktopCredentials(HermesDesktopCredentials? value) =>
+      value == null || value.isEmpty
+      ? _secure.deleteHermesDesktopCredentials()
+      : _secure.saveHermesDesktopCredentials(jsonEncode(value.toJson()));
 
   Future<T> _withRunAdmissionBlocked<T>(Future<T> Function() operation) async {
     _runAdmissionBlocked = true;
@@ -644,39 +1039,14 @@ class HermesConfigController extends Notifier<HermesConfig> {
   }
 
   /// Canonical origin used to bind secrets to their intended server.
-  static String? connectionOrigin(String value) {
-    final uri = Uri.tryParse(value.trim());
-    if (uri == null ||
-        (uri.scheme != 'http' && uri.scheme != 'https') ||
-        uri.host.isEmpty ||
-        uri.userInfo.isNotEmpty ||
-        uri.hasQuery ||
-        uri.hasFragment) {
-      return null;
-    }
-    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
-    return '${uri.scheme.toLowerCase()}://${uri.host.toLowerCase()}:$port';
-  }
+  static String? connectionOrigin(String value) =>
+      HermesConfig.connectionOrigin(value);
 
   /// Canonical request root used to detect when the currently configured
   /// Hermes endpoint changes. `/v1` and a trailing slash are equivalent because
   /// [HermesApiService] strips them before composing request paths.
-  static String? connectionEndpoint(String value) {
-    var normalized = value.trim();
-    while (normalized.endsWith('/')) {
-      normalized = normalized.substring(0, normalized.length - 1);
-    }
-    if (normalized.endsWith('/v1')) {
-      normalized = normalized.substring(0, normalized.length - '/v1'.length);
-    }
-
-    final uri = Uri.tryParse(normalized);
-    final origin = connectionOrigin(normalized);
-    if (uri == null || origin == null) return null;
-    return '$origin${uri.path}'
-        '${uri.hasQuery ? '?${uri.query}' : ''}'
-        '${uri.hasFragment ? '#${uri.fragment}' : ''}';
-  }
+  static String? connectionEndpoint(String value) =>
+      HermesConfig.connectionEndpoint(value);
 
   String documentTrustPrincipalId() {
     final existing = PreferencesStore.getString(
@@ -797,19 +1167,31 @@ class HermesConfigController extends Notifier<HermesConfig> {
   HermesConfig _withState({
     bool? enabled,
     String? baseUrl,
+    HermesBackendMode? mode,
+    HermesDesktopAuthKind? desktopAuthKind,
+    String? desktopProfile,
     String? apiKey = _keep,
     String? sessionKey = _keep,
+    Object? desktopCredentials = _keepObject,
   }) {
     return HermesConfig(
       enabled: enabled ?? state.enabled,
       baseUrl: baseUrl ?? state.baseUrl,
+      mode: mode ?? state.mode,
+      desktopAuthKind: desktopAuthKind ?? state.desktopAuthKind,
+      desktopProfile: desktopProfile ?? state.desktopProfile,
+      allowSelfSignedCertificates: state.allowSelfSignedCertificates,
       apiKey: identical(apiKey, _keep) ? state.apiKey : apiKey,
       sessionKey: identical(sessionKey, _keep) ? state.sessionKey : sessionKey,
+      desktopCredentials: identical(desktopCredentials, _keepObject)
+          ? state.desktopCredentials
+          : desktopCredentials as HermesDesktopCredentials?,
     );
   }
 
   // Sentinel so setters can distinguish "leave unchanged" from "clear to null".
   static const String _keep = '__hermes_keep__';
+  static const Object _keepObject = Object();
 }
 
 final class _HermesSessionKeyRequest {
@@ -866,11 +1248,39 @@ final hermesConfigProvider =
       HermesConfigController.new,
     );
 
+class HermesConnectionGeneration extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+/// Non-secret epoch used to replace a transport after an identity mutation.
+final hermesConnectionGenerationProvider =
+    NotifierProvider<HermesConnectionGeneration, int>(
+      HermesConnectionGeneration.new,
+    );
+
 /// Whether the Hermes agent is toggled on (regardless of whether it is fully
 /// configured). Used to decide whether to surface the synthetic model.
 final hermesEnabledProvider = Provider<bool>(
   (ref) => ref.watch(hermesConfigProvider).enabled,
 );
+
+class HermesFastTierSelection extends Notifier<bool> {
+  @override
+  bool build() {
+    ref.watch(selectedModelProvider.select((model) => model?.id));
+    return false;
+  }
+
+  void set(bool value) => state = value;
+}
+
+final hermesFastTierSelectionProvider =
+    NotifierProvider<HermesFastTierSelection, bool>(
+      HermesFastTierSelection.new,
+    );
 
 /// True when Hermes is the only currently usable primary backend. A retained
 /// OpenWebUI server does not make the session mixed-mode after its user signs
@@ -901,12 +1311,106 @@ final hermesOnlyModeProvider = Provider<bool>((ref) {
 });
 
 /// The Hermes client, or null when Hermes is disabled / not fully configured.
-final hermesApiServiceProvider = Provider<HermesApiService?>((ref) {
-  final config = ref.watch(hermesConfigProvider);
+final hermesApiServiceProvider = Provider<HermesBackendService?>((ref) {
+  ref.watch(hermesConnectionGenerationProvider);
+  ref.watch(
+    hermesConfigProvider.select(
+      (config) => (
+        config.enabled,
+        config.baseUrl,
+        config.mode,
+        config.desktopAuthKind,
+        config.desktopProfile,
+        config.allowSelfSignedCertificates,
+        config.isUsable,
+      ),
+    ),
+  );
+  final config = ref.read(hermesConfigProvider);
   if (!config.isUsable) return null;
-  final service = HermesApiService(config: config);
+  final HermesBackendService service;
+  if (config.mode == HermesBackendMode.desktopGateway) {
+    final desktopService = HermesDesktopApiService(
+      config: config,
+      onCredentialsChanged: (credentials) async {
+        try {
+          if (!ref.mounted) return;
+          await ref
+              .read(hermesConfigProvider.notifier)
+              .setDesktopNativeTokens(credentials.nativeTokens);
+        } catch (error) {
+          DebugLogger.error(
+            'desktop-token-rotation-persist-failed',
+            scope: 'hermes/config',
+            data: {'errorType': error.runtimeType.toString()},
+          );
+        }
+      },
+    );
+    desktopService.startLifecycleObservation();
+    service = desktopService;
+  } else {
+    service = HermesApiService(config: config);
+  }
   ref.onDispose(service.close);
   return service;
+});
+
+/// Authoritative Desktop turn state. Responses mode remains on its existing
+/// dispatcher and therefore always exposes the neutral idle state here.
+final hermesDesktopTurnStateProvider =
+    StreamProvider.autoDispose<HermesDesktopTurnState>((ref) async* {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) {
+        yield HermesDesktopTurnState.idle;
+        return;
+      }
+      final conversation = ref.watch(activeConversationProvider);
+      if (!isNativeHermesConversation(conversation)) {
+        yield HermesDesktopTurnState.idle;
+        return;
+      }
+      final storedId = conversation?.metadata['hermesSessionId']?.toString();
+      if (storedId == null || storedId.isEmpty) {
+        yield HermesDesktopTurnState.idle;
+        return;
+      }
+      yield* service.turnStatesFor(storedId);
+    });
+
+final hermesDesktopTranscriptChangesProvider = StreamProvider<String>((ref) {
+  final service = ref.watch(hermesApiServiceProvider);
+  return service is HermesDesktopApiService
+      ? service.transcriptChanges
+      : const Stream<String>.empty();
+});
+
+final hermesDesktopModelsProvider = FutureProvider<List<Model>>((ref) async {
+  final service = ref.watch(hermesApiServiceProvider);
+  if (service is! HermesDesktopApiService) return const [];
+  final rows = await service.configuredModels();
+  final models = <Model>[];
+  for (final row in rows.take(1000)) {
+    final id = validateHermesBoundedString(row.id, maxCharacters: 512);
+    if (id == null) continue;
+    final provider =
+        validateHermesBoundedString(
+          row.provider,
+          maxCharacters: 128,
+          allowEmpty: true,
+        ) ??
+        '';
+    models.add(
+      hermesDesktopModel(
+        modelId: id,
+        name: validateHermesBoundedString(row.name, maxCharacters: 512) ?? id,
+        provider: provider,
+        supportsFast: row.supportsFast,
+        supportsReasoning: row.supportsReasoning,
+      ),
+    );
+  }
+  return models;
 });
 
 /// The Hermes agent's skills mapped to [Prompt]s so they can drive the existing
@@ -915,7 +1419,9 @@ final hermesApiServiceProvider = Provider<HermesApiService?>((ref) {
 final hermesSkillPromptsProvider = FutureProvider<List<Prompt>>((ref) async {
   final service = ref.watch(hermesApiServiceProvider);
   if (service == null) return const [];
-  final skills = await service.listSkills();
+  final skills = service is HermesDesktopApiService
+      ? await service.listCommands()
+      : await service.listSkills();
   final prompts = <Prompt>[];
   for (final skill in skills) {
     if (prompts.length >= 256) break;
@@ -932,6 +1438,14 @@ final hermesSkillPromptsProvider = FutureProvider<List<Prompt>>((ref) async {
   }
   return prompts;
 });
+
+final hermesInstalledSkillsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      return service is HermesDesktopApiService
+          ? service.listSkills()
+          : const [];
+    });
 
 /// The Hermes server-side session bound to the current chat, or null for a
 /// fresh chat with no session yet. Created lazily on the first Hermes turn and
@@ -1031,7 +1545,7 @@ class HermesSessionsController
     return sessions;
   }
 
-  HermesApiService? get _service => ref.read(hermesApiServiceProvider);
+  HermesBackendService? get _service => ref.read(hermesApiServiceProvider);
 
   /// Forks a session and returns the new session id (null if Hermes is off).
   Future<String?> fork(String id) async {
@@ -1224,6 +1738,44 @@ final hermesSessionsProvider =
       HermesSessionsController.new,
     );
 
+/// Bot Mode roster, newest activity first. Empty on gateways without Bot Mode
+/// and on the Responses backend, which hides the sidebar section entirely.
+final hermesBotsProvider = FutureProvider<List<HermesBot>>((ref) async {
+  final service = ref.watch(hermesApiServiceProvider);
+  if (service is! HermesDesktopApiService) return const [];
+  ref.watch(hermesDesktopContractProvider);
+  try {
+    return sortHermesBotsByRecency(await service.listBots());
+  } catch (_) {
+    // An older gateway rejects profiles.list outright; the roster is optional.
+    return const [];
+  }
+});
+
+/// Roster order: most recently active first.
+///
+/// Copies before sorting — the Bot-Mode-off path yields an unmodifiable const
+/// list, which would sort in place with an `UnsupportedError`.
+@visibleForTesting
+List<HermesBot> sortHermesBotsByRecency(List<HermesBot> bots) {
+  final epoch = DateTime.fromMillisecondsSinceEpoch(0);
+  return [...bots]..sort(
+    (a, b) => (b.lastActive ?? epoch).compareTo(a.lastActive ?? epoch),
+  );
+}
+
+/// A bot's avatar data URL, or null when it has none.
+final hermesBotAvatarProvider = FutureProvider.autoDispose
+    .family<String?, String>((ref, profile) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) return null;
+      try {
+        return await service.botAvatar(profile);
+      } catch (_) {
+        return null;
+      }
+    });
+
 /// Server-advertised capabilities (`/v1/capabilities`). Falls back to the
 /// optimistic all-enabled default when discovery fails, so features are only
 /// hidden when the server explicitly says they're unsupported.
@@ -1232,19 +1784,32 @@ final hermesCapabilitiesProvider = FutureProvider<HermesCapabilities>((
 ) async {
   final service = ref.watch(hermesApiServiceProvider);
   if (service == null) return HermesCapabilities.enabledByDefault;
+  if (service is HermesDesktopApiService) {
+    ref.watch(hermesDesktopContractProvider);
+  }
   try {
     return HermesCapabilities.fromJson(await service.getCapabilities());
   } catch (_) {
-    return HermesCapabilities.enabledByDefault;
+    return service is HermesDesktopApiService
+        ? HermesCapabilities.desktopCoreOnly
+        : HermesCapabilities.enabledByDefault;
   }
+});
+
+final hermesDesktopContractProvider = StreamProvider<int>((ref) {
+  final service = ref.watch(hermesApiServiceProvider);
+  return service is HermesDesktopApiService
+      ? service.desktopContracts()
+      : const Stream<int>.empty();
 });
 
 /// Synchronous best-effort view of capabilities for gating UI (optimistic
 /// default while loading / on error).
-HermesCapabilities hermesCapabilitiesNow(Ref ref) {
-  return ref.read(hermesCapabilitiesProvider).asData?.value ??
-      HermesCapabilities.enabledByDefault;
-}
+HermesCapabilities hermesCapabilitiesNow(Ref ref) =>
+    ref.read(hermesCapabilitiesProvider).asData?.value ??
+    (ref.read(hermesConfigProvider).mode == HermesBackendMode.desktopGateway
+        ? HermesCapabilities.desktopCoreOnly
+        : HermesCapabilities.enabledByDefault);
 
 /// Resolved toolsets for the api_server platform (`/v1/toolsets`).
 final hermesToolsetsProvider = FutureProvider<List<HermesToolset>>((ref) async {
@@ -1284,7 +1849,7 @@ class HermesJobsController extends AsyncNotifier<List<HermesJob>> {
     return jobs;
   }
 
-  HermesApiService get _service =>
+  HermesBackendService get _service =>
       ref.read(hermesApiServiceProvider) ??
       (throw StateError('Hermes is not configured'));
 
@@ -1321,6 +1886,7 @@ class HermesJobsController extends AsyncNotifier<List<HermesJob>> {
 
   Future<void> runNow(String id) async {
     await _service.runJob(id);
+    ref.invalidate(hermesJobRunsProvider(id));
   }
 
   Future<void> delete(String id) async {
@@ -1334,6 +1900,19 @@ final hermesJobsProvider =
     AsyncNotifierProvider<HermesJobsController, List<HermesJob>>(
       HermesJobsController.new,
     );
+
+/// Desktop cron runs are ordinary Hermes sessions, newest first.
+final hermesJobRunsProvider = FutureProvider.autoDispose
+    .family<List<HermesSessionSummary>, String>((ref, jobId) async {
+      final service = ref.watch(hermesApiServiceProvider);
+      if (service is! HermesDesktopApiService) return const [];
+      final rows = await service.listJobRuns(jobId);
+      return rows
+          .map(HermesSessionSummary.fromJson)
+          .whereType<HermesSessionSummary>()
+          .take(20)
+          .toList(growable: false);
+    });
 
 /// Collision-free address for a Hermes run inside a conversation.
 ///

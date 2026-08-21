@@ -3,25 +3,21 @@ import 'dart:io';
 import 'package:conduit/features/release_notes/data/release_notes_repository.dart';
 import 'package:conduit/features/release_notes/widgets/release_notes_sheet.dart';
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit/shared/widgets/conduit_components.dart';
 import 'package:conduit/shared/widgets/themed_sheets.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../support/test_fonts.dart';
+
 void main() {
-  setUpAll(() async {
-    final fontLoader = FontLoader('Geist Sans')
-      ..addFont(rootBundle.load('assets/fonts/geist/Geist-Regular.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/geist/Geist-SemiBold.ttf'))
-      ..addFont(rootBundle.load('assets/fonts/geist/Geist-Bold.ttf'));
-    await fontLoader.load();
-  });
+  setUpAll(loadTestFonts);
 
   for (final localeName in [
     'cs',
@@ -33,6 +29,7 @@ void main() {
     'ja',
     'ko',
     'nl',
+    'pl',
     'ru',
     'sk',
     'zh',
@@ -62,7 +59,7 @@ void main() {
             child: MaterialApp(
               theme: AppTheme.light(TweakcnThemes.t3Chat),
               locale: locale,
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: conduitLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: Scaffold(
                 body: Align(

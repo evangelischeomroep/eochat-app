@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:checks/checks.dart';
 import 'package:conduit/core/models/chat_message.dart';
 import 'package:conduit/core/services/settings_service.dart';
+import 'package:conduit/core/services/worker_manager.dart';
 import 'package:conduit/features/chat/providers/assistant_response_builder_provider.dart';
 import 'package:conduit/features/chat/providers/chat_providers.dart';
 import 'package:conduit/features/chat/providers/queued_completion_provider.dart';
@@ -14,12 +15,14 @@ import 'package:conduit/features/chat/widgets/follow_up_suggestions.dart';
 import 'package:conduit/features/chat/widgets/streaming_status_widget.dart';
 import 'package:conduit/features/chat/widgets/sources/openwebui_sources.dart';
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:conduit/shared/widgets/chat_action_button.dart';
 import 'package:conduit/shared/widgets/markdown/streaming_markdown_widget.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:flutter/foundation.dart' show SynchronousFuture;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -43,6 +46,36 @@ class _RecordingTextToSpeechController extends TextToSpeechController {
     required String text,
   }) async {
     onToggle();
+  }
+}
+
+/// Runs worker tasks inline so the TTS plain-text pass resolves within a pump.
+class _ImmediateWorkerManager extends WorkerManager {
+  _ImmediateWorkerManager() : super(maxConcurrentTasks: 1);
+
+  @override
+  Future<R> schedule<Q, R>(
+    WorkerTask<Q, R> callback,
+    Q message, {
+    String? debugLabel,
+  }) => Future<R>.value(callback(message));
+}
+
+class _CapturingTextToSpeechController extends TextToSpeechController {
+  _CapturingTextToSpeechController(this.onToggle);
+
+  final void Function(String text) onToggle;
+
+  @override
+  TextToSpeechState build() =>
+      const TextToSpeechState(initialized: true, available: true);
+
+  @override
+  Future<void> toggleForMessage({
+    required String messageId,
+    required String text,
+  }) async {
+    onToggle(text);
   }
 }
 
@@ -76,7 +109,7 @@ class _CountingTextToSpeechController extends TextToSpeechController {
 Widget _buildHarness(Widget child) {
   return MaterialApp(
     theme: AppTheme.light(TweakcnThemes.t3Chat),
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: conduitLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(body: child),
   );
@@ -88,6 +121,7 @@ Widget _buildAssistantHarness(
   bool isStreaming = false,
   bool? isChatStreaming,
   bool disableAnimations = false,
+  bool showActionBar = true,
   VoidCallback? onCopy,
   VoidCallback? onRegenerate,
   FutureOr<void> Function(String suggestion)? onFollowUpSelected,
@@ -103,12 +137,11 @@ Widget _buildAssistantHarness(
     ],
     child: MaterialApp(
       theme: AppTheme.light(TweakcnThemes.t3Chat),
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: conduitLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(disableAnimations: disableAnimations),
+        data: MediaQuery.of(context)
+            .copyWith(disableAnimations: disableAnimations),
         child: child!,
       ),
       home: Scaffold(
@@ -116,6 +149,7 @@ Widget _buildAssistantHarness(
           message: message,
           isStreaming: isStreaming,
           showFollowUps: showFollowUps,
+          showActionBar: showActionBar,
           animateOnMount: false,
           modelName: message.model,
           onCopy: onCopy ?? () {},
@@ -159,6 +193,8 @@ Future<void> _tapVersionControl(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  tearDown(PlatformUiCapabilities.resetDebugOverrides);
+
   testWidgets('streaming content rebuilds only the assistant body', (
     tester,
   ) async {
@@ -186,7 +222,7 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: conduitLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AssistantMessageWidget(
@@ -380,9 +416,8 @@ void main() {
       check(calls).equals(1);
 
       gate.complete(Uri.parse('https://www.help.openai.com/en/articles/'));
-      check(
-        await Future.wait([first, second]),
-      ).deepEquals(['help.openai.com', 'help.openai.com']);
+      check(await Future.wait([first, second]))
+          .deepEquals(['help.openai.com', 'help.openai.com']);
       check(
         await resolveSourceFaviconDomain(
           groundingUrl,
@@ -446,6 +481,132 @@ void main() {
     expect(find.text('Prev'), findsOneWidget);
     expect(find.text('Next'), findsOneWidget);
     expect(find.text('Info'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a non-terminal grouped row keeps its info chips but no actions',
+    (tester) async {
+      // Within a grouped response only the last row paints the toolbar, but its
+      // siblings still own their own citations, so those must survive.
+      final message = ChatMessage(
+        id: 'assistant-grouped-middle',
+        role: 'assistant',
+        content: 'The first part of one grouped answer.',
+        timestamp: DateTime(2024, 1, 1),
+        isStreaming: false,
+        metadata: const {'responseDone': true},
+        sources: const [
+          ChatSourceReference(
+            title: 'Source A',
+            snippet: 'Source details shown in the bottom sheet.',
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _buildAssistantHarness(
+          message,
+          isChatStreaming: false,
+          showActionBar: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      check(find.text('1 Source').evaluate()).length.equals(1);
+      check(find.byType(ChatActionButton).evaluate()).isEmpty();
+      check(find.byIcon(Icons.content_copy).evaluate()).isEmpty();
+      check(find.byIcon(Icons.refresh).evaluate()).isEmpty();
+      check(find.byIcon(Icons.more_horiz_rounded).evaluate()).isEmpty();
+    },
+  );
+
+  testWidgets('the bar owner reads the whole grouped response aloud', (
+    tester,
+  ) async {
+    final spoken = <String>[];
+    final message = ChatMessage(
+      id: 'assistant-grouped-last',
+      role: 'assistant',
+      content: 'The last part.',
+      timestamp: DateTime(2024, 1, 1),
+      isStreaming: false,
+      metadata: const {'responseDone': true},
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          textToSpeechControllerProvider.overrideWith(
+            () => _CapturingTextToSpeechController(spoken.add),
+          ),
+          workerManagerProvider.overrideWithValue(_ImmediateWorkerManager()),
+          isChatStreamingProvider.overrideWithValue(false),
+        ],
+        child: _buildHarness(
+          AssistantMessageWidget(
+            message: message,
+            isStreaming: false,
+            showFollowUps: false,
+            animateOnMount: false,
+            modelName: message.model,
+            resolveGroupedResponseText: () =>
+                'The first part.\n\nThe last part.',
+            onCopy: () {},
+            onRegenerate: () {},
+            onDelete: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.volume_up));
+    await tester.pumpAndSettle();
+
+    check(spoken).length.equals(1);
+    check(spoken.single).contains('The first part.');
+    check(spoken.single).contains('The last part.');
+  });
+
+  testWidgets('assistant overflow uses the native iOS 26 popup menu', (
+    tester,
+  ) async {
+    PlatformUiCapabilities.debugPlatformOverride = TargetPlatform.iOS;
+    PlatformUiCapabilities.debugIOSMajorVersionOverride = 26;
+    PlatformUiCapabilities.debugNativeIOS26Override = true;
+
+    final message = ChatMessage(
+      id: 'assistant-native-overflow',
+      role: 'assistant',
+      content: 'Response with overflow actions.',
+      timestamp: DateTime(2024, 1, 1),
+      usage: const {'total_tokens': 24},
+      versions: [
+        ChatMessageVersion(
+          id: 'assistant-native-overflow-v1',
+          content: 'Older version',
+          timestamp: DateTime(2023, 12, 31),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_buildAssistantHarness(message));
+    await tester.pump();
+
+    final nativeMenu = tester.widget<CNPopupMenuButton>(
+      find.byType(CNPopupMenuButton),
+    );
+    expect(nativeMenu.buttonStyle, CNButtonStyle.plain);
+    expect(nativeMenu.width, 32);
+    expect(
+      nativeMenu.items.whereType<CNPopupMenuItem>().last.isDestructive,
+      isTrue,
+    );
+
+    // The native package delays platform-view readiness in debug builds.
+    // Dispose the control before advancing that guard timer in widget tests.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 500));
   });
 
   testWidgets('assistant header follows the active version model', (
@@ -534,35 +695,27 @@ void main() {
     );
   });
 
-  testWidgets('pending-only finished statuses do not leave an empty gap', (
+  testWidgets('pending-only finished statuses keep the last row visible', (
     tester,
   ) async {
-    final baseline = ChatMessage(
-      id: 'assistant-baseline',
+    // Hiding the whole row at settle shifted the bottom-anchored layout by
+    // the row height and lost the only description of what the turn did;
+    // the last update stays visible (without the pending spinner) instead.
+    final pendingOnly = ChatMessage(
+      id: 'assistant-pending',
       role: 'assistant',
       content: 'Visible response body',
       timestamp: DateTime(2024, 1, 1),
-    );
-    final pendingOnly = baseline.copyWith(
-      id: 'assistant-pending',
       statusHistory: const [
         ChatStatusUpdate(description: 'Searching...', done: false),
       ],
     );
 
-    await tester.pumpWidget(_buildAssistantHarness(baseline));
-    await tester.pumpAndSettle();
-    final baselineDy = tester.getTopLeft(find.text('Visible response body')).dy;
-
     await tester.pumpWidget(_buildAssistantHarness(pendingOnly));
     await tester.pumpAndSettle();
 
-    expect(find.byType(StreamingStatusWidget), findsNothing);
-    expect(find.text('Searching...'), findsNothing);
-    expect(
-      tester.getTopLeft(find.text('Visible response body')).dy,
-      closeTo(baselineDy, 0.001),
-    );
+    expect(find.byType(StreamingStatusWidget), findsOneWidget);
+    expect(find.text('Searching...'), findsOneWidget);
   });
 
   testWidgets('finished nullable-done statuses remain visible', (tester) async {
@@ -1093,7 +1246,7 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.light(TweakcnThemes.t3Chat),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: conduitLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: AssistantMessageWidget(
@@ -1135,7 +1288,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: conduitLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AssistantMessageWidget(
@@ -1281,7 +1434,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: conduitLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AssistantMessageWidget(
@@ -1325,27 +1478,26 @@ void main() {
           textToSpeechControllerProvider.overrideWith(
             _TestTextToSpeechController.new,
           ),
-          queuedCompletionInfoForMessageProvider(
-            'queued-assistant',
-          ).overrideWith(
-            (ref) => Stream<QueuedCompletionInfo?>.value(
-              const QueuedCompletionInfo(
-                databaseOwner: Object(),
-                seq: 42,
-                chatId: 'chat-1',
-                scopedChatId: 'chat-1',
-                assistantMessageId: 'queued-assistant',
-                phase: QueuedCompletionPhase.pending,
-                isOffline: true,
-                lastError: 'offline',
-                nextAttemptAt: 123,
+          queuedCompletionInfoForMessageProvider('queued-assistant')
+              .overrideWith(
+                (ref) => Stream<QueuedCompletionInfo?>.value(
+                  const QueuedCompletionInfo(
+                    databaseOwner: Object(),
+                    seq: 42,
+                    chatId: 'chat-1',
+                    scopedChatId: 'chat-1',
+                    assistantMessageId: 'queued-assistant',
+                    phase: QueuedCompletionPhase.pending,
+                    isOffline: true,
+                    lastError: 'offline',
+                    nextAttemptAt: 123,
+                  ),
+                ),
               ),
-            ),
-          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: conduitLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AssistantMessageWidget(
@@ -1391,26 +1543,25 @@ void main() {
           textToSpeechControllerProvider.overrideWith(
             _TestTextToSpeechController.new,
           ),
-          queuedCompletionInfoForMessageProvider(
-            'partial-assistant',
-          ).overrideWith(
-            (ref) => Stream<QueuedCompletionInfo?>.value(
-              const QueuedCompletionInfo(
-                databaseOwner: Object(),
-                seq: 43,
-                chatId: 'chat-1',
-                scopedChatId: 'chat-1',
-                assistantMessageId: 'partial-assistant',
-                phase: QueuedCompletionPhase.failed,
-                isOffline: false,
-                lastError: 'boom',
+          queuedCompletionInfoForMessageProvider('partial-assistant')
+              .overrideWith(
+                (ref) => Stream<QueuedCompletionInfo?>.value(
+                  const QueuedCompletionInfo(
+                    databaseOwner: Object(),
+                    seq: 43,
+                    chatId: 'chat-1',
+                    scopedChatId: 'chat-1',
+                    assistantMessageId: 'partial-assistant',
+                    phase: QueuedCompletionPhase.failed,
+                    isOffline: false,
+                    lastError: 'boom',
+                  ),
+                ),
               ),
-            ),
-          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: conduitLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AssistantMessageWidget(
@@ -1453,26 +1604,25 @@ void main() {
           textToSpeechControllerProvider.overrideWith(
             _TestTextToSpeechController.new,
           ),
-          queuedCompletionInfoForMessageProvider(
-            'pending-partial-assistant',
-          ).overrideWith(
-            (ref) => Stream<QueuedCompletionInfo?>.value(
-              const QueuedCompletionInfo(
-                databaseOwner: Object(),
-                seq: 44,
-                chatId: 'chat-1',
-                scopedChatId: 'chat-1',
-                assistantMessageId: 'pending-partial-assistant',
-                phase: QueuedCompletionPhase.pending,
-                isOffline: true,
-                lastError: 'offline',
+          queuedCompletionInfoForMessageProvider('pending-partial-assistant')
+              .overrideWith(
+                (ref) => Stream<QueuedCompletionInfo?>.value(
+                  const QueuedCompletionInfo(
+                    databaseOwner: Object(),
+                    seq: 44,
+                    chatId: 'chat-1',
+                    scopedChatId: 'chat-1',
+                    assistantMessageId: 'pending-partial-assistant',
+                    phase: QueuedCompletionPhase.pending,
+                    isOffline: true,
+                    lastError: 'offline',
+                  ),
+                ),
               ),
-            ),
-          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: conduitLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: AssistantMessageWidget(

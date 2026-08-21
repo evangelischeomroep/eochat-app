@@ -1,16 +1,23 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../l10n/app_localizations.dart';
+import '../../../l10n/app_localizations_en.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
-import '../../profile/widgets/settings_page_scaffold.dart';
+import '../../../shared/widgets/utility_components.dart';
 import '../models/hermes_job.dart';
+import '../models/hermes_config.dart';
 import '../providers/hermes_providers.dart';
 import '../utils/hermes_schedule_format.dart';
 import '../widgets/hermes_job_editor.dart';
+import '../widgets/hermes_session_tile.dart' show openHermesSession;
+
+AppLocalizations _l10n(BuildContext context) =>
+    AppLocalizations.of(context) ?? AppLocalizationsEn();
 
 /// "Scheduled Agents" — cron-driven Hermes jobs (`/api/jobs`): create, edit,
 /// pause/resume, run-now, delete.
@@ -51,12 +58,13 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
     final writable =
         ref.watch(hermesCapabilitiesProvider).asData?.value.jobsAdmin ?? true;
     final theme = context.conduitTheme;
+    final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
 
-    return SettingsPageScaffold(
-      title: 'Scheduled Agents',
+    return UtilityPageScaffold.settings(
+      title: l10n.hermesScheduledAgentsTitle,
       children: [
         ConduitButton(
-          text: 'New scheduled job',
+          text: l10n.hermesJobNew,
           icon: Icons.add,
           isFullWidth: true,
           isLoading: _creating,
@@ -65,8 +73,8 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
         if (!writable) ...[
           const SizedBox(height: Spacing.sm),
           Text(
-            'This server has job administration disabled — jobs are read-only.',
-            style: AppTypography.captionStyle.copyWith(
+            l10n.hermesJobAdminDisabled,
+            style: AppTypography.bodySmallStyle.copyWith(
               color: theme.textSecondary,
             ),
           ),
@@ -79,8 +87,7 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
                 padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
                 child: Center(
                   child: Text(
-                    'No scheduled jobs yet.\nCreate one to have the agent run a '
-                    'prompt on a schedule.',
+                    '${l10n.hermesNoSchedulesYet}\n${l10n.hermesJobEmptyMessage}',
                     textAlign: TextAlign.center,
                     style: AppTypography.bodySmallStyle.copyWith(
                       color: theme.textSecondary,
@@ -110,8 +117,7 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
             padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
             child: Center(
               child: Text(
-                'Could not load scheduled jobs.\nCheck the connection in '
-                'Settings → Hermes Agent.',
+                l10n.hermesJobLoadFailed,
                 textAlign: TextAlign.center,
                 style: AppTypography.bodySmallStyle.copyWith(
                   color: theme.error,
@@ -125,14 +131,11 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
   }
 
   Future<void> _createJob() async {
+    final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
     final result = await showHermesJobEditor(context);
     if (result == null || !mounted || _creating) return;
     if (ref.read(hermesApiServiceProvider) == null) {
-      UiUtils.showMessage(
-        context,
-        'Could not create scheduled job.',
-        isError: true,
-      );
+      UiUtils.showMessage(context, l10n.hermesJobCreateFailed, isError: true);
       return;
     }
     setState(() => _creating = true);
@@ -145,8 +148,8 @@ class _HermesJobsPageState extends ConsumerState<HermesJobsPage> {
             prompt: result.prompt,
             schedule: result.schedule,
           ),
-      failureMessage: 'Could not create scheduled job.',
-      successMessage: 'Scheduled job created.',
+      failureMessage: l10n.hermesJobCreateFailed,
+      successMessage: l10n.hermesJobCreated,
     );
     if (mounted) setState(() => _creating = false);
   }
@@ -166,6 +169,7 @@ class _JobCard extends ConsumerStatefulWidget {
 
 class _JobCardState extends ConsumerState<_JobCard> {
   _JobMutation? _mutation;
+  bool _historyExpanded = false;
 
   HermesJob get job => widget.job;
   bool get writable => widget.writable;
@@ -174,6 +178,10 @@ class _JobCardState extends ConsumerState<_JobCard> {
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
+    final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
+    final desktop =
+        ref.watch(hermesConfigProvider.select((config) => config.mode)) ==
+        HermesBackendMode.desktopGateway;
 
     return Container(
       padding: const EdgeInsets.all(Spacing.md),
@@ -244,7 +252,6 @@ class _JobCardState extends ConsumerState<_JobCard> {
                         job.schedule,
                         style: AppTypography.codeStyle.copyWith(
                           color: theme.textSecondary,
-                          fontSize: 11,
                         ),
                       ),
                   ],
@@ -253,7 +260,7 @@ class _JobCardState extends ConsumerState<_JobCard> {
               if (!job.enabled) ...[
                 const SizedBox(width: Spacing.sm),
                 Text(
-                  'Paused',
+                  l10n.hermesJobPaused,
                   style: AppTypography.captionStyle.copyWith(
                     color: theme.error,
                   ),
@@ -262,33 +269,149 @@ class _JobCardState extends ConsumerState<_JobCard> {
             ],
           ),
           const SizedBox(height: Spacing.sm),
+          if (desktop) ...[
+            Wrap(
+              spacing: Spacing.sm,
+              runSpacing: Spacing.xxs,
+              children: [
+                Text(
+                  '${l10n.hermesJobStateLabel}: ${job.state ?? (job.enabled ? 'active' : 'paused')}',
+                  style: AppTypography.bodySmallStyle.copyWith(
+                    color: theme.textSecondary,
+                  ),
+                ),
+                Text(
+                  '${l10n.hermesJobDeliveryLabel}: ${job.deliveryTarget ?? 'local'}',
+                  style: AppTypography.bodySmallStyle.copyWith(
+                    color: theme.textSecondary,
+                  ),
+                ),
+                if (job.lastRun != null)
+                  Text(
+                    '${l10n.hermesJobLastLabel}: ${_formatJobTime(context, job.lastRun!)}',
+                    style: AppTypography.bodySmallStyle.copyWith(
+                      color: theme.textSecondary,
+                    ),
+                  ),
+                if (job.nextRun != null)
+                  Text(
+                    '${l10n.hermesJobNextLabel}: ${_formatJobTime(context, job.nextRun!)}',
+                    style: AppTypography.bodySmallStyle.copyWith(
+                      color: theme.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+            if (job.lastStatus?.isNotEmpty == true)
+              Text(
+                job.lastStatus!,
+                style: AppTypography.bodySmallStyle.copyWith(
+                  color: theme.textSecondary,
+                ),
+              ),
+            if (job.lastError?.isNotEmpty == true)
+              Text(
+                job.lastError!,
+                style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
+              ),
+            if (job.lastDeliveryError?.isNotEmpty == true)
+              Text(
+                'Delivery: ${job.lastDeliveryError}',
+                style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
+              ),
+            const SizedBox(height: Spacing.xs),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: () =>
+                    setState(() => _historyExpanded = !_historyExpanded),
+                icon: Icon(
+                  _historyExpanded ? Icons.expand_less : Icons.history,
+                  size: 18,
+                ),
+                label: Text(l10n.hermesJobRunHistory),
+              ),
+            ),
+            if (_historyExpanded) _buildRunHistory(theme),
+            const SizedBox(height: Spacing.xs),
+          ],
           if (writable)
             Row(
               children: [
                 ConduitButton(
                   key: ValueKey<String>('hermes-job-run-${job.id}'),
-                  text: 'Run now',
+                  text: l10n.hermesJobRunNow,
                   isSecondary: true,
                   isCompact: true,
                   isLoading: _mutation == _JobMutation.run,
                   onPressed: _busy ? null : _runNow,
                 ),
                 const Spacer(),
-                IconButton(
-                  icon: Icon(Icons.edit_outlined, color: theme.iconSecondary),
-                  tooltip: 'Edit scheduled job',
+                ConduitIconButton(
+                  icon: Icons.edit_outlined,
+                  iconColor: theme.iconSecondary,
+                  tooltip: l10n.hermesJobEdit,
                   onPressed: _busy ? null : _editJob,
+                  isCompact: true,
                 ),
-                IconButton(
-                  icon: Icon(Icons.delete_outline, color: theme.error),
-                  tooltip: 'Delete scheduled job',
+                ConduitIconButton(
+                  icon: Icons.delete_outline,
+                  iconColor: theme.error,
+                  tooltip: l10n.hermesJobDelete,
                   onPressed: _busy ? null : _deleteJob,
+                  isCompact: true,
                 ),
               ],
             ),
         ],
       ),
     );
+  }
+
+  Widget _buildRunHistory(ConduitThemeExtension theme) {
+    final runs = ref.watch(hermesJobRunsProvider(job.id));
+    return runs.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(Spacing.sm),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => Text(
+        'Could not load run history.',
+        style: AppTypography.bodySmallStyle.copyWith(color: theme.error),
+      ),
+      data: (items) {
+        if (items.isEmpty) {
+          return Text(
+            'No runs yet.',
+            style: AppTypography.bodySmallStyle.copyWith(
+              color: theme.textSecondary,
+            ),
+          );
+        }
+        return Column(
+          children: [
+            for (final run in items)
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.chat_bubble_outline, size: 18),
+                title: Text(run.title, maxLines: 1),
+                subtitle: run.updatedAt == null
+                    ? null
+                    : Text(_formatJobTime(context, run.updatedAt!)),
+                onTap: () => openHermesSession(context, ref, run),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _formatJobTime(BuildContext context, DateTime value) {
+    final local = value.toLocal();
+    final material = MaterialLocalizations.of(context);
+    return '${material.formatMediumDate(local)} '
+        '${material.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
   }
 
   Future<void> _runMutation({
@@ -317,18 +440,18 @@ class _JobCardState extends ConsumerState<_JobCard> {
     action: () =>
         ref.read(hermesJobsProvider.notifier).setEnabled(job.id, enabled),
     failureMessage: enabled
-        ? 'Could not resume scheduled job.'
-        : 'Could not pause scheduled job.',
+        ? _l10n(context).hermesJobResumeFailed
+        : _l10n(context).hermesJobPauseFailed,
     successMessage: enabled
-        ? 'Scheduled job resumed.'
-        : 'Scheduled job paused.',
+        ? _l10n(context).hermesJobResumed
+        : _l10n(context).hermesJobPausedSuccess,
   );
 
   Future<void> _runNow() => _runMutation(
     mutation: _JobMutation.run,
     action: () => ref.read(hermesJobsProvider.notifier).runNow(job.id),
-    failureMessage: 'Could not run scheduled job.',
-    successMessage: 'Scheduled job started.',
+    failureMessage: _l10n(context).hermesJobRunFailed,
+    successMessage: _l10n(context).hermesJobStarted,
   );
 
   Future<void> _editJob() async {
@@ -349,25 +472,25 @@ class _JobCardState extends ConsumerState<_JobCard> {
             prompt: result.prompt,
             schedule: result.schedule,
           ),
-      failureMessage: 'Could not update scheduled job.',
-      successMessage: 'Scheduled job updated.',
+      failureMessage: _l10n(context).hermesJobUpdateFailed,
+      successMessage: _l10n(context).hermesJobUpdated,
     );
   }
 
   Future<void> _deleteJob() async {
     final confirmed = await ThemedDialogs.confirm(
       context,
-      title: 'Delete job',
-      message: 'Delete this scheduled job? This cannot be undone.',
-      confirmText: 'Delete',
+      title: _l10n(context).hermesJobDeleteTitle,
+      message: _l10n(context).hermesJobDeleteMessage,
+      confirmText: _l10n(context).delete,
       isDestructive: true,
     );
     if (!confirmed || !mounted) return;
     await _runMutation(
       mutation: _JobMutation.delete,
       action: () => ref.read(hermesJobsProvider.notifier).delete(job.id),
-      failureMessage: 'Could not delete scheduled job.',
-      successMessage: 'Scheduled job deleted.',
+      failureMessage: _l10n(context).hermesJobDeleteFailed,
+      successMessage: _l10n(context).hermesJobDeleted,
     );
   }
 }

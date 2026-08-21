@@ -1,15 +1,17 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-// ignore: implementation_imports
-import 'package:adaptive_platform_ui/src/widgets/ios26/ios26_native_toolbar.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:conduit/shared/theme/theme_extensions.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
-import '../theme/theme_extensions.dart';
+import 'adaptive_toolbar_components.dart';
+import 'chrome_gradient_fade.dart';
 
-/// iOS 26 sidebar scaffold workaround for `adaptive_platform_ui`.
+const double _nativeTabBarPlaceholderHeight = 50;
+
+/// iOS 26 sidebar shell backed by cupertino_native_better chrome.
 ///
-/// The sidebar owns tab body switching and keeps one body tree mounted. This
-/// local scaffold also lets a fully closed mobile drawer omit the underlying
-/// UIKit toolbar and tab-bar views without removing their Flutter geometry.
+/// Wrapped in a [CupertinoTheme] override so the native iOS chrome (tab bar,
+/// nav bar) picks up EOchat's sidebar brand color, while [body] keeps the
+/// original app theme.
 class SidebarIos26Scaffold extends StatelessWidget {
   const SidebarIos26Scaffold({
     super.key,
@@ -17,7 +19,6 @@ class SidebarIos26Scaffold extends StatelessWidget {
     required this.body,
     this.leading,
     this.actions,
-    this.minimizeBehavior = TabBarMinimizeBehavior.never,
     this.showNativeView = true,
   });
 
@@ -25,7 +26,6 @@ class SidebarIos26Scaffold extends StatelessWidget {
   final Widget body;
   final Widget? leading;
   final List<AdaptiveAppBarAction>? actions;
-  final TabBarMinimizeBehavior minimizeBehavior;
   final bool showNativeView;
 
   @override
@@ -43,65 +43,130 @@ class SidebarIos26Scaffold extends StatelessWidget {
     final routeAllowsNativeView =
         (route?.isCurrent ?? true) ||
         route?.animation?.status == AnimationStatus.reverse;
-    final shouldShowNativeView = showNativeView && routeAllowsNativeView;
-    final hasToolbarContent =
-        leading != null || (actions != null && actions!.isNotEmpty);
-    final hasBottomNavigation =
-        bottomNavigationBar?.items != null &&
-        bottomNavigationBar!.items!.isNotEmpty &&
-        bottomNavigationBar!.selectedIndex != null &&
-        bottomNavigationBar!.onTap != null;
-    final brightness = MediaQuery.platformBrightnessOf(context);
-    final textColor = brightness == Brightness.dark
-        ? CupertinoColors.white
-        : CupertinoColors.black;
+    final composeNativeViews = showNativeView && routeAllowsNativeView;
+    final navigation = bottomNavigationBar;
+    final safePadding = MediaQuery.paddingOf(context);
+    final renderedBottomNavigation = switch (navigation) {
+      final navigation?
+          when navigation.items.length >= 2 && navigation.items.length <= 5 =>
+        navigation.renderer == AdaptiveBottomNavigationRenderer.fullWidth
+            ? buildAdaptiveCupertinoTabBar(navigation)
+            : composeNativeViews
+            ? buildAdaptiveNativeTabBar(
+                navigation,
+                tint:
+                    navigation.selectedItemColor ??
+                    CupertinoTheme.of(context).primaryColor,
+              )
+            : SizedBox(
+                height: safePadding.bottom + _nativeTabBarPlaceholderHeight,
+              ),
+      _ => null,
+    };
+    final hasBottomNavigation = renderedBottomNavigation != null;
+    final textColor = CupertinoColors.label.resolveFrom(context);
+    final hasNavigationBar = leading != null || actions?.isNotEmpty == true;
+    final toolbarActions = actions ?? const <AdaptiveAppBarAction>[];
+    final toolbarActionsWidth = toolbarActions.isEmpty
+        ? 0.0
+        : (toolbarActions.length * TouchTarget.minimum) +
+              ((toolbarActions.length - 1) * Spacing.sm);
 
-    return CupertinoTheme(
+return CupertinoTheme(
       data: originalCupertinoTheme.copyWith(primaryColor: sidebarPrimary),
       child: CupertinoPageScaffold(
         resizeToAvoidBottomInset: !hasBottomNavigation,
+        navigationBar: hasNavigationBar
+            ? ConduitAdaptiveCupertinoNavigationBar(
+                textScaler: MediaQuery.textScalerOf(context),
+                leading: leading ?? const SizedBox.shrink(),
+                trailing: toolbarActions.isEmpty
+                    ? null
+                    : SizedBox(
+                        width: toolbarActionsWidth,
+                        height: TouchTarget.minimum,
+                        child: composeNativeViews
+                            ? _NativeToolbarActions(actions: toolbarActions)
+                            : null,
+                      ),
+              )
+            : null,
         child: Stack(
           children: [
             DefaultTextStyle(
               style: TextStyle(color: textColor, fontSize: 17),
               child: CupertinoTheme(data: originalCupertinoTheme, child: body),
             ),
-            if (hasToolbarContent)
+            if (hasNavigationBar)
               Positioned(
                 left: 0,
                 right: 0,
                 top: 0,
-                child: IOS26NativeToolbar(
-                  leading: leading,
-                  actions: actions,
-                  showNativeView: shouldShowNativeView,
-                  onActionTap: (index) {
-                    final currentActions = actions;
-                    if (currentActions != null &&
-                        index >= 0 &&
-                        index < currentActions.length) {
-                      currentActions[index].onPressed();
-                    }
-                  },
+                child: ConduitChromeGradientFade.top(
+                  contentHeight:
+                      safePadding.top +
+                      conduitAdaptiveToolbarHeightOf(context),
                 ),
               ),
-            if (hasBottomNavigation)
+            if (renderedBottomNavigation != null)
               Positioned(
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: IOS26NativeTabBar(
-                  destinations: bottomNavigationBar!.items!,
-                  selectedIndex: bottomNavigationBar!.selectedIndex!,
-                  onTap: bottomNavigationBar!.onTap!,
-                  tint: CupertinoTheme.of(context).primaryColor,
-                  minimizeBehavior: minimizeBehavior,
-                  showNativeView: shouldShowNativeView,
-                ),
+                child: renderedBottomNavigation,
               ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _NativeToolbarActions extends StatelessWidget {
+  const _NativeToolbarActions({required this.actions});
+
+  final List<AdaptiveAppBarAction> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return CNGlassButtonGroup.fromWidgets(
+      spacing: 8,
+      spacingForGlass: 36,
+      buttonWidgets: [
+        for (final action in actions)
+          if (action.title case final title?)
+            CNButton(
+              label: title,
+              onPressed: action.onPressed,
+              tint: action.tintColor,
+              config: CNButtonConfig(
+                minHeight: TouchTarget.minimum,
+                shrinkWrap: true,
+                style: action.prominent
+                    ? CNButtonStyle.prominentGlass
+                    : CNButtonStyle.glass,
+              ),
+            )
+          else
+            CNButton.icon(
+              icon: action.iosSymbol == null
+                  ? null
+                  : CNSymbol(
+                      action.iosSymbol!,
+                      size: kCupertinoNativeControlSymbolExtent,
+                    ),
+              customIcon: action.iosSymbol == null ? action.icon : null,
+              onPressed: action.onPressed,
+              tint: action.tintColor,
+              config: CNButtonConfig(
+                minHeight: TouchTarget.minimum,
+                width: TouchTarget.minimum,
+                style: action.prominent
+                    ? CNButtonStyle.prominentGlass
+                    : CNButtonStyle.glass,
+              ),
+            ),
+      ],
     );
   }
 }

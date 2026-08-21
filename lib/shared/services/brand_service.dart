@@ -1,7 +1,10 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
-import 'package:flutter/material.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../theme/theme_extensions.dart';
-import 'package:flutter/cupertino.dart';
+
+import 'package:cupertino_ui/cupertino_ui.dart';
+
 import 'dart:io' show Platform;
 import '../../core/config/fork_overrides.dart';
 import '../theme/color_tokens.dart';

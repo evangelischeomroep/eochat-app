@@ -1,24 +1,29 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/navigation_service.dart';
 import '../../../core/utils/debug_logger.dart';
-import '../../../shared/theme/theme_extensions.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../../l10n/app_localizations_en.dart';
 import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/utils/ui_utils.dart';
-import '../../../shared/widgets/responsive_drawer_layout.dart';
+import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../chat/providers/chat_providers.dart' show isChatStreamingProvider;
 import '../../navigation/widgets/conversation_tile.dart';
 import '../models/hermes_model.dart';
 import '../models/hermes_session.dart';
+import '../models/hermes_bot.dart';
 import '../providers/hermes_providers.dart';
-import '../services/hermes_api_service.dart';
+import '../services/hermes_backend_service.dart';
+import '../services/hermes_desktop_api_service.dart';
+import '../services/hermes_decision_projection.dart';
 import '../services/hermes_local_document_trust_store.dart';
 import '../services/hermes_message_mapper.dart';
+import '../services/hermes_pending_decision_store.dart';
 import '../services/hermes_session_provenance.dart';
 
 /// A single Hermes session row, styled to match the chat conversation tiles —
@@ -33,8 +38,6 @@ class HermesSessionTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = context.conduitTheme;
-
     final selected =
         ref.watch(activeConversationProvider)?.id == _localConversationId;
     // The session is "in progress" when its run is the one currently streaming.
@@ -42,87 +45,55 @@ class HermesSessionTile extends ConsumerWidget {
         ref.watch(hermesActiveSessionProvider) == session.id &&
         ref.watch(isChatStreamingProvider);
 
-    final baseBackground = theme.surfaceBackground;
-    final background = selected
-        ? Color.alphaBlend(
-            theme.buttonPrimary.withValues(alpha: 0.1),
-            baseBackground,
-          )
-        : baseBackground;
-
     return ConduitContextMenu(
       actions: _contextMenuActions(context, ref),
-      child: Semantics(
+      previewBuilder: buildConversationTileContextPreview,
+      child: ConversationTile(
+        title: _displayTitle(context),
+        pinned: false,
         selected: selected,
-        button: true,
-        child: Container(
-          margin: const EdgeInsets.only(
-            right: Spacing.xs,
-            top: Spacing.xxs,
-            bottom: Spacing.xxs,
-          ),
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(AppBorderRadius.card),
-          ),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => openHermesSession(context, ref, session),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: TouchTarget.listItem,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.md,
-                  vertical: Spacing.sm,
-                ),
-                child: ConversationTileContent(
-                  title: _displayTitle(),
-                  pinned: false,
-                  selected: selected,
-                  isLoading: false,
-                  isGenerating: isGenerating,
-                ),
-              ),
-            ),
-          ),
-        ),
+        isLoading: false,
+        isGenerating: isGenerating,
+        onTap: () => openHermesSession(context, ref, session),
       ),
     );
   }
 
   /// Single-line label: the title, falling back to the transcript preview when
   /// the server left it untitled (e.g. cron/telegram sessions).
-  String _displayTitle() {
+  String _displayTitle(BuildContext context) {
     final title = session.title.trim();
     if (title.isNotEmpty && title != 'Untitled session') return title;
     final preview = session.preview?.trim();
     if (preview != null && preview.isNotEmpty) return preview;
-    return title.isEmpty ? 'Untitled session' : title;
+    return title.isEmpty
+        ? (AppLocalizations.of(context) ?? AppLocalizationsEn())
+              .hermesSessionUntitled
+        : title;
   }
 
   List<ConduitContextMenuAction> _contextMenuActions(
     BuildContext context,
     WidgetRef ref,
   ) {
+    final l10n = AppLocalizations.of(context) ?? AppLocalizationsEn();
     return [
       ConduitContextMenuAction(
         cupertinoIcon: CupertinoIcons.arrow_branch,
         materialIcon: Icons.call_split,
-        label: 'Fork',
+        label: l10n.hermesSessionFork,
         onSelected: () => _fork(context, ref),
       ),
       ConduitContextMenuAction(
         cupertinoIcon: CupertinoIcons.pencil,
         materialIcon: Icons.edit_outlined,
-        label: 'Rename',
+        label: l10n.rename,
         onSelected: () => _rename(context, ref),
       ),
       ConduitContextMenuAction(
         cupertinoIcon: CupertinoIcons.delete,
         materialIcon: Icons.delete_outline,
-        label: 'Delete',
+        label: l10n.delete,
         destructive: true,
         onSelected: () => _delete(context, ref),
       ),
@@ -153,7 +124,7 @@ class HermesSessionTile extends ConsumerWidget {
   Future<void> _fork(BuildContext context, WidgetRef ref) {
     return _runSessionAction(
       context,
-      'Could not fork conversation.',
+      AppLocalizations.of(context)!.hermesSessionForkFailed,
       () => ref.read(hermesSessionsProvider.notifier).fork(session.id),
     );
   }
@@ -161,15 +132,15 @@ class HermesSessionTile extends ConsumerWidget {
   Future<void> _rename(BuildContext context, WidgetRef ref) async {
     final name = await ThemedDialogs.promptTextInput(
       context,
-      title: 'Rename conversation',
-      hintText: 'Conversation name',
+      title: AppLocalizations.of(context)!.hermesSessionRenameTitle,
+      hintText: AppLocalizations.of(context)!.hermesSessionNameHint,
       initialValue: session.title,
     );
     if (name == null || name.trim().isEmpty) return;
     if (!context.mounted) return;
     await _runSessionAction(
       context,
-      'Could not rename conversation.',
+      AppLocalizations.of(context)!.hermesSessionRenameFailed,
       () => ref
           .read(hermesSessionsProvider.notifier)
           .rename(session.id, name.trim()),
@@ -179,22 +150,22 @@ class HermesSessionTile extends ConsumerWidget {
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final confirmed = await ThemedDialogs.confirm(
       context,
-      title: 'Delete conversation',
-      message: 'Delete this Hermes conversation? This cannot be undone.',
-      confirmText: 'Delete',
+      title: AppLocalizations.of(context)!.hermesSessionDeleteTitle,
+      message: AppLocalizations.of(context)!.hermesSessionDeleteMessage,
+      confirmText: AppLocalizations.of(context)!.delete,
       isDestructive: true,
     );
     if (!confirmed || !context.mounted) return;
     await _runSessionAction(
       context,
-      'Could not delete conversation.',
+      AppLocalizations.of(context)!.hermesSessionDeleteFailed,
       () => deleteHermesSession(ref, session.id),
     );
   }
 }
 
 ({String? endpointIdentity, String? connectionIdentity})
-_sessionConnectionIdentity(HermesApiService service, String principalId) {
+_sessionConnectionIdentity(HermesBackendService service, String principalId) {
   final endpointIdentity = HermesConfigController.connectionEndpoint(
     service.config.baseUrl,
   );
@@ -278,8 +249,10 @@ Future<void> deleteHermesSession(WidgetRef ref, String sessionId) async {
 Future<void> openHermesSession(
   BuildContext context,
   WidgetRef ref,
-  HermesSessionSummary session,
-) async {
+  HermesSessionSummary session, {
+  HermesBot? bot,
+  String? botAvatar,
+}) async {
   final openEpoch = ref
       .read(hermesSessionNavigationEpochProvider.notifier)
       .bump();
@@ -291,6 +264,7 @@ Future<void> openHermesSession(
   final trustPrincipalId = configController.documentTrustPrincipalId();
 
   List<Map<String, dynamic>> raw;
+  var pendingDecisions = const <HermesPendingDesktopDecision>[];
   try {
     raw = await service.getSessionMessages(session.id);
   } catch (error) {
@@ -304,11 +278,18 @@ Future<void> openHermesSession(
     if (context.mounted) {
       UiUtils.showMessage(
         context,
-        'Could not load this conversation. Check the connection and try again.',
+        AppLocalizations.of(context)!.hermesSessionLoadFailed,
         isError: true,
       );
     }
     return;
+  }
+  if (service is HermesDesktopApiService) {
+    try {
+      pendingDecisions = await service.pendingDecisionsForSession(session.id);
+    } catch (_) {
+      // Pending presentation is recoverable; the transcript is still useful.
+    }
   }
 
   var hermesModel = hermesSyntheticModel();
@@ -345,11 +326,17 @@ Future<void> openHermesSession(
           connectionIdentity: connectionIdentity,
           sessionId: session.id,
         );
-  final messages = hermesMessagesToChatMessages(
-    raw,
-    modelId: hermesModel.id,
-    trustedLocalDocumentKeys: trustedDocuments,
-  );
+  final messages =
+      hermesMessagesToChatMessages(
+        raw,
+        modelId: hermesModel.id,
+        trustedLocalDocumentKeys: trustedDocuments,
+      )..addAll(
+        hermesPendingDesktopDecisionMessages(
+          pendingDecisions,
+          modelId: hermesModel.id,
+        ),
+      );
 
   ref.read(hermesActiveSessionProvider.notifier).set(session.id);
   // Mark as a manual selection (same as startNewHermesChat) so the default-
@@ -373,6 +360,11 @@ Future<void> openHermesSession(
       metadata: {
         'backend': 'hermes',
         'hermesSessionId': session.id,
+        if (bot != null) kHermesBotTitleMetadataKey: bot.title,
+        kHermesBotAvatarMetadataKey: ?botAvatar,
+        if (bot != null) kHermesBotShapeMetadataKey: bot.avatarShape,
+        if (bot != null) kHermesBotColorMetadataKey: bot.avatarColor,
+        kHermesBotImageKindMetadataKey: ?bot?.avatarImageKind,
         kHermesConnectionIdentityMetadataKey: ?connectionIdentity,
       },
     ),
@@ -381,7 +373,6 @@ Future<void> openHermesSession(
 
   if (context.mounted) {
     NavigationService.router.go(Routes.chat);
-    final isTablet = MediaQuery.sizeOf(context).shortestSide >= 600;
-    if (!isTablet) ResponsiveDrawerLayout.of(context)?.close();
+    closeSidebarDrawerIfOverlay(context);
   }
 }

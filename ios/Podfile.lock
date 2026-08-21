@@ -1,11 +1,15 @@
 PODS:
-  - adaptive_platform_ui (0.1.0):
-    - Flutter
   - audio_session (0.0.1):
     - Flutter
+  - CocoaLumberjack (3.9.1):
+    - CocoaLumberjack/Core (= 3.9.1)
+  - CocoaLumberjack/Core (3.9.1)
   - connectivity_plus (0.0.1):
     - Flutter
   - CryptoSwift (1.8.4)
+  - cupertino_native_better (0.0.1):
+    - Flutter
+    - SVGKit (~> 3.0)
   - file_picker (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -30,8 +34,6 @@ PODS:
     - Flutter
     - FlutterMacOS
   - flutter_sharing_intent (1.0.1):
-    - Flutter
-  - gaimon (0.0.1):
     - Flutter
   - geolocator_apple (1.2.0):
     - Flutter
@@ -70,7 +72,7 @@ PODS:
     - Flutter
   - quick_actions_ios (0.0.1):
     - Flutter
-  - record_ios (1.2.1):
+  - record_ios (2.0.0):
     - Flutter
   - SDWebImage (5.21.5):
     - SDWebImage/Core (= 5.21.5)
@@ -86,6 +88,8 @@ PODS:
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
+  - SVGKit (3.0.0):
+    - CocoaLumberjack (~> 3.0)
   - swift-collections (1.1.1):
     - swift-collections/BitCollections (= 1.1.1)
     - swift-collections/DequeModule (= 1.1.1)
@@ -114,9 +118,9 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
-  - adaptive_platform_ui (from `.symlinks/plugins/adaptive_platform_ui/ios`)
   - audio_session (from `.symlinks/plugins/audio_session/ios`)
   - connectivity_plus (from `.symlinks/plugins/connectivity_plus/ios`)
+  - cupertino_native_better (from `.symlinks/plugins/cupertino_native_better/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/darwin`)
   - Flutter (from `Flutter`)
   - flutter_callkit_incoming (from `.symlinks/plugins/flutter_callkit_incoming/ios`)
@@ -125,7 +129,6 @@ DEPENDENCIES:
   - flutter_local_notifications (from `.symlinks/plugins/flutter_local_notifications/ios`)
   - flutter_secure_storage_darwin (from `.symlinks/plugins/flutter_secure_storage_darwin/darwin`)
   - flutter_sharing_intent (from `.symlinks/plugins/flutter_sharing_intent/ios`)
-  - gaimon (from `.symlinks/plugins/gaimon/ios`)
   - geolocator_apple (from `.symlinks/plugins/geolocator_apple/darwin`)
   - home_widget (from `.symlinks/plugins/home_widget/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
@@ -145,6 +148,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - CocoaLumberjack
     - CryptoSwift
     - InternalCollectionsUtilities
     - libwebp
@@ -152,15 +156,16 @@ SPEC REPOS:
     - onnxruntime-objc
     - SDWebImage
     - SDWebImageWebPCoder
+    - SVGKit
     - swift-collections
 
 EXTERNAL SOURCES:
-  adaptive_platform_ui:
-    :path: ".symlinks/plugins/adaptive_platform_ui/ios"
   audio_session:
     :path: ".symlinks/plugins/audio_session/ios"
   connectivity_plus:
     :path: ".symlinks/plugins/connectivity_plus/ios"
+  cupertino_native_better:
+    :path: ".symlinks/plugins/cupertino_native_better/ios"
   file_picker:
     :path: ".symlinks/plugins/file_picker/darwin"
   Flutter:
@@ -177,8 +182,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_secure_storage_darwin/darwin"
   flutter_sharing_intent:
     :path: ".symlinks/plugins/flutter_sharing_intent/ios"
-  gaimon:
-    :path: ".symlinks/plugins/gaimon/ios"
   geolocator_apple:
     :path: ".symlinks/plugins/geolocator_apple/darwin"
   home_widget:
@@ -213,19 +216,19 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/webview_flutter_wkwebview/darwin"
 
 SPEC CHECKSUMS:
-  adaptive_platform_ui: cd3c5a2997126f138a1e7f12e8376d3ca3fdbfad
   audio_session: 9bb7f6c970f21241b19f5a3658097ae459681ba0
+  CocoaLumberjack: e4ba3b414dfca8c1916c6303d37f63b3a95134c6
   connectivity_plus: cb623214f4e1f6ef8fe7403d580fdad517d2f7dd
   CryptoSwift: e64e11850ede528a02a0f3e768cec8e9d92ecb90
+  cupertino_native_better: 48a6a9cd45efc9ea9e1eec30755b5a8ebe92f1f2
   file_picker: 70164d9778c42c47218d6cd79ce435de0856b11a
-  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  Flutter: 71a624a5bc0c04062bf19101d501e466baf2fb47
   flutter_callkit_incoming: a143995975818a3717524decd3566d5ca7a8c608
   flutter_image_compress_common: 11d5dcfb36f4ded92320bfa896261813a073240e
   flutter_inappwebview_ios: 9cde7869829d54b4110df350f3eedd192c5a4aea
   flutter_local_notifications: 643a3eda1ce1c0599413ca31672536d423dee214
   flutter_secure_storage_darwin: acdb3f316ed05a3e68f856e0353b133eec373a23
   flutter_sharing_intent: 0c1e53949f09fa8df8ac2268505687bde8ff264c
-  gaimon: 1979ed07cdcfd0bf0d208f255f550936a196cf5a
   geolocator_apple: ab36aa0e8b7d7a2d7639b3b4e48308394e8cef5e
   home_widget: 54b4f6b36ed8d64cfee594a476225c35c3e45091
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
@@ -238,12 +241,13 @@ SPEC CHECKSUMS:
   pdfium_flutter: e5a6e881af0b182d5b0465ebad23a8a20caa28d4
   permission_handler_apple: 92d754bbaa7361d436db2d6c3c1c2a0fdcec462e
   quick_actions_ios: 500fcc11711d9f646739093395c4ae8eec25f779
-  record_ios: 980fd386a97a35987d0fce3dfda4b26a38c90f4c
+  record_ios: 390a30c7caaf8b5d0fb1cb1d2fd5064b48b4520c
   SDWebImage: e9c98383c7572d713c1a0d7dd2783b10599b9838
   SDWebImageWebPCoder: 0e06e365080397465cc73a7a9b472d8a3bd0f377
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
+  SVGKit: 1ad7513f8c74d9652f94ed64ddecda1a23864dea
   swift-collections: ba248ecaf44ef500b27d5cf94d304218c89892ff
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   vad: 7934867589afe53567f492df66fb1615f2185822

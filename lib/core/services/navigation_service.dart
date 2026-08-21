@@ -1,6 +1,7 @@
 import 'package:conduit/l10n/app_localizations.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../shared/widgets/themed_dialogs.dart';
 
 /// Marks routes opened after a native sheet dismisses so Flutter does not
@@ -180,6 +181,7 @@ class Routes {
       '/profile/direct-connections/:id';
   static const String hermesSettings = '/profile/hermes';
   static const String hermesJobs = '/profile/hermes/jobs';
+  static const String hermesMcp = '/profile/hermes/mcp';
   static const String about = '/profile/about';
   static const String notes = '/notes';
   static const String noteEditor = '/notes/:id';
@@ -215,6 +217,7 @@ class RouteNames {
   static const String directConnectionEditor = 'direct-connection-editor';
   static const String hermesSettings = 'hermes-settings';
   static const String hermesJobs = 'hermes-jobs';
+  static const String hermesMcp = 'hermes-mcp';
   static const String about = 'about';
   static const String notes = 'notes';
   static const String noteEditor = 'note-editor';

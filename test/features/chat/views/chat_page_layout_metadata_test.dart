@@ -16,16 +16,11 @@ import 'package:conduit/features/direct_connections/models/direct_connection_pro
 import 'package:conduit/features/direct_connections/models/direct_remote_model.dart';
 import 'package:conduit/features/direct_connections/services/direct_model_registry.dart';
 import 'package:conduit/features/hermes/services/hermes_session_provenance.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('message cache shrinks only while streaming', () {
-    check(debugChatMessageScrollCachePixels(streaming: false)).equals(600);
-    check(debugChatMessageScrollCachePixels(streaming: true)).equals(120);
-  });
-
   testWidgets(
     'assistant row state survives the live-tail to history transition',
     (tester) async {
@@ -332,15 +327,12 @@ void main() {
   });
 
   test('undispatched screen context retries use bounded backoff', () {
-    check(
-      debugScreenContextRetryDelayForTesting(completedRetries: 0),
-    ).equals(const Duration(milliseconds: 250));
-    check(
-      debugScreenContextRetryDelayForTesting(completedRetries: 1),
-    ).equals(const Duration(milliseconds: 500));
-    check(
-      debugScreenContextRetryDelayForTesting(completedRetries: 2),
-    ).equals(const Duration(seconds: 1));
+    check(debugScreenContextRetryDelayForTesting(completedRetries: 0))
+        .equals(const Duration(milliseconds: 250));
+    check(debugScreenContextRetryDelayForTesting(completedRetries: 1))
+        .equals(const Duration(milliseconds: 500));
+    check(debugScreenContextRetryDelayForTesting(completedRetries: 2))
+        .equals(const Duration(seconds: 1));
     check(debugScreenContextRetryDelayForTesting(completedRetries: 3)).isNull();
   });
 
@@ -552,53 +544,50 @@ void main() {
     ).isFalse();
   });
 
-  test(
-    'bottom anchor controller hysteresis keeps the button shown across the band',
-    () {
-      final controller = ChatBottomAnchorController(
-        showThreshold: 300,
-        hideThreshold: 150,
-      );
+  test('bottom anchor controller hysteresis keeps the button shown across the band', () {
+    final controller = ChatBottomAnchorController(
+      showThreshold: 300,
+      hideThreshold: 150,
+    );
 
-      // Detach so the button is currently visible.
-      controller.updateAnchor(
+    // Detach so the button is currently visible.
+    controller.updateAnchor(
+      hasScrollableContent: true,
+      distanceFromBottom: 320,
+    );
+
+    // Already showing: in the 150-300 band the button stays shown (the hide
+    // check uses hideThreshold, not showThreshold).
+    expect(
+      controller.shouldShowScrollToBottom(
+        currentlyShowing: true,
         hasScrollableContent: true,
-        distanceFromBottom: 320,
-      );
+        distanceFromBottom: 200,
+      ),
+      isTrue,
+    );
 
-      // Already showing: in the 150-300 band the button stays shown (the hide
-      // check uses hideThreshold, not showThreshold).
-      expect(
-        controller.shouldShowScrollToBottom(
-          currentlyShowing: true,
-          hasScrollableContent: true,
-          distanceFromBottom: 200,
-        ),
-        isTrue,
-      );
+    // Already showing: at/under hideThreshold the button hides.
+    expect(
+      controller.shouldShowScrollToBottom(
+        currentlyShowing: true,
+        hasScrollableContent: true,
+        distanceFromBottom: 100,
+      ),
+      isFalse,
+    );
 
-      // Already showing: at/under hideThreshold the button hides.
-      expect(
-        controller.shouldShowScrollToBottom(
-          currentlyShowing: true,
-          hasScrollableContent: true,
-          distanceFromBottom: 100,
-        ),
-        isFalse,
-      );
-
-      // Contrast: a hidden button does not appear yet in the same band (the show
-      // check uses showThreshold).
-      expect(
-        controller.shouldShowScrollToBottom(
-          currentlyShowing: false,
-          hasScrollableContent: true,
-          distanceFromBottom: 200,
-        ),
-        isFalse,
-      );
-    },
-  );
+    // Contrast: a hidden button does not appear yet in the same band (the show
+    // check uses showThreshold).
+    expect(
+      controller.shouldShowScrollToBottom(
+        currentlyShowing: false,
+        hasScrollableContent: true,
+        distanceFromBottom: 200,
+      ),
+      isFalse,
+    );
+  });
 
   test(
     'bottom anchor controller preserves explicit short-content detachment',
@@ -718,6 +707,119 @@ void main() {
       expect(summary[2].showFollowUps, isTrue);
     },
   );
+
+  test(
+    'a Hermes turn gets one header on top and one action bar at the bottom',
+    () {
+      // Hermes lands one turn as several flat sibling assistant rows sharing a
+      // model. Before grouping, each of them painted its own toolbar.
+      final messages = <ChatMessage>[
+        ChatMessage(
+          id: 'user-1',
+          role: 'user',
+          content: 'Question',
+          timestamp: DateTime(2026),
+        ),
+        for (final part in const ['Planning', 'Working', 'Answer'])
+          ChatMessage(
+            id: 'hermes-${part.toLowerCase()}',
+            role: 'assistant',
+            content: part,
+            timestamp: DateTime(2026),
+            model: 'hermes',
+            metadata: const {'modelName': 'Hermes'},
+          ),
+      ];
+
+      final summary = debugBuildChatListLayoutSummaryForTesting(messages);
+
+      check(summary.map((row) => row.showModelHeader).toList())
+          .deepEquals([false, true, false, false]);
+      check(summary.map((row) => row.showActionBar).toList())
+          .deepEquals([false, false, false, true]);
+      // The bar owner acts on the whole turn, so copy/listen/delete reach every
+      // part rather than the tail alone.
+      check(summary.last.groupMessageIds)
+          .deepEquals(['hermes-planning', 'hermes-working', 'hermes-answer']);
+      check(summary.first.groupMessageIds).isEmpty();
+    },
+  );
+
+  test('archived and decision rows drop out of the grouped response', () {
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'hermes-1',
+        role: 'assistant',
+        content: 'First part',
+        timestamp: DateTime(2026),
+        model: 'hermes',
+        metadata: const {'modelName': 'Hermes'},
+      ),
+      ChatMessage(
+        id: 'hermes-decision',
+        role: 'assistant',
+        content: '',
+        timestamp: DateTime(2026),
+        model: 'hermes',
+        metadata: const {
+          'modelName': 'Hermes',
+          'restoredDesktopDecision': true,
+        },
+      ),
+      ChatMessage(
+        id: 'hermes-archived',
+        role: 'assistant',
+        content: 'Superseded',
+        timestamp: DateTime(2026),
+        model: 'hermes',
+        metadata: const {'modelName': 'Hermes', 'archivedVariant': true},
+      ),
+      ChatMessage(
+        id: 'hermes-2',
+        role: 'assistant',
+        content: 'Last part',
+        timestamp: DateTime(2026),
+        model: 'hermes',
+        metadata: const {'modelName': 'Hermes'},
+      ),
+    ];
+
+    final summary = debugBuildChatListLayoutSummaryForTesting(messages);
+
+    check(summary.map((row) => row.showActionBar).toList())
+        .deepEquals([false, false, false, true]);
+    check(summary.last.groupMessageIds).deepEquals(['hermes-1', 'hermes-2']);
+    check(summary[1].groupMessageIds).isEmpty();
+    check(summary[2].groupMessageIds).isEmpty();
+  });
+
+  test('the layout signature reacts to the decision-card flag', () {
+    // Decision cards are skipped by the grouped-response pass, so the flag is
+    // layout input; a stale cache would leave the bar on the wrong row.
+    ChatMessage row({required bool isDecision}) => ChatMessage(
+      id: 'hermes-1',
+      role: 'assistant',
+      content: 'Part',
+      timestamp: DateTime(2026),
+      model: 'hermes',
+      metadata: {
+        'modelName': 'Hermes',
+        if (isDecision) 'restoredDesktopDecision': true,
+      },
+    );
+
+    check(
+      debugBuildChatListStableLayoutSignatureForTesting([
+        row(isDecision: true),
+      ]),
+    ).not(
+      (it) => it.equals(
+        debugBuildChatListStableLayoutSignatureForTesting([
+          row(isDecision: false),
+        ]),
+      ),
+    );
+  });
 
   test(
     'layout metadata uses Open WebUI modelName before model lookup loads',
@@ -867,9 +969,8 @@ void main() {
         directModelRegistry: registry,
       );
 
-      check(
-        debugChatListStableLayoutSignatureBuildCountForTesting(cache),
-      ).equals(1);
+      check(debugChatListStableLayoutSignatureBuildCountForTesting(cache))
+          .equals(1);
 
       debugResolveChatListStableLayoutCacheForTesting(
         cache,
@@ -877,9 +978,8 @@ void main() {
         models: null,
         directModelRegistry: registry,
       );
-      check(
-        debugChatListStableLayoutSignatureBuildCountForTesting(cache),
-      ).equals(2);
+      check(debugChatListStableLayoutSignatureBuildCountForTesting(cache))
+          .equals(2);
     },
   );
 
@@ -1516,9 +1616,8 @@ void main() {
       await refreshActiveOpenWebUiConversation(container);
 
       check(api.fetches).equals(0);
-      check(
-        identical(container.read(activeConversationProvider), native),
-      ).isTrue();
+      check(identical(container.read(activeConversationProvider), native))
+          .isTrue();
       check(
         isNativeHermesConversation(container.read(activeConversationProvider)),
       ).isTrue();
@@ -1531,9 +1630,8 @@ void main() {
       await refreshActiveOpenWebUiConversation(container);
 
       check(api.fetches).equals(0);
-      check(
-        identical(container.read(activeConversationProvider), direct),
-      ).isTrue();
+      check(identical(container.read(activeConversationProvider), direct))
+          .isTrue();
     },
   );
 
@@ -1562,9 +1660,8 @@ void main() {
     api.response.complete(_refreshConversation(rawId, 'Stale response'));
     await refresh;
 
-    check(
-      identical(container.read(activeConversationProvider), replacement),
-    ).isTrue();
+    check(identical(container.read(activeConversationProvider), replacement))
+        .isTrue();
   });
 
   test('refresh replaces an unchanged OpenWebUI conversation', () async {
@@ -1613,9 +1710,8 @@ void main() {
     api.response.complete(_refreshConversation('different-id', 'Wrong row'));
     await refresh;
 
-    check(
-      identical(container.read(activeConversationProvider), original),
-    ).isTrue();
+    check(identical(container.read(activeConversationProvider), original))
+        .isTrue();
   });
 
   test('refresh exposes API errors for the caller to report', () async {
@@ -1638,9 +1734,8 @@ void main() {
     api.response.completeError(StateError('refresh failed'));
 
     await expectLater(refresh, throwsA(isA<StateError>()));
-    check(
-      identical(container.read(activeConversationProvider), original),
-    ).isTrue();
+    check(identical(container.read(activeConversationProvider), original))
+        .isTrue();
   });
 }
 

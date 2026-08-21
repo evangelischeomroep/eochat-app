@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
 import '../services/api_service.dart';
 import '../services/attachment_upload_queue.dart';
 import '../auth/auth_state_manager.dart';
@@ -44,13 +45,16 @@ import '../../shared/theme/tweakcn_themes.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../features/tools/providers/tools_providers.dart';
 import '../../features/hermes/models/hermes_model.dart';
+import '../../features/hermes/models/hermes_config.dart';
 import '../../features/hermes/providers/hermes_providers.dart';
 import '../../features/hermes/services/hermes_session_provenance.dart';
 import '../../features/direct_connections/direct_connections.dart';
 import 'backend_mode_providers.dart';
 import '../models/socket_transport_availability.dart';
 import 'storage_providers.dart';
+
 import 'package:drift/drift.dart' show Value;
+
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
 import '../database/chat_database_repository.dart';
@@ -1017,9 +1021,9 @@ _OpenWebUiConversationReadContext? _readOpenWebUiConversationContext(
   String? certifiedDatabaseServerId;
   try {
     authSessionEpoch = ref.read(openWebUiAuthSessionEpochProvider) as Object;
-    databaseAccessPhase =
-        ref.read(openWebUiDatabaseAccessProvider)
-            as OpenWebUiDatabaseAccessPhase;
+    databaseAccessPhase = ref.read(
+      openWebUiDatabaseAccessProvider,
+    ) as OpenWebUiDatabaseAccessPhase;
     certifiedDatabaseServerId =
         ref.read(openWebUiCertifiedDatabaseServerProvider) as String?;
   } catch (_) {
@@ -1092,9 +1096,9 @@ String? _readOpenWebUiLogicalServerId(dynamic ref) {
 
   late final OpenWebUiDatabaseAccessPhase accessPhase;
   try {
-    accessPhase =
-        ref.read(openWebUiDatabaseAccessProvider)
-            as OpenWebUiDatabaseAccessPhase;
+    accessPhase = ref.read(
+      openWebUiDatabaseAccessProvider,
+    ) as OpenWebUiDatabaseAccessPhase;
   } catch (_) {
     return null;
   }
@@ -1306,13 +1310,12 @@ bool openWebUiConversationReadIsCertifiedForPublication(
       openWebUiAccountStorageIsCertified(ref);
 }
 
-typedef SocketServiceFactory =
-    SocketService Function({
-      required ServerConfig serverConfig,
-      required String authToken,
-      required bool websocketOnly,
-      required bool allowWebsocketUpgrade,
-    });
+typedef SocketServiceFactory = SocketService Function({
+  required ServerConfig serverConfig,
+  required String authToken,
+  required bool websocketOnly,
+  required bool allowWebsocketUpgrade,
+});
 
 final socketServiceFactoryProvider = Provider<SocketServiceFactory>((ref) {
   return ({
@@ -1710,15 +1713,37 @@ final refreshAuthStateProvider = Provider<void>((ref) {
 List<Model> appendHermesModelIfUsable(
   List<Model> models, {
   required bool hermesUsable,
+  bool allowSyntheticHermesModel = true,
+  List<Model> hermesModels = const [],
 }) {
   final directModels = models.where(isLocallyMintedDirectModel);
   final safeModels = sanitizeRemoteHermesModels(
     sanitizeRemoteDirectModels(models),
   );
   return hermesUsable
-      ? <Model>[...safeModels, ...directModels, hermesSyntheticModel()]
+      ? <Model>[
+          ...safeModels,
+          ...directModels,
+          if (allowSyntheticHermesModel) hermesSyntheticModel(),
+          ...hermesModels,
+        ]
       : <Model>[...safeModels, ...directModels];
 }
+
+bool _sameModelCacheOwnership(
+  OpenWebUiCacheOwnershipSnapshot? previous,
+  OpenWebUiCacheOwnershipSnapshot next,
+) =>
+    previous != null &&
+    identical(previous.api, next.api) &&
+    previous.serverId == next.serverId &&
+    previous.activeServerId == next.activeServerId &&
+    identical(previous.authSessionEpoch, next.authSessionEpoch) &&
+    previous.authToken == next.authToken &&
+    previous.authenticated == next.authenticated &&
+    previous.databaseAccessPhase == next.databaseAccessPhase &&
+    previous.certifiedDatabaseServerId == next.certifiedDatabaseServerId &&
+    previous.rawActiveServerId == next.rawActiveServerId;
 
 String _modelBackendForDiagnostics(Model? model) {
   if (model == null) return 'none';
@@ -1730,6 +1755,8 @@ String _modelBackendForDiagnostics(Model? model) {
 @Riverpod(keepAlive: true)
 class Models extends _$Models {
   bool _terminalDirectDiscoveryNeedsReconciliation = false;
+  Future<void>? _refreshInFlight;
+  OpenWebUiCacheOwnershipSnapshot? _warmRefreshOwnership;
 
   @override
   Future<List<Model>> build() async {
@@ -1741,6 +1768,21 @@ class Models extends _$Models {
     final hermesUsable = ref.watch(
       hermesConfigProvider.select((config) => config.isUsable),
     );
+    final hermesMode = ref.watch(
+      hermesConfigProvider.select((config) => config.mode),
+    );
+    if (hermesUsable && hermesMode == HermesBackendMode.desktopGateway) {
+      try {
+        await ref.watch(hermesDesktopModelsProvider.future);
+      } catch (error, stackTrace) {
+        DebugLogger.error(
+          'desktop-discovery-failed',
+          scope: 'models/hermes',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    }
     final directModels = ref.watch(
       directModelDiscoveryProvider.select((value) {
         final models = value.value?.models;
@@ -1870,19 +1912,23 @@ class Models extends _$Models {
         if (visibleCached.length != cached.length && cacheOwnership != null) {
           _persistModelsAsync(visibleCached, ownership: cacheOwnership);
         }
-        Future.microtask(() async {
-          if (!ref.mounted) return;
-          try {
-            await refresh();
-          } catch (error, stackTrace) {
-            DebugLogger.error(
-              'warm-refresh-failed',
-              scope: 'models/cache',
-              error: error,
-              stackTrace: stackTrace,
-            );
-          }
-        });
+        if (cacheOwnership != null &&
+            !_sameModelCacheOwnership(_warmRefreshOwnership, cacheOwnership)) {
+          _warmRefreshOwnership = cacheOwnership;
+          Future.microtask(() async {
+            if (!ref.mounted) return;
+            try {
+              await refresh();
+            } catch (error, stackTrace) {
+              DebugLogger.error(
+                'warm-refresh-failed',
+                scope: 'models/cache',
+                error: error,
+                stackTrace: stackTrace,
+              );
+            }
+          });
+        }
         return _returnWithSelectionReconciliation(
           _withLocalModels(visibleCached, directModels: directModels),
           deferDirectSelection: deferDirectSelectionReconciliation,
@@ -2008,9 +2054,14 @@ class Models extends _$Models {
           const <Model>[],
       registry: ref.read(directModelRegistryProvider),
     );
+    final hermesConfig = ref.read(hermesConfigProvider);
     return appendHermesModelIfUsable(
       withDirect,
-      hermesUsable: ref.read(hermesConfigProvider).isUsable,
+      hermesUsable: hermesConfig.isUsable,
+      allowSyntheticHermesModel: true,
+      hermesModels: hermesConfig.mode == HermesBackendMode.desktopGateway
+          ? ref.read(hermesDesktopModelsProvider).asData?.value ?? const []
+          : const [],
     );
   }
 
@@ -2099,7 +2150,10 @@ class Models extends _$Models {
       return models;
     }
 
-    final replacement = models.isNotEmpty ? models.first : null;
+    final replacement = replacementForUnavailableLocalModel(
+      models: models,
+      current: currentSelected,
+    );
     ref.read(isManualModelSelectionProvider.notifier).set(false);
     ref.read(selectedModelProvider.notifier).set(replacement);
     DebugLogger.warning(
@@ -2122,12 +2176,43 @@ class Models extends _$Models {
     DebugLogger.warning('hermes-selection-unavailable', scope: 'models');
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh() {
+    final inFlight = _refreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    late final Future<void> operation;
+    operation = _refresh().whenComplete(() {
+      if (identical(_refreshInFlight, operation)) {
+        _refreshInFlight = null;
+      }
+    });
+    _refreshInFlight = operation;
+    return operation;
+  }
+
+  Future<void> _refresh() async {
     if (ref.read(reviewerModeProvider)) {
       state = AsyncData<List<Model>>(_reconcileLocalSelection(_demoModels()));
       return;
     }
     await ref.read(directModelDiscoveryProvider.notifier).refresh();
+    if (!ref.mounted) return;
+    final hermesConfig = ref.read(hermesConfigProvider);
+    if (hermesConfig.isUsable &&
+        hermesConfig.mode == HermesBackendMode.desktopGateway) {
+      ref.invalidate(hermesDesktopModelsProvider);
+      try {
+        await ref.read(hermesDesktopModelsProvider.future);
+      } catch (error, stackTrace) {
+        DebugLogger.error(
+          'desktop-discovery-refresh-failed',
+          scope: 'models/hermes',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+      if (!ref.mounted) return;
+    }
     final modelAuth = ref.read(_modelAuthReadinessProvider);
     if (!modelAuth.authenticated && _modelAuthIsPending(modelAuth)) {
       // An explicit refresh during login/revalidation is deferred. This keeps
@@ -2211,7 +2296,10 @@ class Models extends _$Models {
             );
           }
         } catch (_) {
-          final replacement = freshModels.isNotEmpty ? freshModels.first : null;
+          final replacement = replacementForUnavailableLocalModel(
+            models: freshModels,
+            current: currentSelected,
+          );
           ref.read(isManualModelSelectionProvider.notifier).set(false);
           ref.read(selectedModelProvider.notifier).set(replacement);
           DebugLogger.warning(
@@ -2250,6 +2338,7 @@ class Models extends _$Models {
           'hidden': models.length - visibleModels.length,
         },
       );
+      _warmRefreshOwnership = ownership;
       _persistModelsAsync(visibleModels, ownership: ownership);
       return (models: visibleModels, ownership: ownership);
     } catch (e, stackTrace) {
@@ -2316,6 +2405,21 @@ class Models extends _$Models {
       supportedParameters: ['max_tokens', 'stream'],
     ),
   ];
+}
+
+@visibleForTesting
+Model? replacementForUnavailableLocalModel({
+  required Iterable<Model> models,
+  required Model current,
+}) {
+  if (isHermesModel(current)) {
+    return models.where(isHermesModel).firstOrNull ?? models.firstOrNull;
+  }
+  if (isLocallyMintedDirectModel(current)) {
+    return models.where(isLocallyMintedDirectModel).firstOrNull ??
+        models.firstOrNull;
+  }
+  return models.firstOrNull;
 }
 
 typedef _OwnedModels = ({
@@ -2793,6 +2897,8 @@ final defaultModelAutoSelectionProvider = Provider<void>((ref) {
   ref.watch(modelToolsAutoSelectionProvider);
   ref.watch(modelTerminalAutoSelectionProvider);
   ref.watch(modelFiltersAutoSelectionProvider);
+  ref.watch(modelsProvider);
+  ref.watch(defaultModelProvider);
 
   ref.listen<AppSettings>(appSettingsProvider, (previous, next) {
     // Only react when default model value changes
@@ -3969,10 +4075,9 @@ void markConversationRead(
   Conversation? targetConversation;
   var resolvedSelectionId = scopedId;
   try {
-    final conversations =
-        (ref.read(conversationsProvider) as AsyncValue<List<Conversation>>)
-            .asData
-            ?.value;
+    final conversations = (ref.read(
+      conversationsProvider,
+    ) as AsyncValue<List<Conversation>>).asData?.value;
     if (conversations != null) {
       final index = _conversationIndexForSelection(conversations, scopedId);
       if (index >= 0) {
@@ -4397,6 +4502,7 @@ Future<Model?> defaultModel(Ref ref) async {
   ref.watch(apiServiceProvider);
   ref.watch(_modelAuthReadinessProvider);
   ref.watch(reviewerModeProvider);
+  ref.watch(modelsProvider);
   return resolved;
 }
 
@@ -4458,7 +4564,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     final models = await ref.read(modelsProvider.future);
     if (!ref.mounted) return null;
     final reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     final latestSelected = ref.read(selectedModelProvider);
     final latestManual = ref.read(isManualModelSelectionProvider);
     if (isGenuinelyNewManualSelection(latestSelected, latestManual)) {
@@ -4505,7 +4611,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     final settledAuth = await authBuildFuture;
     if (!ref.mounted) return null;
     final reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     modelAuth = (
       authenticated: settledAuth.isAuthenticated,
       loading:
@@ -4525,7 +4631,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     )) {
       // Authentication hydration/revalidation is not logout. Keep the current
       // model and avoid protected OpenWebUI calls until auth settles.
-      return ref.read(selectedModelProvider);
+      return await Future<Model?>.value(ref.read(selectedModelProvider));
     }
 
     final currentSelected = ref.read(selectedModelProvider);
@@ -4544,7 +4650,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
       final discovery = await ref.read(directModelDiscoveryProvider.future);
       if (!ref.mounted) return null;
       final reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       final registry = ref.read(directModelRegistryProvider);
       standalone = _accountlessSelection(
         models: discovery.models.where(
@@ -4558,7 +4664,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
       final models = await ref.read(modelsProvider.future);
       if (!ref.mounted) return null;
       final reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       standalone = _accountlessSelection(
         models: models,
         current: currentSelected,
@@ -4572,7 +4678,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     await Future<void>.delayed(Duration.zero);
     if (!ref.mounted) return null;
     final reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     final latestSelected = ref.read(selectedModelProvider);
     final latestAuth = ref.read(_modelAuthReadinessProvider);
     final preferenceIsCurrent =
@@ -4657,9 +4763,9 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     final models = await ref.read(modelsProvider.future);
     if (!ref.mounted) return null;
     final reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-      return ref.read(selectedModelProvider);
+      return await Future<Model?>.value(ref.read(selectedModelProvider));
     }
     final standalone =
         _modelForPreferredBackend(models, preferredBackend) ??
@@ -4691,18 +4797,18 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
         await SettingsService.getDefaultModel().catchError((_) => null);
     if (!ref.mounted) return null;
     var reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-      return ref.read(selectedModelProvider);
+      return await Future<Model?>.value(ref.read(selectedModelProvider));
     }
 
     if (storedDefaultId != null && storedDefaultId.isNotEmpty) {
       final availableModels = await ref.read(modelsProvider.future);
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-        return ref.read(selectedModelProvider);
+        return await Future<Model?>.value(ref.read(selectedModelProvider));
       }
       final availableMatch =
           ref
@@ -4742,9 +4848,9 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
       final cachedMatch = await selectCachedModel(storage, storedDefaultId);
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-        return ref.read(selectedModelProvider);
+        return await Future<Model?>.value(ref.read(selectedModelProvider));
       }
       if (cachedMatch != null && !ref.read(isManualModelSelectionProvider)) {
         ref.read(selectedModelProvider.notifier).set(cachedMatch);
@@ -4769,9 +4875,9 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
       final availableModels = await ref.read(modelsProvider.future);
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-        return ref.read(selectedModelProvider);
+        return await Future<Model?>.value(ref.read(selectedModelProvider));
       }
       final preferred = _modelForPreferredBackend(
         availableModels,
@@ -4788,25 +4894,25 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
       final cached = await storage.getLocalDefaultModel();
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-        return ref.read(selectedModelProvider);
+        return await Future<Model?>.value(ref.read(selectedModelProvider));
       }
       if (cached != null && !ref.read(isManualModelSelectionProvider)) {
         final cachedMatch = await selectCachedModel(storage, cached.id);
         if (!ref.mounted) return null;
         reviewerRedirect = reviewerRedirectAfterAwait();
-        if (reviewerRedirect != null) return reviewerRedirect;
+        if (reviewerRedirect != null) return await reviewerRedirect;
         if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-          return ref.read(selectedModelProvider);
+          return await Future<Model?>.value(ref.read(selectedModelProvider));
         }
         if (cachedMatch == null) {
           await storage.saveLocalDefaultModel(null);
           if (!ref.mounted) return null;
           reviewerRedirect = reviewerRedirectAfterAwait();
-          if (reviewerRedirect != null) return reviewerRedirect;
+          if (reviewerRedirect != null) return await reviewerRedirect;
           if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-            return ref.read(selectedModelProvider);
+            return await Future<Model?>.value(ref.read(selectedModelProvider));
           }
         } else {
           ref.read(selectedModelProvider.notifier).set(cachedMatch);
@@ -4824,9 +4930,9 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     } catch (_) {
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-        return ref.read(selectedModelProvider);
+        return await Future<Model?>.value(ref.read(selectedModelProvider));
       }
     }
 
@@ -4836,17 +4942,17 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
       final serverDefault = await api.getDefaultModel();
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
       if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-        return ref.read(selectedModelProvider);
+        return await Future<Model?>.value(ref.read(selectedModelProvider));
       }
       if (serverDefault != null && serverDefault.isNotEmpty) {
         final availableModels = await ref.read(modelsProvider.future);
         if (!ref.mounted) return null;
         reviewerRedirect = reviewerRedirectAfterAwait();
-        if (reviewerRedirect != null) return reviewerRedirect;
+        if (reviewerRedirect != null) return await reviewerRedirect;
         if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-          return ref.read(selectedModelProvider);
+          return await Future<Model?>.value(ref.read(selectedModelProvider));
         }
         Model? resolved = ref
             .read(directModelRegistryProvider)
@@ -4855,9 +4961,9 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
           final models = await api.getModels();
           if (!ref.mounted) return null;
           reviewerRedirect = reviewerRedirectAfterAwait();
-          if (reviewerRedirect != null) return reviewerRedirect;
+          if (reviewerRedirect != null) return await reviewerRedirect;
           if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-            return ref.read(selectedModelProvider);
+            return await Future<Model?>.value(ref.read(selectedModelProvider));
           }
           resolved = resolveSafeRemoteDefaultModel(models, serverDefault);
         }
@@ -4891,7 +4997,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     } catch (_) {
       if (!ref.mounted) return null;
       reviewerRedirect = reviewerRedirectAfterAwait();
-      if (reviewerRedirect != null) return reviewerRedirect;
+      if (reviewerRedirect != null) return await reviewerRedirect;
     }
 
     // 4) Fallback: fetch models and pick first available
@@ -4899,9 +5005,9 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
     final models = await ref.read(modelsProvider.future);
     if (!ref.mounted) return null;
     reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     if (!authenticatedResolutionIsCurrent(selectionSnapshot)) {
-      return ref.read(selectedModelProvider);
+      return await Future<Model?>.value(ref.read(selectedModelProvider));
     }
     DebugLogger.log(
       'models-loaded',
@@ -4944,7 +5050,7 @@ Future<Model?> _resolveDefaultModel(Ref ref) async {
   } catch (e) {
     if (!ref.mounted) return null;
     final reviewerRedirect = reviewerRedirectAfterAwait();
-    if (reviewerRedirect != null) return reviewerRedirect;
+    if (reviewerRedirect != null) return await reviewerRedirect;
     DebugLogger.error('set-default-failed', scope: 'models/default', error: e);
     return null;
   }

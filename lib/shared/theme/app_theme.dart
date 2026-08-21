@@ -1,8 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+
 import '../../core/utils/system_ui_style.dart';
 import 'theme_extensions.dart';
 import 'tweakcn_themes.dart';
@@ -105,7 +106,6 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: brightness,
-      fontFamily: AppTypography.fontFamily,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: surfaces.background,
       canvasColor: surfaces.background,
@@ -162,7 +162,7 @@ class AppTheme {
           shadows.shadowXs.first.color,
           conduitExtension.inputBackground,
         ),
-        hintStyle: textTheme.bodyMedium?.copyWith(
+        hintStyle: AppTypography.inputHintStyle.copyWith(
           color: conduitExtension.inputPlaceholder,
         ),
         border: baseInputBorder,

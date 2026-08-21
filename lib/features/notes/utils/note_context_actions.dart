@@ -1,4 +1,4 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit/core/models/note.dart';
 import 'package:conduit/core/services/haptic_service.dart';
 import 'package:conduit/features/notes/providers/notes_providers.dart';
@@ -6,8 +6,8 @@ import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/shared/utils/conversation_context_menu.dart';
 import 'package:conduit/shared/utils/ui_utils.dart';
 import 'package:conduit/shared/widgets/themed_dialogs.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 

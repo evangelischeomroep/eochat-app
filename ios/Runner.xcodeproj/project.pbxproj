@@ -18,6 +18,7 @@
 		D2A0B1C42F5E4D6C7B8A9012 /* NativePasteBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B1C32F5E4D6C7B8A9012 /* NativePasteBridge.swift */; };
 		D2A0B1D42F5E4D6C7B8A9012 /* NativeKeyboardAttachmentBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B1D32F5E4D6C7B8A9012 /* NativeKeyboardAttachmentBridge.swift */; };
 		D2A0B1E42F5E4D6C7B8A9012 /* NativeSheetBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B1E32F5E4D6C7B8A9012 /* NativeSheetBridge.swift */; };
+		D2A0B1E52F5E4D6C7B8A9012 /* NativeSheetUIFoundation.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B1E62F5E4D6C7B8A9012 /* NativeSheetUIFoundation.swift */; };
 		D2A0B1F42F5E4D6C7B8A9012 /* NativeDropdownBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B1F32F5E4D6C7B8A9012 /* NativeDropdownBridge.swift */; };
 		D2A0B2042F5E4D6C7B8A9012 /* NativeSttBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B2032F5E4D6C7B8A9012 /* NativeSttBridge.swift */; };
 		D2A0B2062F5E4D6C7B8A9012 /* ConduitSceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0B2052F5E4D6C7B8A9012 /* ConduitSceneDelegate.swift */; };
@@ -111,6 +112,7 @@
 		D2A0B1C32F5E4D6C7B8A9012 /* NativePasteBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativePasteBridge.swift; sourceTree = "<group>"; };
 		D2A0B1D32F5E4D6C7B8A9012 /* NativeKeyboardAttachmentBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeKeyboardAttachmentBridge.swift; sourceTree = "<group>"; };
 		D2A0B1E32F5E4D6C7B8A9012 /* NativeSheetBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSheetBridge.swift; sourceTree = "<group>"; };
+		D2A0B1E62F5E4D6C7B8A9012 /* NativeSheetUIFoundation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSheetUIFoundation.swift; sourceTree = "<group>"; };
 		D2A0B1F32F5E4D6C7B8A9012 /* NativeDropdownBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDropdownBridge.swift; sourceTree = "<group>"; };
 		D2A0B2032F5E4D6C7B8A9012 /* NativeSttBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSttBridge.swift; sourceTree = "<group>"; };
 		D2A0B2052F5E4D6C7B8A9012 /* ConduitSceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConduitSceneDelegate.swift; sourceTree = "<group>"; };
@@ -143,6 +145,7 @@
 		F1L10N102EE5500000000009 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		F1L10N102EE550000000000A /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/InfoPlist.strings"; sourceTree = "<group>"; };
 		F1L10N102EE550000000000B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		F1L10N102EE550000000000C /* pl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pl; path = pl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		F1L10N202EE5500000000001 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		F1L10N202EE5500000000002 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
 		F1L10N202EE5500000000003 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -154,6 +157,7 @@
 		F1L10N202EE5500000000009 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		F1L10N202EE550000000000A /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		F1L10N202EE550000000000B /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F1L10N202EE550000000000C /* pl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pl; path = pl.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -314,6 +318,7 @@
 				D2A0B1C32F5E4D6C7B8A9012 /* NativePasteBridge.swift */,
 				D2A0B1D32F5E4D6C7B8A9012 /* NativeKeyboardAttachmentBridge.swift */,
 				D2A0B1E32F5E4D6C7B8A9012 /* NativeSheetBridge.swift */,
+				D2A0B1E62F5E4D6C7B8A9012 /* NativeSheetUIFoundation.swift */,
 				D2A0B1F32F5E4D6C7B8A9012 /* NativeDropdownBridge.swift */,
 				D2A0B2032F5E4D6C7B8A9012 /* NativeSttBridge.swift */,
 				D2A0B2052F5E4D6C7B8A9012 /* ConduitSceneDelegate.swift */,
@@ -454,6 +459,7 @@
 				ko,
 				ja,
 				nl,
+				pl,
 				ru,
 				"zh-Hans",
 				"zh-Hant",
@@ -661,6 +667,7 @@
 				D2A0B2242F5E4D6C7B8A9012 /* ConduitCarPlayBridge.swift in Sources */,
 				D2A0B2252F5E4D6C7B8A9012 /* ConduitCarPlaySceneDelegate.swift in Sources */,
 				D2A0B1E42F5E4D6C7B8A9012 /* NativeSheetBridge.swift in Sources */,
+				D2A0B1E52F5E4D6C7B8A9012 /* NativeSheetUIFoundation.swift in Sources */,
 				D2A0B2042F5E4D6C7B8A9012 /* NativeSttBridge.swift in Sources */,
 				D2A0B1D42F5E4D6C7B8A9012 /* NativeKeyboardAttachmentBridge.swift in Sources */,
 				D2A0B1C42F5E4D6C7B8A9012 /* NativePasteBridge.swift in Sources */,
@@ -735,6 +742,7 @@
 				F1L10N102EE5500000000009 /* zh-Hans */,
 				F1L10N102EE550000000000A /* zh-Hant */,
 				F1L10N102EE550000000000B /* ja */,
+				F1L10N102EE550000000000C /* pl */,
 			);
 			name = InfoPlist.strings;
 			sourceTree = "<group>";
@@ -753,6 +761,7 @@
 				F1L10N202EE5500000000009 /* zh-Hans */,
 				F1L10N202EE550000000000A /* zh-Hant */,
 				F1L10N202EE550000000000B /* ja */,
+				F1L10N202EE550000000000C /* pl */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";

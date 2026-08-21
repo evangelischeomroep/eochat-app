@@ -1,10 +1,12 @@
 import 'package:conduit/core/models/chat_message.dart';
 import 'package:conduit/features/chat/widgets/assistant_detail_header.dart';
 import 'package:conduit/features/chat/widgets/streaming_status_widget.dart';
+import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,10 +18,11 @@ void main() {
   }) {
     return MaterialApp(
       theme: AppTheme.light(TweakcnThemes.t3Chat),
+      localizationsDelegates: conduitLocalizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(disableAnimations: disableAnimations),
+        data: MediaQuery.of(context)
+            .copyWith(disableAnimations: disableAnimations),
         child: child!,
       ),
       home: Scaffold(
@@ -83,9 +86,10 @@ void main() {
       greaterThan(0),
     );
 
-    final expectedRailColor = AppTheme.light(
-      TweakcnThemes.t3Chat,
-    ).extension<ConduitThemeExtension>()!.textSecondary.withValues(alpha: 0.6);
+    final expectedRailColor = AppTheme.light(TweakcnThemes.t3Chat)
+        .extension<ConduitThemeExtension>()!
+        .textSecondary
+        .withValues(alpha: 0.6);
     final rail = tester.widget<ColoredBox>(
       find.descendant(
         of: find.byKey(const ValueKey<String>('status-timeline-rail-0')),
@@ -110,18 +114,22 @@ void main() {
     expect(bottomSheetTitle.maxLines, isNull);
   });
 
-  testWidgets('hides incomplete status rows once streaming has finished', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      buildHarness(const [
-        ChatStatusUpdate(description: 'Searching...', done: false),
-      ], isStreaming: false),
-    );
+  testWidgets(
+    'keeps the last incomplete status row when settling would empty the list',
+    (tester) async {
+      // Dropping the whole row at settle shifted the bottom-anchored layout
+      // by the row height and lost the only description of what the turn
+      // did; the last update stays visible instead.
+      await tester.pumpWidget(
+        buildHarness(const [
+          ChatStatusUpdate(description: 'Searching...', done: false),
+        ], isStreaming: false),
+      );
 
-    expect(find.text('Searching...'), findsNothing);
-    expect(find.byType(StreamingStatusWidget), findsOneWidget);
-  });
+      expect(find.text('Searching...'), findsOneWidget);
+      expect(find.byType(StreamingStatusWidget), findsOneWidget);
+    },
+  );
 
   testWidgets('keeps completed status rows visible after streaming finishes', (
     tester,
@@ -149,6 +157,54 @@ void main() {
       expect(find.text('Generating image...'), findsOneWidget);
     },
   );
+
+  testWidgets('groups Hermes tools with OpenWebUI-style counts', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildHarness(const [
+        ChatStatusUpdate(
+          action: 'hermes_tool_web_search',
+          description: 'web_search',
+          done: true,
+        ),
+        ChatStatusUpdate(
+          action: 'hermes_tool_web_search',
+          description: 'web_search',
+          done: true,
+        ),
+        ChatStatusUpdate(
+          action: 'hermes_tool_terminal',
+          description: 'terminal',
+          done: true,
+        ),
+      ], isStreaming: false),
+    );
+
+    expect(find.text('Explored web_search (2), terminal'), findsOneWidget);
+    expect(find.text('terminal'), findsNothing);
+  });
+
+  testWidgets('keeps a grouped Hermes title pending while any tool runs', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      buildHarness(const [
+        ChatStatusUpdate(
+          action: 'hermes_tool_web_search',
+          description: 'web_search',
+          done: true,
+        ),
+        ChatStatusUpdate(
+          action: 'hermes_tool_terminal',
+          description: 'terminal',
+          done: false,
+        ),
+      ]),
+    );
+
+    expect(find.text('Exploring web_search, terminal'), findsOneWidget);
+  });
 
   testWidgets('reduced motion skips status-chip entrance effects', (
     tester,

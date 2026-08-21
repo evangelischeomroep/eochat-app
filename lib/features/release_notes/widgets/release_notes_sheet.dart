@@ -1,6 +1,6 @@
-import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
+import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -65,9 +65,7 @@ class ReleaseNotesSheet extends StatelessWidget {
         _StaggeredReveal(
           index: revealIndex++,
           child: _ReleaseHeader(
-            title: l10n.releaseNotesAnnouncementTitle(
-              currentVersion.split('.').take(2).join('.'),
-            ),
+            title: l10n.releaseNotesTitle,
             version: currentVersion,
             intro: intro,
           ),
@@ -174,7 +172,7 @@ class _ReleaseHeader extends StatelessWidget {
           children: [
             Expanded(
               child: Semantics(
-                header: true,
+                headingLevel: 1,
                 child: Text(
                   title,
                   style: AppTypography.headlineMediumStyle.copyWith(
