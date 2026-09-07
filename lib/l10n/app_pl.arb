@@ -265,6 +265,18 @@
   "@reasoningEffortHigh": {
     "description": "High model reasoning effort option."
   },
+  "reasoningEffortLight": "Lekki",
+  "@reasoningEffortLight": {
+    "description": "Light Apple PCC reasoning effort option."
+  },
+  "reasoningEffortModerate": "Umiarkowany",
+  "@reasoningEffortModerate": {
+    "description": "Moderate Apple PCC reasoning effort option."
+  },
+  "reasoningEffortDeep": "Głęboki",
+  "@reasoningEffortDeep": {
+    "description": "Deep Apple PCC reasoning effort option."
+  },
   "reasoningEffortMinimal": "Minimalny",
   "@reasoningEffortMinimal": {
     "description": "Minimal model reasoning effort option."
@@ -4189,6 +4201,8 @@
     "description": "Label for the base-model selector."
   },
   "workspaceModelBaseModelNone": "Brak (własny)",
+  "workspaceModelBaseModelRequired": "Wybierz model bazowy.",
+  "@workspaceModelBaseModelRequired": {"description": "Validation shown when a non-admin model create or protected edit has no base model."},
   "@workspaceModelBaseModelNone": {
     "description": "Base-model option meaning no base model is used."
   },
@@ -5790,13 +5804,110 @@
   "@directHistoryLocalOnlySubtitle": {
     "description": "Description shown when direct chat history sync is disabled."
   },
+  "backendChooserSelfHostedSectionTitle": "Usługi hostowane samodzielnie",
+  "@backendChooserSelfHostedSectionTitle": {
+    "description": "Section title for self-hosted backend choices on the first-run backend chooser."
+  },
+  "backendChooserAppleSectionTitle": "Apple Intelligence",
+  "@backendChooserAppleSectionTitle": {
+    "description": "Section title for available Apple model choices on the first-run backend chooser."
+  },
+  "backendChooserModelApisSectionTitle": "Interfejsy API modeli",
+  "@backendChooserModelApisSectionTitle": {
+    "description": "Section title for direct model API choices on the first-run backend chooser."
+  },
   "backendChooserDirectTitle": "Połącz bezpośrednio",
   "@backendChooserDirectTitle": {
     "description": "Title of the direct provider option on the first-run backend chooser."
   },
-  "backendChooserDirectSubtitle": "Użyj interfejsu API zgodnego z OpenAI lub Ollamy bez Open WebUI.",
+  "backendChooserDirectSubtitle": "Połącz interfejs API zgodny z OpenAI lub Ollama. Dane logowania pozostaną na tym urządzeniu.",
   "@backendChooserDirectSubtitle": {
     "description": "Description of the direct provider option on the first-run backend chooser."
+  },
+  "backendChooserAppleOnDeviceTitle": "Apple On-Device",
+  "@backendChooserAppleOnDeviceTitle": {
+    "description": "Title of the Apple on-device model option on the first-run backend chooser."
+  },
+  "backendChooserAppleOnDeviceSubtitle": "Uruchamiaj prywatny model Apple na tym urządzeniu, także offline.",
+  "@backendChooserAppleOnDeviceSubtitle": {
+    "description": "Description of the Apple on-device model option on the first-run backend chooser."
+  },
+  "appleOnDeviceUnavailable": "Model Apple On-Device jest niedostępny na tym urządzeniu.",
+  "@appleOnDeviceUnavailable": {
+    "description": "Fallback shown when the Apple on-device model cannot be selected during onboarding."
+  },
+  "backendChooserApplePccTitle": "Apple Private Cloud Compute",
+  "@backendChooserApplePccTitle": {
+    "description": "Title of the Apple PCC option on the first-run backend chooser."
+  },
+  "backendChooserApplePccSubtitle": "Używaj prywatnego modelu chmurowego Apple bez klucza API.",
+  "@backendChooserApplePccSubtitle": {
+    "description": "Description of the Apple PCC option on the first-run backend chooser."
+  },
+  "applePccUnavailable": "Usługa Apple Private Cloud Compute jest niedostępna na tym urządzeniu.",
+  "@applePccUnavailable": {
+    "description": "Fallback shown when Apple PCC cannot be selected during onboarding."
+  },
+  "applePccStatusAvailable": "Dostępna",
+  "@applePccStatusAvailable": {
+    "description": "Apple PCC availability label."
+  },
+  "applePccQuotaApproaching": "Zbliżasz się do dziennego limitu użycia",
+  "@applePccQuotaApproaching": {
+    "description": "Apple PCC quota warning."
+  },
+  "applePccQuotaReached": "Osiągnięto dzienny limit użycia",
+  "@applePccQuotaReached": {
+    "description": "Apple PCC exhausted quota label."
+  },
+  "applePccQuotaResetsAt": "Odnowienie: {time}",
+  "@applePccQuotaResetsAt": {
+    "description": "Apple PCC quota reset time.",
+    "placeholders": {
+      "time": {"type": "String"}
+    }
+  },
+  "applePccShowQuotaOptions": "Pokaż opcje użycia",
+  "@applePccShowQuotaOptions": {
+    "description": "Action that presents Apple's PCC quota increase flow."
+  },
+  "applePccOnDeviceFallback": "Model na urządzeniu",
+  "@applePccOnDeviceFallback": {
+    "description": "Apple PCC network fallback preference."
+  },
+  "applePccOnDeviceFallbackSubtitle": "Użyj mniejszego modelu Apple na urządzeniu, gdy PCC jest nieosiągalne. Żądania z rozumowaniem nie używają tego trybu.",
+  "@applePccOnDeviceFallbackSubtitle": {
+    "description": "Description of the Apple PCC network fallback preference."
+  },
+  "applePccCurrentLanguageUnsupported": "Bieżący język urządzenia może nie być obsługiwany.",
+  "@applePccCurrentLanguageUnsupported": {
+    "description": "Warning shown when PCC does not support the current locale."
+  },
+  "applePccContextSize": "Kontekst: {tokens} tokenów",
+  "@applePccContextSize": {
+    "description": "Apple PCC context size label.",
+    "placeholders": {
+      "tokens": {"type": "String"}
+    }
+  },
+  "directContextLimit": "Limit kontekstu: {tokens}",
+  "@directContextLimit": {
+    "description": "Provider-neutral model context limit label.",
+    "placeholders": {
+      "tokens": {"type": "String"}
+    }
+  },
+  "directContextCompactionTitle": "Kompaktowanie kontekstu",
+  "@directContextCompactionTitle": {
+    "description": "Section title for fallback context windows used by Direct models."
+  },
+  "directContextCompactionDescription": "Te modele nie podają rozmiaru okna kontekstu. Conduit używa wybranego limitu do kompaktowania starszych wiadomości, zanim żądanie stanie się zbyt duże.",
+  "@directContextCompactionDescription": {
+    "description": "Footer explaining per-model Direct context window fallbacks."
+  },
+  "directContextCompactionPickerDescription": "Wybierz okno kontekstu używane przez Conduit do automatycznego kompaktowania.",
+  "@directContextCompactionPickerDescription": {
+    "description": "Description in the Direct context window fallback picker."
   },
   "testDirectConnection": "Testuj połączenie",
   "@testDirectConnection": {
@@ -5846,7 +5957,7 @@
   "@backendChooserWelcome": {
     "description": "Welcome heading on the first-run backend chooser."
   },
-  "backendChooserPrompt": "Wybierz usługę, od której chcesz zacząć. Inne możesz dodać później.",
+  "backendChooserPrompt": "Wybierz jedną opcję na początek. Kolejne możesz dodać później.",
   "@backendChooserPrompt": {
     "description": "Prompt on the first-run backend chooser."
   },
@@ -5862,7 +5973,7 @@
   "@backendChooserHermesTitle": {
     "description": "Title of the Hermes Agent option on the backend chooser."
   },
-  "backendChooserHermesSubtitle": "Użyj samodzielnie hostowanego agenta Hermes bez Open WebUI.",
+  "backendChooserHermesSubtitle": "Połącz samodzielnie hostowanego agenta Hermes.",
   "@backendChooserHermesSubtitle": {
     "description": "Description of the Hermes Agent option on the backend chooser."
   },
@@ -5874,6 +5985,12 @@
   "@hermesApprovalFallback": {
     "description": "Fallback description for a Hermes approval request."
   },
+  "openWebUiPromptOther": "Inne",
+  "@openWebUiPromptOther": {"description": "Label for a free-form answer to an Open WebUI ask-user question."},
+  "openWebUiPromptAnswerHint": "Wpisz odpowiedź",
+  "@openWebUiPromptAnswerHint": {"description": "Placeholder for a free-form Open WebUI ask-user answer."},
+  "openWebUiPromptSubmit": "Prześlij",
+  "@openWebUiPromptSubmit": {"description": "Action that submits all answers to an Open WebUI ask-user prompt."},
   "hermesApprovalApproved": "Zatwierdzono ✓",
   "@hermesApprovalApproved": {
     "description": "Resolved status for an approved Hermes request."
@@ -6269,5 +6386,33 @@
   "voiceCallSpeakerOff": "Wyłącz głośnik",
   "@voiceCallSpeakerOff": {
     "description": "Tooltip for disabling the loudspeaker during a voice call."
-  }
+  },
+  "directMcpServersTitle": "MCP servers", "directMcpEmptyTitle": "No MCP servers yet", "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.", "directMcpEditorTitle": "Edit MCP server", "directMcpAddTitle": "Add MCP server", "directMcpName": "Server name", "directMcpEndpoint": "Streamable HTTP endpoint", "directMcpBearerToken": "Bearer token (optional)", "directMcpCustomHeaders": "Custom headers (optional)", "directMcpCustomHeadersHint": "One per line: Name: Value", "directMcpTestConnection": "Test connection", "directMcpTesting": "Testing connection…", "directMcpTestSucceeded": "Connected — {count} tools found.", "@directMcpTestSucceeded": {"placeholders":{"count":{"type":"int"}}}, "directMcpTestFailed": "Could not list tools from this MCP server.", "directMcpSaveFailed": "Could not save this MCP server.", "directMcpLoadFailed": "Could not load MCP servers from secure storage.", "directMcpMissing": "This MCP server no longer exists.", "directMcpCredentialTransferTitle": "Use credentials with new server?", "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.", "directMcpCredentialTransferConfirm": "Use credentials", "directMcpDeleteTitle": "Delete MCP server?", "directMcpDeleteMessage": "This removes {name} and its credentials from this device.", "@directMcpDeleteMessage": {"placeholders":{"name":{"type":"String"}}}, "directMcpDeleteFailed": "Could not delete this MCP server.", "directMcpAuthMode": "Authentication", "directMcpAuthNone": "None", "directMcpAuthBearer": "Bearer token", "directMcpAuthOAuth": "OAuth", "directMcpOAuthConnect": "Connect in browser", "directMcpOAuthReconnect": "Reconnect in browser", "directMcpOAuthDisconnect": "Disconnect OAuth", "directMcpOAuthPending": "Waiting for authorization in the browser…", "directMcpOAuthConnected": "OAuth connected.", "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}", "@directMcpOAuthConnectionDetails": {"placeholders":{"issuerHost":{"type":"String"},"scopes":{"type":"String"}}}, "directMcpOAuthNoScopes": "No scopes reported", "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.", "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.", "directMcpApprovalTitle": "Tool approval", "directMcpApprovalAllowOnce": "Allow once", "directMcpApprovalAllowSession": "Allow for session", "directMcpApprovalAllowAlways": "Always allow", "directMcpApprovalAlwaysTitle": "Always allow this tool?", "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.", "@directMcpApprovalAlwaysMessage": {"placeholders":{"serverName":{"type":"String"},"toolName":{"type":"String"}}}, "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.", "directMcpApprovalDeny": "Deny", "directMcpApprovalAllowed": "Allowed once", "directMcpApprovalAllowedSession": "Allowed for session", "directMcpApprovalAllowedAlways": "Always allowed", "directMcpApprovalDenied": "Denied", "directMcpApprovalExpired": "Approval expired", "directMcpRememberedApprovalsTitle": "Always allowed tools", "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.", "directMcpRememberedApprovalRevoke": "Revoke", "directMcpRememberedApprovalsRevokeAll": "Revoke all", "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval."
+  ,"directMcpContentAction": "MCP content"
+  ,"directMcpContentTitle": "MCP content"
+  ,"directMcpContentServer": "MCP server"
+  ,"directMcpContentSearch": "Search prompts and resources"
+  ,"directMcpContentPrompts": "Prompts"
+  ,"directMcpContentResources": "Resources"
+  ,"directMcpContentEmpty": "This server has no prompts or resources."
+  ,"directMcpContentNoMatches": "No matching prompts or resources."
+  ,"directMcpContentLoadFailed": "Could not load content from this MCP server."
+  ,"directMcpContentRefresh": "Refresh MCP content"
+  ,"directMcpContentPreviewTitle": "Preview"
+  ,"directMcpContentInsert": "Insert"
+  ,"directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}"
+  ,"@directMcpContentPromptHeading": {"placeholders":{"serverName":{"type":"String"},"promptName":{"type":"String"}}}
+  ,"directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}"
+  ,"@directMcpContentResourceHeading": {"placeholders":{"serverName":{"type":"String"},"resourceUri":{"type":"String"}}}
+  ,"directMcpContentRoleUser": "User"
+  ,"directMcpContentRoleAssistant": "Assistant"
+  ,"directMcpContentRequestFailed": "Could not load this MCP content. Try again."
+  ,"directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource."
+  ,"directMcpContentChanged": "This item changed on the server. Refresh and choose it again."
+  ,"directMcpContentTooLarge": "This content is too large to insert."
+  ,"directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again."
+  ,"directMcpContentLoading": "Loading MCP content…"
+  ,"directMcpInsecureCredentialsTitle": "Send credentials without encryption?"
+  ,"directMcpInsecureCredentialsMessage": "This server uses unencrypted HTTP. Your bearer token, OAuth token, and custom headers could be read or changed on the network."
+  ,"directMcpInsecureCredentialsConfirm": "Send without encryption"
 }

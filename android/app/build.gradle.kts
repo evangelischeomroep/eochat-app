@@ -15,7 +15,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "nl.eo.eochat"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 37
     ndkVersion = "29.0.14206865"
 
     defaultConfig {

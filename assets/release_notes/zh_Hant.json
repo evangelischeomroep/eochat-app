@@ -18,6 +18,59 @@
           "icon": "direct"
         }
       ]
+    },
+    {
+      "version": "4.1.2",
+      "title": "新變化",
+      "intro": "你好！Apple On-Device 在手機上跑。Direct chats 能用，Open WebUI 聊天離線時也能用。語音通話從揚聲器開始，讀的是答案而不是思考。Hermes 閒置後會恢復，幾個聊天問題也修了。",
+      "bullets": [
+        {
+          "text": "Apple On-Device: Direct chats 在本機跑，Open WebUI 聊天離線時也能用。",
+          "icon": "direct"
+        },
+        {
+          "text": "語音通話: 沒插耳機時從揚聲器開始，跳過思考，把整段答案讀出來。",
+          "icon": "polish"
+        },
+        {
+          "text": "Hermes: 閒置後會把已完成的任務找回來，並且能收 PDF。技能會邊打邊補全。引用連結、筆記清單和 Open WebUI 0.11.1 都能用。",
+          "icon": "hermes"
+        }
+      ]
+    },
+    {
+      "version": "4.1.3",
+      "title": "新變化",
+      "intro": "你好！Direct chats 能從手機呼叫 MCP 伺服器。每個工具都要你批准。Mac 上有鍵盤快捷鍵和聊天捲軸。Hermes 的批准和 Markdown 引用也修了。",
+      "bullets": [
+        {
+          "text": "MCP 伺服器: 給 Direct chats 新增，Apple On-Device 也能用。工具可以批准一次、本次工作階段、或始終允許。把提示詞和資源插入聊天。",
+          "icon": "direct"
+        },
+        {
+          "text": "Mac: 鍵盤快捷鍵、側邊欄懸停、右鍵選單。聊天有捲軸。引用塊會按引用顯示。",
+          "icon": "polish"
+        },
+        {
+          "text": "Hermes: 串流工具呼叫會畫成塊。批准會留在對應的那次執行上。重新打開正在跑的 Desktop 工作階段，轉圈還在。",
+          "icon": "hermes"
+        }
+      ]
+    },
+    {
+      "version": "4.1.4",
+      "title": "新變化",
+      "intro": "你好！Open WebUI 0.11.3 能用了。還不支援的伺服器警告挪到了新聊天畫面，不會再打斷你已經開始的對話。",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.11.2 和 0.11.3: 不再跳出相容性警告。",
+          "icon": "direct"
+        },
+        {
+          "text": "不支援的伺服器警告: 只在新聊天出現。已經開始的對話裡不會再顯示。",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

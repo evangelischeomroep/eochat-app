@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'dart:io' show Platform;
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -35,6 +36,10 @@ import '../../hermes/models/hermes_config.dart';
 import '../../hermes/providers/hermes_providers.dart';
 import '../../hermes/services/hermes_local_document_service.dart';
 import '../../direct_connections/direct_connections.dart';
+import '../../direct_connections/providers/direct_mcp_providers.dart';
+import '../../direct_connections/services/direct_mcp_client.dart';
+import '../../direct_connections/views/direct_mcp_content_sheet.dart';
+import '../../workspace/models/workspace_resources.dart';
 import '../../../core/models/tool.dart';
 import '../../../core/models/model.dart';
 import '../../../core/models/prompt.dart';
@@ -70,6 +75,7 @@ import 'composer_overflow_menu.dart';
 import 'mention_text_controller.dart';
 import 'model_suggestion_overlay.dart';
 import 'prompt_suggestion_overlay.dart';
+import 'skill_suggestion_overlay.dart';
 
 /// Native platform views are recomposited for every animated cursor-opacity
 /// frame. Keep the normal animated caret everywhere else, but use a discrete
@@ -84,6 +90,34 @@ bool composerUsesNativeSystemSelectionMenu({
   required bool isIOS,
   required bool systemMenuSupported,
 }) => isIOS && systemMenuSupported;
+
+@visibleForTesting
+TextEditingValue composerTextValueAfterInsertion(
+  TextEditingValue current,
+  String content,
+) {
+  final text = current.text;
+  final selection = current.selection;
+  final start = selection.isValid
+      ? selection.start.clamp(0, text.length).toInt()
+      : text.length;
+  final end = selection.isValid
+      ? selection.end.clamp(0, text.length).toInt()
+      : text.length;
+  final before = text.substring(0, start);
+  return TextEditingValue(
+    text: '$before$content${text.substring(end)}',
+    selection: TextSelection.collapsed(offset: before.length + content.length),
+    composing: TextRange.empty,
+  );
+}
+
+@visibleForTesting
+bool directMcpInsertionFitsComposer(TextEditingValue current, String content) =>
+    utf8
+        .encode(composerTextValueAfterInsertion(current, content).text)
+        .length <=
+    kDirectMcpMaxInsertionBytes;
 
 /// Returns a stable UIKit edit-menu model for the composer.
 ///
@@ -136,10 +170,14 @@ bool directModelAcceptsImageInput(Model? model, DirectModelRegistry registry) {
 List<String>? localFilePickerExtensionsForModel(
   Model? selectedModel, {
   bool desktopHermes = false,
+  bool hermesResponsesFiles = false,
 }) {
   if (selectedModel == null) return null;
   if (isHermesModel(selectedModel)) {
-    return desktopHermes ? null : kHermesLocalDocumentPickerExtensions;
+    if (desktopHermes) return null;
+    final extensions = <String>{...kHermesLocalDocumentPickerExtensions};
+    if (hermesResponsesFiles) extensions.add('pdf');
+    return extensions.toList(growable: false)..sort();
   }
   if (hasReservedDirectIdentity(selectedModel)) {
     final extensions = <String>{...kDirectLocalDocumentPickerExtensions};
@@ -214,7 +252,6 @@ List<IosKeyboardAttachmentActionConfig> buildIosKeyboardAttachmentActions({
   required List<ToggleFilter> availableFilters,
   required List<String> selectedFilterIds,
 }) {
-  final restrictedMode = hermesMode || directMode;
   final items = buildComposerOverflowItems(
     l10n: l10n,
     attachmentAvailability: attachmentAvailability,
@@ -224,9 +261,9 @@ List<IosKeyboardAttachmentActionConfig> buildIosKeyboardAttachmentActions({
     webSearchEnabled: webSearchEnabled,
     imageGenerationAvailable: !hermesMode && imageGenerationAvailable,
     imageGenerationEnabled: imageGenerationEnabled,
-    availableTools: restrictedMode ? const <Tool>[] : availableTools,
+    availableTools: hermesMode ? const <Tool>[] : availableTools,
     selectedToolIds: selectedToolIds,
-    availableFilters: restrictedMode
+    availableFilters: hermesMode || directMode
         ? const <ToggleFilter>[]
         : availableFilters,
     selectedFilterIds: selectedFilterIds,
@@ -240,12 +277,17 @@ List<IosKeyboardAttachmentActionConfig> buildIosKeyboardAttachmentActions({
                   item.id == ComposerOverflowActionIds.photo ||
                   item.id == ComposerOverflowActionIds.camera);
         }
-        return !directMode ||
-            item.id == ComposerOverflowActionIds.file ||
-            item.id == ComposerOverflowActionIds.photo ||
-            item.id == ComposerOverflowActionIds.camera ||
-            item.id == ComposerOverflowActionIds.webSearch ||
-            item.id == ComposerOverflowActionIds.imageGeneration;
+        if (!directMode) {
+          return item.id != ComposerOverflowActionIds.mcpContent;
+        }
+        return item.enabled &&
+            (item.section == ComposerOverflowSection.tools ||
+                item.id == ComposerOverflowActionIds.file ||
+                item.id == ComposerOverflowActionIds.photo ||
+                item.id == ComposerOverflowActionIds.camera ||
+                item.id == ComposerOverflowActionIds.mcpContent ||
+                item.id == ComposerOverflowActionIds.webSearch ||
+                item.id == ComposerOverflowActionIds.imageGeneration);
       })
       .map(
         (item) => IosKeyboardAttachmentActionConfig(
@@ -281,6 +323,7 @@ class ModernChatInput extends ConsumerStatefulWidget {
   /// Receives the button size so the replacement can match layout.
   /// When provided, the default [ComposerAttachmentKeyboard] is not used.
   final Widget Function(double size)? overflowButtonBuilder;
+  final Widget? attachedOverlay;
 
   final Function()? onVoiceInput;
   final Function()? onVoiceCall;
@@ -308,6 +351,7 @@ class ModernChatInput extends ConsumerStatefulWidget {
     this.managesSystemKeyboardInset = false,
     this.placeholder,
     this.overflowButtonBuilder,
+    this.attachedOverlay,
     this.onVoiceInput,
     this.onVoiceCall,
     this.onFileAttachment,
@@ -480,6 +524,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   VoiceInputService? _voiceService;
   StreamSubscription<String>? _textSub;
   Timer? _contextSuggestionDebounce;
+  Timer? _skillSuggestionDebounce;
   String _baseTextAtStart = '';
   bool _isDeactivated = false;
   int _lastHandledFocusTick = 0;
@@ -493,6 +538,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   List<_ComposerContextSuggestion> _contextSuggestions =
       const <_ComposerContextSuggestion>[];
   int _contextSuggestionRequestId = 0;
+  int _skillSuggestionRequestId = 0;
+  AsyncValue<List<WorkspaceSkillSummary>> _skillSuggestions = const AsyncData(
+    <WorkspaceSkillSummary>[],
+  );
   bool _isNativeAttachmentPanelVisible = false;
   bool _isFallbackAttachmentPanelVisible = false;
   bool _fallbackPanelReplacedKeyboard = false;
@@ -622,6 +671,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     _keyboardAttachmentSubscription?.cancel();
     _textSub?.cancel();
     _contextSuggestionDebounce?.cancel();
+    _skillSuggestionDebounce?.cancel();
     if (!kIsWeb && Platform.isIOS) {
       unawaited(IosKeyboardAttachmentBridge.instance.hide());
     }
@@ -797,6 +847,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         return;
       case ComposerOverflowActionIds.web:
         if (availability.web) widget.onWebAttachment?.call();
+        return;
+      case ComposerOverflowActionIds.mcpContent:
+        if (availability.mcpContent) unawaited(_openDirectMcpContent());
         return;
       default:
         toggleComposerOverflowSelection(ref, id);
@@ -1053,23 +1106,37 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       return;
     }
 
-    final text = _controller.text;
-    final selection = _controller.selection;
-    final int start = selection.isValid
-        ? selection.start.clamp(0, text.length).toInt()
-        : text.length;
-    final int end = selection.isValid
-        ? selection.end.clamp(0, text.length).toInt()
-        : text.length;
-    final before = text.substring(0, start);
-    final after = text.substring(end);
-    final caret = before.length + content.length;
-
-    _controller.value = TextEditingValue(
-      text: '$before$content$after',
-      selection: TextSelection.collapsed(offset: caret),
-      composing: TextRange.empty,
+    _controller.value = composerTextValueAfterInsertion(
+      _controller.value,
+      content,
     );
+    _ensureFocusedIfEnabled();
+  }
+
+  Future<void> _openDirectMcpContent() async {
+    if (!widget.enabled) return;
+    final selection = _controller.selection;
+    _dismissFallbackAttachmentPanel();
+    await _hideNativeKeyboardAttachmentPanel();
+    if (!mounted || _isDeactivated) return;
+    final content = await DirectMcpContentSheet.show(context);
+    if (!mounted ||
+        _isDeactivated ||
+        !widget.enabled ||
+        content == null ||
+        content.isEmpty) {
+      return;
+    }
+    final restored = _controller.value.copyWith(selection: selection);
+    if (!directMcpInsertionFitsComposer(restored, content)) {
+      AdaptiveSnackBar.show(
+        context,
+        message: AppLocalizations.of(context)!.directMcpContentComposerTooLarge,
+        type: AdaptiveSnackBarType.error,
+      );
+      return;
+    }
+    _controller.value = composerTextValueAfterInsertion(restored, content);
     _ensureFocusedIfEnabled();
   }
 
@@ -1218,6 +1285,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       widget.enabled,
     );
     final bool isContextTrigger = match?.command.startsWith('#') ?? false;
+    final bool isSkillTrigger = match?.command.startsWith('\$') ?? false;
     final bool shouldShow = match != null;
     final bool wasShowing = _showPromptOverlay;
     final String previousCommand = _currentPromptCommand;
@@ -1262,8 +1330,12 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         if (!isContextTrigger) {
           _clearContextSuggestions();
         }
+        if (!isSkillTrigger) {
+          _clearSkillSuggestions();
+        }
       } else {
         _clearContextSuggestions();
+        _clearSkillSuggestions();
         _currentPromptCommand = '';
         _currentPromptRange = null;
         _promptSelectionIndex = 0;
@@ -1276,6 +1348,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     } else {
       _contextSuggestionDebounce?.cancel();
       _contextSuggestionDebounce = null;
+    }
+
+    if (isSkillTrigger) {
+      _scheduleSkillSuggestionSearch(match!.command);
+    } else {
+      _skillSuggestionDebounce?.cancel();
+      _skillSuggestionDebounce = null;
     }
 
     if (!wasShowing && shouldShow) {
@@ -1308,6 +1387,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       ? ref.read(hermesSkillPromptsProvider).value
       : ref.read(promptsListProvider).value;
 
+  bool get _openWebUiSkillsAvailable {
+    if (!ref.read(openWebUiAccountAvailableProvider)) return false;
+    final model = ref.read(selectedModelProvider);
+    return model == null ||
+        (!isHermesModel(model) && !isLocallyMintedDirectModel(model));
+  }
+
   PromptCommandMatch? _resolvePromptCommand(
     String text,
     TextSelection selection,
@@ -1333,7 +1419,12 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     if (candidate.isEmpty ||
         !(candidate.startsWith('/') ||
             candidate.startsWith('#') ||
-            candidate.startsWith('@'))) {
+            candidate.startsWith('@') ||
+            candidate.startsWith('\$'))) {
+      return null;
+    }
+
+    if (candidate.startsWith('\$') && !_openWebUiSkillsAvailable) {
       return null;
     }
 
@@ -1391,6 +1482,91 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
               m.id.toLowerCase().contains(searchQuery),
         )
         .toList();
+  }
+
+  void _clearSkillSuggestions() {
+    _skillSuggestionDebounce?.cancel();
+    _skillSuggestionDebounce = null;
+    _skillSuggestionRequestId++;
+    _skillSuggestions = const AsyncData(<WorkspaceSkillSummary>[]);
+  }
+
+  void _scheduleSkillSuggestionSearch(String command) {
+    _skillSuggestionDebounce?.cancel();
+    final requestId = ++_skillSuggestionRequestId;
+    setState(() {
+      _skillSuggestions = const AsyncLoading();
+      _promptSelectionIndex = 0;
+    });
+
+    final query = command.length > 1 ? command.substring(1).trim() : '';
+    _skillSuggestionDebounce = Timer(_contextSuggestionDelay, () {
+      unawaited(_loadSkillSuggestions(command, query, requestId));
+    });
+  }
+
+  Future<void> _loadSkillSuggestions(
+    String command,
+    String query,
+    int requestId,
+  ) async {
+    final api = ref.read(apiServiceProvider);
+    final token = ref.read(authTokenProvider3);
+    if (api == null || !_openWebUiSkillsAvailable) {
+      if (mounted && !_isDeactivated) _hidePromptOverlay();
+      return;
+    }
+
+    try {
+      final response = await api.getWorkspaceSkills(
+        query: query.isEmpty ? null : query,
+        page: 1,
+      );
+      if (!_skillSuggestionRequestIsCurrent(command, requestId, api, token)) {
+        return;
+      }
+      final skills = response.items
+          .where(
+            (skill) =>
+                skill.isActive && skill.id.isNotEmpty && skill.name.isNotEmpty,
+          )
+          .toList(growable: false);
+      setState(() {
+        _skillSuggestions = AsyncData(skills);
+        _promptSelectionIndex = skills.isEmpty
+            ? 0
+            : _promptSelectionIndex.clamp(0, skills.length - 1);
+      });
+    } catch (error, stackTrace) {
+      if (!_skillSuggestionRequestIsCurrent(command, requestId, api, token)) {
+        return;
+      }
+      DebugLogger.warning(
+        'skill suggestion search failed',
+        scope: 'chat/skills',
+        data: {'errorType': error.runtimeType.toString()},
+      );
+      setState(() {
+        _skillSuggestions = AsyncError(error, stackTrace);
+        _promptSelectionIndex = 0;
+      });
+    }
+  }
+
+  bool _skillSuggestionRequestIsCurrent(
+    String command,
+    int requestId,
+    Object api,
+    String? token,
+  ) {
+    return mounted &&
+        !_isDeactivated &&
+        requestId == _skillSuggestionRequestId &&
+        _currentPromptCommand == command &&
+        _currentPromptCommand.startsWith('\$') &&
+        identical(ref.read(apiServiceProvider), api) &&
+        ref.read(authTokenProvider3) == token &&
+        _openWebUiSkillsAvailable;
   }
 
   void _clearContextSuggestions() {
@@ -1704,6 +1880,40 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     });
   }
 
+  void _applySkill(WorkspaceSkillSummary skill) {
+    final range = _currentPromptRange;
+    if (range == null) return;
+
+    final text = _controller.text;
+    final before = text.substring(0, range.start);
+    final after = text.substring(range.end);
+    final mention = '\$${skill.name} ';
+    final newText = '$before$mention$after';
+    final newCursor = before.length + mention.length;
+
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newCursor),
+    );
+    _controller.addMention(
+      range.start,
+      range.start + mention.trimRight().length,
+      id: skill.id,
+      label: skill.name,
+      kind: MentionKind.skill,
+    );
+
+    setState(() {
+      _hasText = newText.trim().isNotEmpty;
+      _clearSkillSuggestions();
+      _showPromptOverlay = false;
+      _currentPromptCommand = '';
+      _currentPromptRange = null;
+      _promptSelectionIndex = 0;
+    });
+    _ensureFocusedIfEnabled();
+  }
+
   void _movePromptSelection(int delta) {
     if (_currentPromptCommand.startsWith('#')) {
       final int itemCount = _contextSuggestions.length;
@@ -1725,7 +1935,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
 
     // Determine filtered list length based on trigger type.
     final int filteredLength;
-    if (_currentPromptCommand.startsWith('@')) {
+    if (_currentPromptCommand.startsWith('\$')) {
+      filteredLength = _skillSuggestions.asData?.value.length ?? 0;
+    } else if (_currentPromptCommand.startsWith('@')) {
       final List<Model>? models = ref.read(modelsProvider).value;
       if (models == null || models.isEmpty) return;
       filteredLength = _filterModels(models).length;
@@ -1771,6 +1983,15 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       if (filtered.isEmpty) return;
       int index = _promptSelectionIndex.clamp(0, filtered.length - 1);
       _applyModel(filtered[index]);
+      return;
+    }
+
+    if (_currentPromptCommand.startsWith('\$')) {
+      final skills =
+          _skillSuggestions.asData?.value ?? const <WorkspaceSkillSummary>[];
+      if (skills.isEmpty) return;
+      final index = _promptSelectionIndex.clamp(0, skills.length - 1);
+      _applySkill(skills[index]);
       return;
     }
 
@@ -1906,6 +2127,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     if (!_showPromptOverlay) return;
     setState(() {
       _clearContextSuggestions();
+      _clearSkillSuggestions();
       _showPromptOverlay = false;
       _currentPromptCommand = '';
       _currentPromptRange = null;
@@ -1915,10 +2137,19 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
 
   bool get _shouldShowPromptOverlay {
     if (!_showPromptOverlay) return false;
+    if (_currentPromptCommand.startsWith('\$')) {
+      return _openWebUiSkillsAvailable;
+    }
     final model = ref.read(selectedModelProvider);
     return !(model != null &&
         isHermesModel(model) &&
         _currentPromptCommand.startsWith('#'));
+  }
+
+  bool get _canConfirmPromptSelection {
+    if (!_shouldShowPromptOverlay) return false;
+    if (!_currentPromptCommand.startsWith('\$')) return true;
+    return _skillSuggestions.asData?.value.isNotEmpty ?? false;
   }
 
   Future<void> _openKnowledgePicker({String? initialBaseId}) async {
@@ -2180,6 +2411,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         filteredModels: _filterModels,
         selectionIndex: _promptSelectionIndex,
         onModelSelected: _applyModel,
+      );
+    }
+    if (_currentPromptCommand.startsWith('\$')) {
+      return SkillSuggestionOverlay(
+        skills: _skillSuggestions,
+        selectionIndex: _promptSelectionIndex,
+        onSkillSelected: _applySkill,
       );
     }
     return PromptSuggestionOverlay(
@@ -2447,6 +2685,14 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     final fileInputAvailable =
         model != null &&
         ref.read(fileUploadCapableModelsProvider).contains(model.id);
+    final mcpContentAvailable =
+        directMode &&
+        ref
+            .read(directMcpServersProvider)
+            .maybeWhen(
+              data: (servers) => servers.any((server) => server.enabled),
+              orElse: () => false,
+            );
     return ComposerOverflowAttachmentAvailability(
       file: fileInputAvailable && widget.onFileAttachment != null,
       serverFile:
@@ -2456,6 +2702,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       photo: imageInputAvailable && widget.onImageAttachment != null,
       camera: imageInputAvailable && widget.onCameraCapture != null,
       web: !directMode && widget.onWebAttachment != null,
+      mcpContent: mcpContentAvailable,
     );
   }
 
@@ -2498,12 +2745,23 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
 
   List<IosKeyboardAttachmentActionConfig>
   _currentNativeKeyboardAttachmentActions({required AppLocalizations l10n}) {
-    final availableTools = ref
-        .read(toolsListProvider)
-        .maybeWhen<List<Tool>>(
-          data: (tools) => tools,
-          orElse: () => const <Tool>[],
+    final selectedModel = ref.read(selectedModelProvider);
+    final directMode =
+        selectedModel != null && hasReservedDirectIdentity(selectedModel);
+    final directToolsAvailable =
+        directMode &&
+        directBindingSupportsLocalMcp(
+          ref.read(directModelRegistryProvider).resolve(selectedModel),
         );
+    final tools = directMode
+        ? (directToolsAvailable
+              ? ref.read(directMcpToolsProvider)
+              : const AsyncData<List<Tool>>([]))
+        : ref.read(toolsListProvider);
+    final availableTools = tools.maybeWhen<List<Tool>>(
+      data: (tools) => tools,
+      orElse: () => const <Tool>[],
+    );
 
     return _nativeKeyboardAttachmentActions(
       l10n: l10n,
@@ -2821,11 +3079,30 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     final sendOnEnter = ref.watch(
       appSettingsProvider.select((s) => s.sendOnEnter),
     );
-    final toolsAsync = ref.watch(toolsListProvider);
-    final List<Tool> availableTools = toolsAsync.maybeWhen<List<Tool>>(
-      data: (t) => t,
-      orElse: () => const <Tool>[],
-    );
+    final selectedComposerModel = ref.watch(selectedModelProvider);
+    final isDirectComposer =
+        selectedComposerModel != null &&
+        hasReservedDirectIdentity(selectedComposerModel);
+    final directToolsAvailable =
+        isDirectComposer &&
+        directBindingSupportsLocalMcp(
+          ref.watch(directModelRegistryProvider).resolve(selectedComposerModel),
+        );
+    final toolsAsync = isDirectComposer
+        ? const AsyncData<List<Tool>>([])
+        : ref.watch(toolsListProvider);
+    final directMcpToolsAsync = directToolsAvailable
+        ? ref.watch(directMcpToolsProvider)
+        : const AsyncData<List<Tool>>([]);
+    if (isDirectComposer) {
+      ref.listen<AsyncValue<List<Tool>>>(directMcpToolsProvider, (
+        previous,
+        next,
+      ) {
+        _scheduleNativeKeyboardAttachmentSync();
+      });
+      ref.watch(directMcpServersProvider);
+    }
     final bool showWebPill = selectedQuickPills.contains('web');
     final bool showImagePillPref = selectedQuickPills.contains('image');
     final voiceAvailableAsync = ref.watch(voiceInputAvailableProvider);
@@ -2866,13 +3143,15 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     // Watching the capabilities value makes a loading -> data transition
     // rebuild the composer. Attachment access still fails closed below.
     ref.watch(hermesCapabilitiesProvider);
-    final selectedComposerModel = ref.watch(selectedModelProvider);
     final visionCapableModelIds = ref.watch(visionCapableModelsProvider);
     ref.watch(fileUploadCapableModelsProvider);
     final attachmentAvailability = _overflowAttachmentAvailability;
-    final bool isDirectComposer =
-        selectedComposerModel != null &&
-        hasReservedDirectIdentity(selectedComposerModel);
+    final List<Tool> availableTools =
+        (isDirectComposer ? directMcpToolsAsync : toolsAsync)
+            .maybeWhen<List<Tool>>(
+              data: (tools) => tools,
+              orElse: () => const <Tool>[],
+            );
     final directSupportsImages =
         !isDirectComposer ||
         (visionCapableModelIds.contains(selectedComposerModel.id) &&
@@ -2883,8 +3162,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       directSupportsImages: directSupportsImages,
       directHasOverflowActions:
           attachmentAvailability.file ||
+          attachmentAvailability.mcpContent ||
           webSearchAvailable ||
-          imageGenAvailable,
+          imageGenAvailable ||
+          (isDirectComposer && availableTools.isNotEmpty),
       hermesHasLocalAttachmentActions:
           attachmentAvailability.file ||
           attachmentAvailability.photo ||
@@ -2969,8 +3250,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
             ? CupertinoIcons.photo
             : Icons.image;
         void handleTap() {
-          final notifier = ref.read(imageGenerationEnabledProvider.notifier);
-          notifier.set(!imageGenEnabled);
+          setComposerOverflowSelection(
+            ref,
+            actionId: ComposerOverflowActionIds.imageGeneration,
+            selected: !imageGenEnabled,
+          );
         }
 
         quickPills.add(
@@ -3376,7 +3660,15 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: [?compactPromptOverlay, shell],
+        children: [
+          if (widget.attachedOverlay != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.xs),
+              child: widget.attachedOverlay!,
+            ),
+          ?compactPromptOverlay,
+          shell,
+        ],
       ),
     );
     return _wrapWithComposerLineMeasurement(
@@ -3440,6 +3732,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           : null,
       onWebAttachment: attachmentAvailability.web
           ? widget.onWebAttachment
+          : null,
+      onMcpContent: attachmentAvailability.mcpContent
+          ? _openDirectMcpContent
           : null,
     );
 
@@ -3572,7 +3867,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           actions: <Type, Action<Intent>>{
             SendMessageIntent: CallbackAction<SendMessageIntent>(
               onInvoke: (intent) {
-                if (_shouldShowPromptOverlay) {
+                if (_canConfirmPromptSelection) {
                   _confirmPromptSelection();
                   return null;
                 }

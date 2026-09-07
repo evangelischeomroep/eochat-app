@@ -89,6 +89,9 @@ final class DirectModelBinding {
   );
 }
 
+bool directBindingSupportsLocalMcp(DirectModelBinding? binding) =>
+    binding != null;
+
 final Expando<DirectModelBinding> _trustedBindings =
     Expando<DirectModelBinding>('locally-minted-direct-model');
 
@@ -254,6 +257,17 @@ final class DirectModelRegistry {
       final displayName = prefix == null || prefix.isEmpty
           ? remote.name
           : '$prefix.${remote.name}';
+      final rawSupportedParameters =
+          remote.capabilities['supported_parameters'];
+      final normalizedSupportedParameters = rawSupportedParameters is Iterable
+          ? rawSupportedParameters
+                .map((value) => value.toString().trim())
+                .where((value) => value.isNotEmpty)
+                .toList(growable: false)
+          : const <String>[];
+      final supportedParameters = normalizedSupportedParameters.isEmpty
+          ? null
+          : normalizedSupportedParameters;
       final candidateBinding = DirectModelBinding(
         profileId: profile.id,
         adapterKey: profile.adapterKey,
@@ -276,6 +290,7 @@ final class DirectModelRegistry {
         description: remote.description,
         isMultimodal: remote.isMultimodal,
         supportsStreaming: true,
+        supportedParameters: supportedParameters,
         capabilities: <String, dynamic>{
           ...remote.capabilities,
           'openrouter': profile.isOpenRouter,

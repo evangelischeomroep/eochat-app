@@ -49,6 +49,7 @@ import '../../features/hermes/models/hermes_config.dart';
 import '../../features/hermes/providers/hermes_providers.dart';
 import '../../features/hermes/services/hermes_session_provenance.dart';
 import '../../features/direct_connections/direct_connections.dart';
+import '../../features/direct_connections/providers/direct_mcp_providers.dart';
 import 'backend_mode_providers.dart';
 import '../models/socket_transport_availability.dart';
 import 'storage_providers.dart';
@@ -89,6 +90,9 @@ void _resetProvidersAfterFullAppDataClear(Ref ref) {
   ref.invalidate(preferredBackendProvider);
 
   ref.invalidate(directConnectionProfilesProvider);
+  ref.invalidate(directMcpServerStoreProvider);
+  ref.invalidate(directMcpServersProvider);
+  ref.invalidate(directMcpOAuthCoordinatorProvider);
   ref.invalidate(directHistoryPolicyProvider);
   ref.invalidate(directDeviceTrustKeyProvider);
   ref.invalidate(directRunRegistryProvider);
@@ -143,6 +147,7 @@ final class SignOutCoordinator {
 
   Future<void> _signOut({required bool keepServerDetails}) async {
     final directProfiles = _ref.read(directConnectionProfilesProvider.notifier);
+    final directMcpServers = _ref.read(directMcpServersProvider.notifier);
     final hermesConfig = _ref.read(hermesConfigProvider.notifier);
     final directRuns = _ref.read(directRunRegistryProvider);
     FullAppDataClearOutcome? outcome;
@@ -161,6 +166,7 @@ final class SignOutCoordinator {
           PreferencesStore.blockWritesForAppDataClear(),
           SecureCredentialStorage.blockDirectIdentityWritesForAppDataClear(),
           directProfiles.blockMutationsForAppDataClear(),
+          directMcpServers.blockMutationsForAppDataClear(),
           hermesConfig.blockMutationsForAppDataClear(),
         ]);
         _ref.invalidate(directProviderAdapterRegistryProvider);
@@ -174,6 +180,7 @@ final class SignOutCoordinator {
       } catch (_) {
         resumeGlobalAdmission();
         directProfiles.resumeMutationsAfterAppDataClearAbort();
+        directMcpServers.resumeMutationsAfterAppDataClearAbort();
         hermesConfig.resumeMutationsAfterAppDataClearAbort();
         rethrow;
       }
@@ -189,6 +196,7 @@ final class SignOutCoordinator {
       switch (outcome) {
         case FullAppDataClearOutcome.cleared ||
             FullAppDataClearOutcome.localDataClearedSessionCleanupIncomplete:
+          directRuns.commitAppDataClear();
           // The auth transaction has committed and did not yield to a newer
           // session. Only now is it safe to destructively remove the
           // app-global direct-local database; beforeClear is a reversible
@@ -197,15 +205,19 @@ final class SignOutCoordinator {
           directLocalPurgeCompleted = true;
           _resetProvidersAfterFullAppDataClear(_ref);
         case FullAppDataClearOutcome.incomplete:
+          directRuns.commitAppDataClear();
           await Future.wait<void>([
             directProfiles.blockMutationsForAppDataClear(),
+            directMcpServers.blockMutationsForAppDataClear(),
             hermesConfig.blockMutationsForAppDataClear(),
           ]);
           directProfiles.revokeRuntimeAfterIncompleteAppDataClear();
+          directMcpServers.revokeRuntimeAfterIncompleteAppDataClear();
           hermesConfig.revokeRuntimeAfterIncompleteAppDataClear();
         case FullAppDataClearOutcome.ownershipYielded:
           resumeGlobalAdmission();
           directProfiles.resumeMutationsAfterAppDataClearAbort();
+          directMcpServers.resumeMutationsAfterAppDataClearAbort();
           hermesConfig.resumeMutationsAfterAppDataClearAbort();
       }
     } finally {
@@ -222,6 +234,7 @@ final class SignOutCoordinator {
       if (outcome == null) {
         resumeGlobalAdmission();
         directProfiles.resumeMutationsAfterAppDataClearAbort();
+        directMcpServers.resumeMutationsAfterAppDataClearAbort();
         hermesConfig.resumeMutationsAfterAppDataClearAbort();
       }
     }
@@ -2690,7 +2703,13 @@ final modelToolsAutoSelectionProvider = Provider<void>((ref) {
 
   Future<void> applyTools(Model? model) async {
     List<String> preserveDirectServerSelections(List<String> ids) {
-      return ids.where((id) => id.startsWith('direct_server:')).toList();
+      return ids
+          .where(
+            (id) =>
+                id.startsWith('direct_server:') ||
+                id.startsWith(kDirectMcpToolIdPrefix),
+          )
+          .toList();
     }
 
     // Skip if not authenticated - prevents API calls after logout
@@ -3469,6 +3488,17 @@ class Conversations extends _$Conversations {
             data: {'ms': coldStart.elapsedMilliseconds, 'rows': entries.length},
           );
           completer.complete(conversations);
+          return;
+        }
+        // Drift invalidates table watchers on ANY chats write, including
+        // sync-cycle upserts that change nothing — every background pull
+        // re-emitted an identical projection here as fresh objects, and the
+        // drawer rebuilt every mounted tile for it. Conversation is freezed
+        // (structural ==), so drop emissions that match the PUBLISHED state
+        // exactly; comparing against the published value (not the previous
+        // raw projection) keeps emissions that must correct a diverged
+        // optimistic in-memory update flowing through.
+        if (listEquals(state.asData?.value, conversations)) {
           return;
         }
         if (ref.mounted) {
@@ -6003,10 +6033,17 @@ class AccountProfile extends _$AccountProfile {
     if (api == null) {
       throw StateError('No API service available');
     }
+    final authenticationEpoch = api.authenticationEpoch;
     await api.updateAccountPassword(
       password: password,
       newPassword: newPassword,
     );
+    if (!ref.mounted ||
+        !identical(api, ref.read(apiServiceProvider)) ||
+        api.authenticationEpoch != authenticationEpoch) {
+      return;
+    }
+    await ref.read(authStateManagerProvider.notifier).logout();
   }
 
   Future<AccountMetadata?> _loadProfile() async {
@@ -6499,6 +6536,14 @@ class Folders extends _$Folders {
         final folders = _sort([for (final row in rows) folderFromRow(row)]);
         if (!completer.isCompleted) {
           completer.complete(folders);
+          return;
+        }
+        // Every sync cycle rewrites the folders table inside a transaction
+        // (replaceServerFolders), which invalidates this watcher even when
+        // nothing changed. Folder is freezed (structural ==) — drop
+        // value-identical emissions so the drawer's folder sections don't
+        // rebuild once per background pull.
+        if (listEquals(state.asData?.value, folders)) {
           return;
         }
         if (ref.mounted) {
