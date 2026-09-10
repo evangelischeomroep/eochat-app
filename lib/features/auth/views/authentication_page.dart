@@ -551,23 +551,6 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
       _ => const SizedBox.shrink(),
     };
 
-    if (_forceSsoOnly) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (_hasSsoEnabled) ...[
-            _buildSsoButtons(l10n),
-          ] else ...[
-            _buildSsoPrompt(),
-          ],
-          if (_loginError != null) ...[
-            const SizedBox(height: Spacing.md),
-            _buildErrorMessage(_loginError!),
-          ],
-        ],
-      );
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -580,7 +563,7 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
     );
   }
 
-Widget _buildDividerWithText(String text) {
+  Widget _buildDividerWithText(String text) {
     return Row(
       children: [
         Expanded(
@@ -603,55 +586,6 @@ Widget _buildDividerWithText(String text) {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildSsoButtons(AppLocalizations l10n) {
-    var providers = _oauthProviders.enabledProviders;
-    if (_forceSsoOnly &&
-        providers.contains(ForkOverrides.preferredSsoProvider)) {
-      providers = [ForkOverrides.preferredSsoProvider];
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (int i = 0; i < providers.length; i++) ...[
-          if (i > 0) const SizedBox(height: Spacing.sm),
-          _buildOAuthButton(providers[i], l10n),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildOAuthButton(String provider, AppLocalizations l10n) {
-    final displayName = _oauthProviders.getProviderDisplayName(provider);
-
-    IconData icon;
-
-    switch (provider) {
-      case 'google':
-        icon = Icons.g_mobiledata;
-      case 'microsoft':
-        icon = Icons.window;
-      case 'github':
-        icon = Icons.code;
-      case 'oidc':
-        icon = context.usesCupertinoChrome
-            ? CupertinoIcons.lock_shield
-            : Icons.security;
-      case 'feishu':
-        icon = Icons.chat_bubble_outline;
-      default:
-        icon = Icons.login;
-    }
-
-    return ConduitButton(
-      text: l10n.continueWithProvider(displayName),
-      icon: icon,
-      onPressed: _navigateToSso,
-      isSecondary: true,
-      isFullWidth: true,
     );
   }
 
