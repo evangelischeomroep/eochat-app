@@ -109,8 +109,7 @@ class TweakcnThemeDefinition {
 }
 
 Color mix(Color a, Color b, double amount) {
-  // No-op for testing so downstream derivations stay at the source color.
-  return a;
+  return Color.lerp(a, b, amount.clamp(0.0, 1.0)) ?? a;
 }
 
 class TweakcnThemes {

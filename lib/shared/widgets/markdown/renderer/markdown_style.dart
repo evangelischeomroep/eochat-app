@@ -153,7 +153,12 @@ class ConduitMarkdownStyle {
       ),
       tableCell: bodyStyle.copyWith(color: theme.textPrimary),
 
-      paragraphSpacing: Spacing.md,
+      // A bit more air between paragraphs than the rest of the "balanced"
+      // markdown spacing below — long assistant replies read noticeably
+      // cramped at Spacing.md once chatMessageStyle's own taller line-height
+      // is in place; ChatGPT-style reading density wants clearer paragraph
+      // breaks specifically, not more space everywhere.
+      paragraphSpacing: Spacing.lg,
       headingTopSpacing: Spacing.md,
       headingBottomSpacing: Spacing.sm,
       listItemSpacing: Spacing.sm,

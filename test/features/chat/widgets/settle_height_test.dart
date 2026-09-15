@@ -129,11 +129,13 @@ void main() {
     );
   }
 
-  // The timeline swaps the typing-indicator footer (16 + 28 + 4) for the
-  // in-card action row (16 + 32) at settle. These cases must be
-  // extent-neutral so the bottom-anchored viewport does not jump; growth
-  // from settle-only UI (sources row, text-scaled chips) is animated by the
-  // AnimatedSize around the footer slot instead.
+  // The timeline swaps the typing-indicator footer (paragraphSpacing + 28 +
+  // Spacing.xs) for the in-card action row (paragraphSpacing + 32) at
+  // settle — paragraphSpacing is shared by both sides and cancels out, so
+  // only the 28-vs-32 delta (plus Spacing.xs) has to balance. These cases
+  // must be extent-neutral so the bottom-anchored viewport does not jump;
+  // growth from settle-only UI (sources row, text-scaled chips) is animated
+  // by the AnimatedSize around the footer slot instead.
   testWidgets('the streaming-to-settled swap is extent-neutral', (
     tester,
   ) async {

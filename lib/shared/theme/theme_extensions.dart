@@ -47,7 +47,14 @@ class ConduitThemeExtension extends ThemeExtension<ConduitThemeExtension> {
       isDark ? tokens.neutralTone40 : tokens.neutralTone20;
   Color get chatBubbleAssistant =>
       isDark ? tokens.neutralTone20 : tokens.neutralTone00;
-  Color get chatBubbleUserText => tokens.neutralOnSurface;
+  // Light mode uses tonal (same-hue) text on the tinted user bubble instead
+  // of flat neutral ink — a same-family bg+text pairing reads calmer/more
+  // modern than plain-black-on-tint. Dark mode keeps the neutral, high-
+  // contrast text: the dark bubble is already close in lightness to
+  // `variant.primary`, so tinting the text there would hurt contrast instead
+  // of helping it (see the light/dark eochat_palette.dart values).
+  Color get chatBubbleUserText =>
+      isDark ? tokens.neutralOnSurface : variant.primary;
   Color get chatBubbleAssistantText => tokens.neutralOnSurface;
   Color get chatBubbleUserBorder =>
       isDark ? tokens.neutralTone40 : tokens.neutralTone20;
@@ -1199,7 +1206,13 @@ class AppTypography {
 
   static TextStyle get codeStyle => _monospaceFont(_scale.codeStyle);
 
-  static TextStyle get chatMessageStyle => bodyLargeStyle;
+  // A dedicated copy (not a plain alias) so chat message text can carry
+  // more generous leading than the shared bodyLargeStyle used for buttons,
+  // dialogs, and settings rows. bodyLargeStyle's height (1.29, tuned for
+  // short UI labels) reads cramped over multi-line prose — most chat UIs,
+  // ChatGPT included, give message text closer to 1.4-1.5x leading. Only
+  // the line-height changes; font size stays identical so nothing rewraps.
+  static TextStyle get chatMessageStyle => bodyLargeStyle.copyWith(height: 1.45);
 
   static TextStyle get chatCodeStyle => codeStyle;
 
@@ -1524,6 +1537,16 @@ class AppTypography {
 }
 
 /// Consistent icon sizes - Enhanced for production with better hierarchy
+/// Canonical icon-size scale: xs=12, sm=16, md=20, lg=24, xl=32, xxl=48.
+///
+/// Every other name below is an alias onto this same scale, kept only
+/// because call sites already reference them by these names. They are NOT
+/// independent sizes — prefer the six canonical names (`xs`..`xxl`) for any
+/// new code so two icons that are meant to match can't silently drift apart
+/// by picking two differently-named aliases of the same or a slightly
+/// different value. There is no size between these six steps (e.g. no 18,
+/// 19, 22, 28); if an icon looks like it needs one, it should snap to the
+/// nearest canonical step instead of introducing a bespoke literal.
 class IconSize {
   static const double xs = 12.0;
   static const double sm = 16.0;
@@ -1532,37 +1555,39 @@ class IconSize {
   static const double xl = 32.0;
   static const double xxl = 48.0;
 
-  // Enhanced icon sizes for specific components with better hierarchy
-  static const double button = 20.0;
-  static const double card = 24.0;
-  static const double input = 20.0;
-  static const double modal = 24.0;
-  static const double message = 18.0;
-  static const double navigation = 24.0;
-  static const double avatar = 40.0;
-  static const double badge = 16.0;
+  // The one genuinely distinct in-between size (message/chat-bubble chips).
   static const double chip = 18.0;
-  static const double tooltip = 16.0;
 
-  // Icon sizes for different contexts with improved hierarchy
-  static const double micro = 12.0;
-  static const double small = 16.0;
-  static const double medium = 20.0;
-  static const double large = 24.0;
-  static const double extraLarge = 32.0;
-  static const double huge = 48.0;
+  // Enhanced icon sizes for specific components — aliases of the scale above.
+  static const double button = md;
+  static const double card = lg;
+  static const double input = md;
+  static const double modal = lg;
+  static const double message = chip;
+  static const double navigation = lg;
+  static const double avatar = 40.0;
+  static const double badge = sm;
+  static const double tooltip = sm;
 
-  // Specific component icon sizes with better consistency
-  static const double chatBubble = 18.0;
-  static const double actionButton = 20.0;
-  static const double floatingButton = 24.0;
-  static const double bottomSheet = 24.0;
-  static const double dialog = 24.0;
-  static const double snackbar = 20.0;
-  static const double tabBar = 20.0;
-  static const double appBar = 24.0;
-  static const double listItem = 20.0;
-  static const double formField = 20.0;
+  // Icon sizes for different contexts — aliases of the scale above.
+  static const double micro = xs;
+  static const double small = sm;
+  static const double medium = md;
+  static const double large = lg;
+  static const double extraLarge = xl;
+  static const double huge = xxl;
+
+  // Specific component icon sizes — aliases of the scale above.
+  static const double chatBubble = chip;
+  static const double actionButton = md;
+  static const double floatingButton = lg;
+  static const double bottomSheet = lg;
+  static const double dialog = lg;
+  static const double snackbar = md;
+  static const double tabBar = md;
+  static const double appBar = lg;
+  static const double listItem = md;
+  static const double formField = md;
 }
 
 /// Alpha values for opacity/transparency - Enhanced for production with better hierarchy

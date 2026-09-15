@@ -46,8 +46,11 @@ class AdaptiveSegmentedSelector<T extends Object> extends StatelessWidget {
     }
 
     if (isCupertino) {
+      final theme = context.conduitTheme;
       return CupertinoSlidingSegmentedControl<T>(
         groupValue: selectedValue,
+        backgroundColor: theme.surfaceContainer,
+        thumbColor: theme.cardBackground,
         disabledChildren: {
           for (final option in options)
             if (!option.enabled) option.value,
@@ -131,8 +134,11 @@ class ThemeModeSegmentedControl extends StatelessWidget {
     }
 
     if (isCupertino) {
+      final theme = context.conduitTheme;
       return CupertinoSlidingSegmentedControl<ThemeMode>(
         groupValue: value,
+        backgroundColor: theme.surfaceContainer,
+        thumbColor: theme.cardBackground,
         onValueChanged: (next) {
           if (next != null) {
             commitSelection(next);

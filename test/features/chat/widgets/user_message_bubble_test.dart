@@ -148,7 +148,13 @@ void main() {
     );
     final decoration = bubble.decoration! as BoxDecoration;
 
-    expect(bubble.padding, const EdgeInsets.all(Spacing.sm + Spacing.xs));
+    expect(
+      bubble.padding,
+      const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm + Spacing.xs,
+      ),
+    );
     expect(
       decoration.borderRadius,
       const BorderRadius.only(

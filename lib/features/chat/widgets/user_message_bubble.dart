@@ -822,7 +822,15 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                       actions: actions,
                       child: Container(
                         key: const Key('user-message-bubble-surface'),
-                        padding: const EdgeInsets.all(Spacing.sm + Spacing.xs),
+                        // Wider than tall — a plain EdgeInsets.all(12) here
+                        // read noticeably tighter/squarer than reference chat
+                        // UIs' pill-shaped user bubbles; only the horizontal
+                        // inset grows; height (and the bubble's fit against
+                        // short messages) is unchanged.
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Spacing.md,
+                          vertical: Spacing.sm + Spacing.xs,
+                        ),
                         decoration: BoxDecoration(
                           color: theme.chatBubbleUser,
                           borderRadius: bubbleBorderRadius,

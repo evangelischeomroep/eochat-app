@@ -4186,7 +4186,12 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       context,
       baseExtent: size ?? _composerControlSize,
     );
-    final iconSize = conduitScaledIconExtent(context, IconSize.large);
+    // Matches the sibling composer buttons (create-note, dictation-stop),
+    // which share this same _composerControlSize container but use
+    // IconSize.medium — this one was rendering its icon (including the same
+    // stop glyph _buildDictationStopButton shows) 20% larger than its
+    // equally-sized neighbours.
+    final iconSize = conduitScaledIconExtent(context, IconSize.medium);
     final IconData iconData = active
         ? (Platform.isIOS ? CupertinoIcons.stop_fill : Icons.stop_rounded)
         : (Platform.isIOS ? CupertinoIcons.mic : Icons.mic);

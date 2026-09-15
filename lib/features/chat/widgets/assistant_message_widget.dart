@@ -1098,7 +1098,12 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
     final content = Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16, right: Spacing.xs),
+      // Matches UserMessageBubble's own bottom margin (Spacing.lg) so the gap
+      // is the same size on both sides of every turn boundary — this used to
+      // be a smaller, hardcoded 16, which made the rhythm uneven (tighter
+      // after an assistant reply than after a user message). ChatGPT-style
+      // vertical rhythm keeps this consistent regardless of who's speaking.
+      margin: const EdgeInsets.only(bottom: Spacing.lg, right: Spacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -167,7 +167,7 @@
   "@releaseNotesLearnMore": {
     "description": "Prompt shown beneath the release announcement banner title."
   },
-  "releaseNotesReviewButton": "Oceń Conduit",
+  "releaseNotesReviewButton": "Oceń EOchat",
   "@releaseNotesReviewButton": {
     "description": "Button opening the app store review/listing page."
   },

@@ -19,10 +19,14 @@ BoxDecoration conduitConversationTileDecoration(
   required bool selected,
   bool pressed = false,
 }) {
+  // Selected tiles use the same overlayMedium token as the rest of the app's
+  // "selected surface" treatment (see navigationSelectedBackground) so the
+  // active conversation reads clearly against the sidebar background instead
+  // of the barely-perceptible 10%-alpha tint this used to apply.
   final background = selected
-      ? Color.alphaBlend(
-          theme.buttonPrimary.withValues(alpha: 0.1),
-          theme.surfaceBackground,
+      ? theme.tokens.overlayOnSurface(
+          theme.tokens.overlayMedium,
+          surface: theme.surfaceBackground,
         )
       : pressed
       ? theme.surfaceContainer

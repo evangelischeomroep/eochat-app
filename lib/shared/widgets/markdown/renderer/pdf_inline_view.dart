@@ -1079,7 +1079,7 @@ class _PdfInlineViewState extends ConsumerState<PdfInlineView> {
           if (_canShare)
             IconButton(
               onPressed: () => unawaited(_sharePdf(_filePath!, title)),
-              icon: Icon(Icons.share, size: 19, color: scheme.primary),
+              icon: Icon(Icons.share, size: 18, color: scheme.primary),
               tooltip: AppLocalizations.of(context)!.share,
               visualDensity: VisualDensity.compact,
               padding: EdgeInsets.zero,

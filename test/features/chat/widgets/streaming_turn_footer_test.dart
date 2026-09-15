@@ -2,8 +2,9 @@ import 'package:checks/checks.dart';
 import 'package:conduit/core/models/chat_message.dart';
 import 'package:conduit/core/services/settings_service.dart';
 import 'package:conduit/features/chat/providers/queued_completion_provider.dart';
-import 'package:conduit/features/chat/widgets/conduit_streaming_orbit.dart';
 import 'package:conduit/features/chat/widgets/streaming_turn_footer.dart';
+import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
 import 'package:conduit/shared/theme/tweakcn_themes.dart';
 import 'package:flutter/foundation.dart';
@@ -55,6 +56,8 @@ Widget _buildHarness({
     container: container,
     child: MaterialApp(
       theme: AppTheme.light(TweakcnThemes.t3Chat),
+      localizationsDelegates: conduitLocalizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: MediaQuery(
         data: const MediaQueryData(disableAnimations: true),
         child: Scaffold(body: StreamingTurnFooter(message: message)),
@@ -131,6 +134,8 @@ void main() {
         container: container,
         child: MaterialApp(
           theme: AppTheme.light(TweakcnThemes.t3Chat),
+          localizationsDelegates: conduitLocalizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
             data: const MediaQueryData(disableAnimations: true),
             child: Scaffold(
@@ -149,7 +154,7 @@ void main() {
     await tester.pump();
 
     final indicatorLeft = tester
-        .getTopLeft(find.byType(ConduitStreamingOrbit))
+        .getTopLeft(find.byType(StreamingThinkingIndicator))
         .dx;
     expect(indicatorLeft, lessThan(48));
   });
@@ -281,7 +286,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.byType(ConduitStreamingOrbit), findsNothing);
+    expect(find.byType(StreamingThinkingIndicator), findsNothing);
     expect(find.byKey(const ValueKey('typing')), findsNothing);
   });
 
@@ -363,6 +368,8 @@ void main() {
             container: container,
             child: MaterialApp(
               theme: AppTheme.light(TweakcnThemes.t3Chat),
+              localizationsDelegates: conduitLocalizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
               home: MediaQuery(
                 data: const MediaQueryData(disableAnimations: true),
                 child: Scaffold(

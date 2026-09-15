@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 
 import 'tweakcn_themes.dart';
@@ -443,7 +445,26 @@ class AppColorTokens extends ThemeExtension<AppColorTokens> {
     required Color foreground,
     double minContrast = 4.5,
   }) {
-    // No-op for testing; bypass contrast adjustments.
-    return foreground;
+    if (_contrastRatio(surface, foreground) >= minContrast) {
+      return foreground;
+    }
+    final bool surfaceIsDark = surface.computeLuminance() < 0.5;
+    final Color target = surfaceIsDark ? Colors.white : Colors.black;
+    Color candidate = foreground;
+    for (var i = 0; i < 6; i++) {
+      candidate = Color.lerp(candidate, target, 0.3)!;
+      if (_contrastRatio(surface, candidate) >= minContrast) {
+        return candidate;
+      }
+    }
+    return target;
+  }
+
+  static double _contrastRatio(Color a, Color b) {
+    final double luminanceA = a.computeLuminance();
+    final double luminanceB = b.computeLuminance();
+    final double lighter = math.max(luminanceA, luminanceB);
+    final double darker = math.min(luminanceA, luminanceB);
+    return (lighter + 0.05) / (darker + 0.05);
   }
 }

@@ -467,11 +467,11 @@ class InlineRenderer {
       ];
     }
 
-    final linkStyle = currentStyle.copyWith(
-      color: style.linkColor,
-      decoration: TextDecoration.underline,
-      decorationColor: style.linkColor,
-    );
+    // Color alone is the link affordance, no underline — the calmer,
+    // underline-free treatment most current chat UIs (ChatGPT included) use
+    // for inline citations/links, instead of the heavier classic-hyperlink
+    // look.
+    final linkStyle = currentStyle.copyWith(color: style.linkColor);
 
     TapGestureRecognizer? recognizer;
     if (onLinkTap != null) {

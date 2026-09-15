@@ -21,7 +21,12 @@ class EOchatBrand {
 final TweakcnThemeVariant _eochatLight = TweakcnThemeVariant(
   background: const Color(0xFFFFFFFF),
   foreground: const Color(0xFF1F1235),
-  card: EOchatBrand.peach,
+  // EOchatBrand.peach (0xFFFEF8F8) used to sit here, but it's only ~1% off
+  // pure white — cards, sheets, and the model picker all rendered as an
+  // invisible surface on top of the page background. Reuse the already
+  // brand-approved `secondary` tone instead, which gives cards a visible
+  // warm-pink separation from the white page.
+  card: const Color(0xFFF5ECEC),
   cardForeground: const Color(0xFF1F1235),
   popover: const Color(0xFFFFFFFF),
   popoverForeground: const Color(0xFF1F1235),
@@ -58,7 +63,12 @@ final TweakcnThemeVariant _eochatLight = TweakcnThemeVariant(
 final TweakcnThemeVariant _eochatDark = TweakcnThemeVariant(
   background: const Color(0xFF140A24),
   foreground: const Color(0xFFF5EEFF),
-  card: const Color(0xFF1D1033),
+  // 0xFF1D1033 used to sit here, ~1.07:1 contrast against `background`
+  // (140A24) — essentially the same near-black, so cards and the model
+  // picker read as a "missing" surface in dark mode. This is background
+  // blended 30% toward `foreground`, giving elevated surfaces a clearly
+  // visible step while staying in the same purple family.
+  card: const Color(0xFF584E66),
   cardForeground: const Color(0xFFF5EEFF),
   popover: const Color(0xFF25113F),
   popoverForeground: const Color(0xFFF5EEFF),

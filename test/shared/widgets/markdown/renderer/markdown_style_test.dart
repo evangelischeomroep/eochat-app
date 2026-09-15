@@ -24,7 +24,7 @@ void main() {
         ),
       );
 
-      check(style.paragraphSpacing).equals(Spacing.md);
+      check(style.paragraphSpacing).equals(Spacing.lg);
       check(style.headingTopSpacing).equals(Spacing.md);
       check(style.headingBottomSpacing).equals(Spacing.sm);
       check(style.listItemSpacing).equals(Spacing.sm);
@@ -89,11 +89,13 @@ void main() {
       expect(android.h1.fontSize, 24);
       expect(android.h2.fontSize, 22);
       expect(android.body.fontSize, 17);
-      expect(android.body.height, 1.29);
+      // chatMessageStyle overrides bodyLargeStyle's 1.29 with 1.45 — taller
+      // leading for multi-line chat prose (see AppTypography.chatMessageStyle).
+      expect(android.body.height, 1.45);
       expect(ios.h1.fontSize, 24);
       expect(ios.h2.fontSize, 22);
       expect(ios.body.fontSize, 17);
-      expect(ios.body.height, 1.29);
+      expect(ios.body.height, 1.45);
     });
   });
 }

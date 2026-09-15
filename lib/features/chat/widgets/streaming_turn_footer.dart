@@ -4,12 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../core/services/settings_service.dart';
+import '../../../l10n/app_localizations.dart';
 import '../providers/streaming_haptic_memory.dart';
 import '../providers/queued_completion_provider.dart';
 import '../views/chat_turn_render_state.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../../shared/widgets/assistant_detail_header.dart';
 import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
-import 'conduit_streaming_orbit.dart';
 
 class StreamingTurnFooter extends ConsumerStatefulWidget {
   const StreamingTurnFooter({
@@ -121,11 +122,7 @@ class _StreamingTurnFooterState extends ConsumerState<StreamingTurnFooter> {
                       bottom: Spacing.xs,
                     ),
                     child: RepaintBoundary(
-                      child: ConduitStreamingOrbit(
-                        size: 28,
-                        color: context.conduitTheme.textSecondary.withValues(
-                          alpha: 0.75,
-                        ),
+                      child: StreamingThinkingIndicator(
                         animate: !_disableAnimations,
                       ),
                     ),
@@ -141,4 +138,47 @@ class _StreamingTurnFooterState extends ConsumerState<StreamingTurnFooter> {
 @visibleForTesting
 bool shouldShowStreamingTurnFooter({required ChatMessage message}) {
   return chatTurnPhaseShowsRunningFooter(chatTurnPhaseForMessage(message));
+}
+
+/// The "still working" cue shown while a turn is running with nothing more
+/// specific to report (no tool/status row active yet).
+///
+/// Replaces the old dot-orbit spinner with the same shimmering-text
+/// treatment [AssistantDetailHeader] already uses for reasoning/tool-call
+/// headers elsewhere in this screen (see details_block_widget.dart), so the
+/// "model is working" cue looks like one consistent idiom instead of two
+/// different loading animations depending on whether a status row happens to
+/// be present.
+class StreamingThinkingIndicator extends StatelessWidget {
+  const StreamingThinkingIndicator({super.key, this.animate = true});
+
+  final bool animate;
+
+  // Pins the row to the old orbit's exact 28px height. settle_height_test.dart
+  // asserts the streaming footer (paragraphSpacing + this + Spacing.xs) is
+  // pixel-equal to the settled in-card action row (paragraphSpacing +
+  // ChatActionButton's 32px), i.e. this must stay exactly 28 regardless of
+  // whatever the shimmer text's own intrinsic line height happens to be.
+  static const double _height = 28;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _height,
+      // ClipRect is a safety net, not the normal case: at very large Dynamic
+      // Type accessibility sizes the shimmer text's intrinsic line height can
+      // exceed 28px. Align alone wouldn't clip that overflow, which would let
+      // the text bleed into the row above/below instead of just being capped.
+      child: ClipRect(
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: AssistantDetailHeader(
+            title: AppLocalizations.of(context)!.thinking,
+            showShimmer: animate,
+            showChevron: false,
+          ),
+        ),
+      ),
+    );
+  }
 }
