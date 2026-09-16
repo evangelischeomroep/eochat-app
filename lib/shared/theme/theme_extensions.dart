@@ -47,14 +47,7 @@ class ConduitThemeExtension extends ThemeExtension<ConduitThemeExtension> {
       isDark ? tokens.neutralTone40 : tokens.neutralTone20;
   Color get chatBubbleAssistant =>
       isDark ? tokens.neutralTone20 : tokens.neutralTone00;
-  // Light mode uses tonal (same-hue) text on the tinted user bubble instead
-  // of flat neutral ink — a same-family bg+text pairing reads calmer/more
-  // modern than plain-black-on-tint. Dark mode keeps the neutral, high-
-  // contrast text: the dark bubble is already close in lightness to
-  // `variant.primary`, so tinting the text there would hurt contrast instead
-  // of helping it (see the light/dark eochat_palette.dart values).
-  Color get chatBubbleUserText =>
-      isDark ? tokens.neutralOnSurface : variant.primary;
+  Color get chatBubbleUserText => tokens.neutralOnSurface;
   Color get chatBubbleAssistantText => tokens.neutralOnSurface;
   Color get chatBubbleUserBorder =>
       isDark ? tokens.neutralTone40 : tokens.neutralTone20;
