@@ -1,11 +1,16 @@
 // This keepAlive notifier reads other providers' `.future`/`.notifier`
 // handles (loadConversationProvider, temporaryChatEnabledProvider, etc.)
 // via ref.read from within async/callback methods rather than ref.watch in
-// build(). riverpod_lint's only_use_keep_alive_inside_keep_alive rule flags
-// this defensively (see analysis_options.yaml, where it's suppressed
-// globally - this plugin-registered rule doesn't respect source-level
-// ignore comments) rather than restructuring pre-existing, unrelated
-// provider architecture.
+// build(). riverpod_lint's only_use_keep_alive_inside_keep_alive rule
+// flags this defensively: loadConversationProvider already manages its
+// own temporary keepAlive internally (ref.keepAlive(), closed via
+// whenComplete once the load finishes - see app_providers.dart), so the
+// static "is this dependency autoDispose" check the lint runs doesn't see
+// that it's actually safe here. Plugin diagnostics need the
+// `pluginName/code` prefix to suppress (bare rule names are silently
+// ignored, and analyzer.errors doesn't recognize plugin codes at all -
+// both confirmed against CI before landing on this).
+// ignore_for_file: riverpod_lint/only_use_keep_alive_inside_keep_alive
 
 import 'dart:async';
 
