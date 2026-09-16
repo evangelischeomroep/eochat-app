@@ -563,32 +563,6 @@ class _AuthenticationPageState extends ConsumerState<AuthenticationPage> {
     );
   }
 
-  Widget _buildDividerWithText(String text) {
-    return Row(
-      children: [
-        Expanded(
-          child: Divider(
-            color: context.conduitTheme.dividerColor.withValues(alpha: 0.5),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-          child: Text(
-            text,
-            style: context.conduitTheme.bodySmall?.copyWith(
-              color: context.conduitTheme.textSecondary,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Divider(
-            color: context.conduitTheme.dividerColor.withValues(alpha: 0.5),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildSsoMethodDescription() => Text(
     _ssoSubtitle(AppLocalizations.of(context)!),
     key: const ValueKey<String>('sso_form'),

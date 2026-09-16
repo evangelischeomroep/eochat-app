@@ -20,6 +20,12 @@ analyzer:
     - linux/**
     - pigeons/**
     - third_party/**
+    # tool/pigeon_codegen is a standalone Dart script with its own
+    # pubspec.yaml/pubspec.lock (declaring the `pigeon` package), run via
+    # `dart run` from within that directory. It is not part of the root
+    # package's dependency graph, so the root analyzer can't resolve
+    # package:pigeon and fails with uri_does_not_exist/undefined_identifier.
+    - tool/pigeon_codegen/**
 
 plugins:
   riverpod_lint: 3.1.8

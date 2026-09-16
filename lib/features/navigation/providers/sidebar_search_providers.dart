@@ -1,3 +1,12 @@
+// The two keepAlive providers below intentionally expose long-lived
+// TextEditingController/FocusNode singletons for the sidebar header search
+// field, disposing them via ref.onDispose. riverpod_lint's
+// unsupported_provider_value rule is tuned for Future/Stream misuse and
+// false-positives on this controller-singleton pattern; suppressed at the
+// file level rather than restructuring pre-existing, unrelated provider
+// architecture.
+// ignore_for_file: unsupported_provider_value
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
