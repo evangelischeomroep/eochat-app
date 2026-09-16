@@ -10,7 +10,6 @@ import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/horizontal_gesture_ownership.dart';
 import '../../../shared/widgets/model_avatar.dart';
 import '../../../shared/widgets/horizontal_overflow_fade.dart';
-import '../../../shared/widgets/platform_ui/platform_ui.dart';
 import '../../../core/models/toggle_filter.dart';
 import '../../../core/models/tool.dart';
 import '../../../core/providers/app_providers.dart';
@@ -88,8 +87,19 @@ class ToggleTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: Spacing.sm),
-            IgnorePointer(
-              child: AdaptiveSwitch(value: selected, onChanged: (_) {}),
+            // Fork: a trailing check instead of a switch — the selected state
+            // is already carried by the tinted leading glyph, and a full
+            // switch per row made the sheet read as a settings form.
+            Icon(
+              selected
+                  ? (Platform.isIOS
+                        ? CupertinoIcons.checkmark_circle_fill
+                        : Icons.check_circle)
+                  : (Platform.isIOS
+                        ? CupertinoIcons.circle
+                        : Icons.circle_outlined),
+              size: IconSize.lg,
+              color: selected ? theme.buttonPrimary : theme.iconSecondary,
             ),
           ],
         ),
@@ -672,19 +682,15 @@ class _ComposerAttachmentKeyboardState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 76,
-                  height: 48,
+                  // Fork: compact filled button instead of a thin-outlined
+                  // 76x48 pill, so the attachment actions read as buttons.
+                  width: 64,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: enabled
-                        ? iconColor.withValues(alpha: 0.10)
+                        ? theme.surfaceContainerHighest
                         : theme.surfaceContainer.withValues(alpha: 0.60),
                     borderRadius: BorderRadius.circular(AppBorderRadius.round),
-                    border: Border.all(
-                      color: enabled
-                          ? iconColor.withValues(alpha: 0.18)
-                          : Colors.transparent,
-                      width: BorderWidth.thin,
-                    ),
                   ),
                   alignment: Alignment.center,
                   child: Icon(

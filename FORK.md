@@ -88,6 +88,15 @@ carried a branding-string swap. Current known inline-touch files:
   `continue`s past inactive pills when
   `ForkOverrides.hideInactiveComposerQuickPills` is set (three one-line
   guards: web, image, filter).
+- `lib/features/chat/widgets/composer_overflow_menu.dart` — `ToggleTile`
+  trails a check icon instead of an `AdaptiveSwitch`; attachment action
+  buttons are 64x44 filled `surfaceContainerHighest` pills without outline.
+- `lib/features/chat/views/chat_page.dart` — scroll-to-bottom native glass
+  button is wrapped in a solid card disc; assistant rows hide the per-message
+  model header when the row's model equals the active model
+  (`ForkOverrides.hideRedundantModelHeader`).
+- `lib/shared/widgets/chrome_gradient_fade.dart` — scrim held stop 0.7 and
+  `kConduitChromeFadeHeight` 24 (upstream 0.92 / 30).
 
 If a new fork behavior needs another upstream file, document why in the PR.
 

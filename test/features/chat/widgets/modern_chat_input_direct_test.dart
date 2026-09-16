@@ -923,7 +923,9 @@ void main() {
       expect(find.text('Photo'), findsNothing);
       expect(find.text('Camera'), findsNothing);
       expect(find.text('Web Search'), findsOneWidget);
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
+      // EOchat toggle tiles trail a check-circle instead of a Switch.
+      expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle), findsNothing);
       expect(
         tester.widget<TextField>(find.byType(TextField)).focusNode?.hasFocus,
         isTrue,
@@ -931,7 +933,8 @@ void main() {
 
       await tester.tap(find.text('Web Search'));
       await tester.pump();
-      expect(tester.widget<Switch>(find.byType(Switch)).value, isTrue);
+      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(find.byIcon(Icons.circle_outlined), findsNothing);
 
       await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
