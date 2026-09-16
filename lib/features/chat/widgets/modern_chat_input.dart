@@ -7,6 +7,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:conduit/core/services/haptic_service.dart';
+import 'package:conduit/core/config/fork_overrides.dart';
 
 import '../../../shared/theme/conduit_input_styles.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -3226,6 +3227,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       }
       final filterId = ComposerOverflowActionIds.filterIdFrom(id);
       if (id == 'web' && showWebPill && webSearchAvailable) {
+        if (ForkOverrides.hideInactiveComposerQuickPills && !webSearchEnabled) {
+          continue;
+        }
         final String label = AppLocalizations.of(context)!.web;
         final IconData icon = Platform.isIOS
             ? CupertinoIcons.search
@@ -3245,6 +3249,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           ),
         );
       } else if (id == 'image' && showImagePillPref && imageGenAvailable) {
+        if (ForkOverrides.hideInactiveComposerQuickPills && !imageGenEnabled) {
+          continue;
+        }
         final String label = AppLocalizations.of(context)!.imageGen;
         final IconData icon = Platform.isIOS
             ? CupertinoIcons.photo
@@ -3277,6 +3284,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         }
         if (filter != null) {
           final bool isSelected = selectedFilterIds.contains(filterId);
+          if (ForkOverrides.hideInactiveComposerQuickPills && !isSelected) {
+            continue;
+          }
           final String label = filter.name;
           final IconData icon = Platform.isIOS
               ? CupertinoIcons.sparkles

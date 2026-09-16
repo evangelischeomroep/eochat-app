@@ -1851,6 +1851,9 @@ void main() {
           apiServiceProvider.overrideWithValue(null),
           appSettingsProvider.overrideWith(_QuickPillAppSettingsNotifier.new),
           webSearchAvailableProvider.overrideWithValue(true),
+          // EOchat only shows quick pills for tools that are enabled
+          // (ForkOverrides.hideInactiveComposerQuickPills).
+          webSearchEnabledProvider.overrideWith(_EnabledWebSearchNotifier.new),
         ],
         child: MaterialApp(
           localizationsDelegates: conduitLocalizationsDelegates,
@@ -1873,6 +1876,11 @@ void main() {
 final class _QuickPillAppSettingsNotifier extends AppSettingsNotifier {
   @override
   AppSettings build() => const AppSettings(quickPills: ['web']);
+}
+
+final class _EnabledWebSearchNotifier extends WebSearchEnabledNotifier {
+  @override
+  bool build() => true;
 }
 
 final class _EnabledNotesFeatureNotifier extends NotesFeatureEnabledNotifier {

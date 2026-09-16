@@ -84,6 +84,10 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/shared/widgets/assistant_detail_header.dart` — title styled as
   metadata (`bodyMedium` + `textSecondary`) instead of `bodyLarge` at 60%
   primary.
+- `lib/features/chat/widgets/modern_chat_input.dart` — quick-pill loop
+  `continue`s past inactive pills when
+  `ForkOverrides.hideInactiveComposerQuickPills` is set (three one-line
+  guards: web, image, filter).
 
 If a new fork behavior needs another upstream file, document why in the PR.
 

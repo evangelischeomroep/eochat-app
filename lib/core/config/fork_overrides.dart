@@ -68,6 +68,16 @@ class ForkOverrides {
     defaultValue: 'Beveiligd en afgeschermde AI',
   );
 
+  /// When true, the composer's second row only shows a quick pill for a
+  /// tool that is currently *enabled* (web search on, image generation on,
+  /// a filter selected). Discovery and toggling stay in the `+` sheet, like
+  /// ChatGPT. Upstream shows every pinned pill, active or not, which reads
+  /// as a row of clipped, equal-weight chips ("Afbeeldingsgenera…").
+  static const bool hideInactiveComposerQuickPills = bool.fromEnvironment(
+    'HIDE_INACTIVE_COMPOSER_QUICK_PILLS',
+    defaultValue: true,
+  );
+
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;
 
