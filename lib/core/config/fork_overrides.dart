@@ -78,6 +78,15 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  /// When true, an assistant row does not paint the avatar + model-name
+  /// header when its model is the conversation's active model — the app-bar
+  /// model pill already names it. The header still appears for responses
+  /// from a different model (e.g. after switching mid-conversation).
+  static const bool hideRedundantModelHeader = bool.fromEnvironment(
+    'HIDE_REDUNDANT_MODEL_HEADER',
+    defaultValue: true,
+  );
+
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;
 

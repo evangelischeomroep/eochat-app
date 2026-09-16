@@ -8,6 +8,7 @@ import '../../../shared/utils/platform_scroll_physics.dart';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show listEquals, visibleForTesting;
+import 'package:conduit/core/config/fork_overrides.dart';
 import 'package:conduit/core/services/haptic_service.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/rendering.dart' show ScrollCacheExtent;
@@ -3337,6 +3338,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }) {
     final groupIds = rowMetadata.groupMessageIds;
     final readOnly = rowRef.watch(activeConversationReadOnlyProvider);
+    // Fork: skip the per-message model header when the row's model is the
+    // active model; the app-bar pill already names it.
+    final activeModelName = rowRef.watch(
+      selectedModelProvider.select((model) => model?.name),
+    );
+    final showModelHeader =
+        rowMetadata.showModelHeader &&
+        !(ForkOverrides.hideRedundantModelHeader &&
+            activeModelName != null &&
+            rowMetadata.displayModelName ==
+                _formatChatModelDisplayName(activeModelName));
     final displayedMessage = groupIds.length > 1
         ? _messageWithGroupedHermesToolStatuses(rowRef, latestMessage, groupIds)
         : latestMessage;
@@ -3344,7 +3356,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             latestMessage.statusHistory.length &&
         debugCanCollapseGroupedAssistantRowForTesting(
           displayedMessage,
-          showModelHeader: rowMetadata.showModelHeader,
+          showModelHeader: showModelHeader,
           showActionBar: rowMetadata.showActionBar,
         )) {
       return const SizedBox.shrink();
@@ -3364,7 +3376,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           ),
       modelName: rowMetadata.displayModelName,
       modelIconUrl: rowMetadata.modelIconUrl,
-      showModelHeader: rowMetadata.showModelHeader,
+      showModelHeader: showModelHeader,
       showActionBar: rowMetadata.showActionBar,
       versionModelNames: rowMetadata.versionModelNames,
       versionModelIconUrls: rowMetadata.versionModelIconUrls,
