@@ -26,7 +26,7 @@ final TweakcnThemeVariant _eochatLight = TweakcnThemeVariant(
   // invisible surface on top of the page background. Reuse the already
   // brand-approved `secondary` tone instead, which gives cards a visible
   // warm-pink separation from the white page.
-  card: const Color(0xFFF5ECEC),
+  card: const Color(0xFFF2E6E6),
   cardForeground: const Color(0xFF1F1235),
   popover: const Color(0xFFFFFFFF),
   popoverForeground: const Color(0xFF1F1235),
@@ -64,11 +64,13 @@ final TweakcnThemeVariant _eochatDark = TweakcnThemeVariant(
   background: const Color(0xFF140A24),
   foreground: const Color(0xFFF5EEFF),
   // 0xFF1D1033 used to sit here, ~1.07:1 contrast against `background`
-  // (140A24) — essentially the same near-black, so cards and the model
-  // picker read as a "missing" surface in dark mode. This is background
-  // blended 30% toward `foreground`, giving elevated surfaces a clearly
-  // visible step while staying in the same purple family.
-  card: const Color(0xFF584E66),
+  // (140A24) — essentially the same near-black, so cards read as a
+  // "missing" surface. The 0xFF584E66 that replaced it overshot the other
+  // way: a washed-out lilac grey that made the settings sheet look like a
+  // different app next to the dark-purple chat list, composer and menus.
+  // One step lighter than `secondary`/`popover` (25113F) keeps every dark
+  // surface within two steps of the background, like the rest of the app.
+  card: const Color(0xFF2E1B4A),
   cardForeground: const Color(0xFFF5EEFF),
   popover: const Color(0xFF25113F),
   popoverForeground: const Color(0xFFF5EEFF),
