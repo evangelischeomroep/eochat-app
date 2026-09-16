@@ -261,8 +261,8 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
       _buildAccountOption(
         context,
         icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.paintbrush,
-          android: Icons.palette_outlined,
+          ios: CupertinoIcons.slider_horizontal_3,
+          android: Icons.tune,
         ),
         title: l10n.settingsAppearance,
         subtitle: l10n.settingsAppearanceSubtitle,
@@ -271,7 +271,7 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
       _buildAccountOption(
         context,
         icon: UiUtils.platformIcon(
-          ios: CupertinoIcons.bubble_left_bubble_right,
+          ios: CupertinoIcons.bubble_left,
           android: Icons.chat_bubble_outline,
         ),
         title: l10n.chatSettings,
