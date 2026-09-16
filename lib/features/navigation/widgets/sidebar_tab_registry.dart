@@ -186,9 +186,12 @@ const sidebarTabRegistry = <SidebarTabDescriptor>[
     labelBuilder: _channelsLabel,
     searchHintBuilder: _channelsSearchHint,
     bodyBuilder: _channelsBody,
+    // Fork: boxed glyph so the channels tab carries the same stroke and
+    // footprint as its bubble/doc/terminal neighbours; a bare '#' read as
+    // text next to them.
     materialIcon: Icons.tag,
     selectedMaterialIcon: Icons.tag,
-    sfSymbol: 'number',
+    sfSymbol: 'number.square',
     selectedSfSymbol: 'number',
     isVisible: _channelsVisible,
     createAction: channelSidebarCreateAction,
