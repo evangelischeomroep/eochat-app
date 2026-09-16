@@ -2,7 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../theme/theme_extensions.dart';
 
-const double kConduitChromeFadeHeight = 30.0;
+const double kConduitChromeFadeHeight = 24.0;
 
 enum ConduitChromeFadeEdge { top, bottom }
 
@@ -55,13 +55,13 @@ class ConduitChromeGradientFade extends StatelessWidget {
     final contentStop = (contentHeight / height).clamp(0.0, 1.0).toDouble();
 
     final opaque = baseColor.withValues(alpha: 1.0);
-    final held = baseColor.withValues(alpha: 0.92);
+    // Fork: 0.92 painted a distinct block behind the app bar in dark mode;
+    // 0.7 reads as a soft scrim while keeping the controls legible.
+    final held = baseColor.withValues(alpha: 0.7);
     final clear = baseColor.withValues(alpha: 0.0);
 
     final isTop = edge == ConduitChromeFadeEdge.top;
-    final colors = isTop
-        ? [opaque, held, clear]
-        : [clear, held, opaque];
+    final colors = isTop ? [opaque, held, clear] : [clear, held, opaque];
     final stops = isTop
         ? [0.0, contentStop, 1.0]
         : [0.0, 1.0 - contentStop, 1.0];
