@@ -1,3 +1,4 @@
+import 'package:conduit/core/config/fork_overrides.dart';
 import 'package:conduit/core/providers/app_providers.dart';
 import 'package:conduit/core/providers/backend_mode_providers.dart';
 import 'package:conduit/features/auth/providers/unified_auth_providers.dart';
@@ -62,13 +63,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('settings-category-support')), findsNothing);
     expect(find.text('About'), findsOneWidget);
-    expect(find.byKey(const Key('settings-donations')), findsOneWidget);
+    // EOchat hides the upstream donation tiles via ForkOverrides.
+    expect(
+      find.byKey(const Key('settings-donations')),
+      ForkOverrides.showDonationLinks ? findsOneWidget : findsNothing,
+    );
     expect(
       find.ancestor(
         of: find.text('Buy Me a Coffee'),
         matching: find.byKey(const Key('settings-donations')),
       ),
-      findsOneWidget,
+      ForkOverrides.showDonationLinks ? findsOneWidget : findsNothing,
     );
     expect(find.byKey(const Key('settings-sign-out')), findsNothing);
 
