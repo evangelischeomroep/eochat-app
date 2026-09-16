@@ -254,7 +254,8 @@ class SidebarListTileContent extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Spacing.md,
-          vertical: Spacing.sm,
+          // Fork: xs (4) instead of sm (8) brings a title-only row to ~50pt.
+          vertical: Spacing.xs,
         ),
         child: Row(
           children: [
