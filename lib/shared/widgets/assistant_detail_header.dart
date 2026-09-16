@@ -103,12 +103,13 @@ class _AssistantDetailHeaderState extends State<AssistantDetailHeader>
             widget.title,
             overflow: widget.allowWrap ? null : TextOverflow.ellipsis,
             maxLines: widget.allowWrap ? null : 1,
+            // Fork: metadata role — one step smaller than message text and
+            // in textSecondary, so "Explored …" / "Thought for …" reads as a
+            // caption rather than as part of the answer.
             style:
-                textTheme.bodyLarge?.copyWith(
-                  color: theme.textPrimary.withValues(alpha: 0.6),
-                ) ??
-                AppTypography.chatMessageStyle.copyWith(
-                  color: theme.textPrimary.withValues(alpha: 0.6),
+                textTheme.bodyMedium?.copyWith(color: theme.textSecondary) ??
+                AppTypography.bodyMediumStyle.copyWith(
+                  color: theme.textSecondary,
                 ),
           ),
         ),
@@ -125,7 +126,7 @@ class _AssistantDetailHeaderState extends State<AssistantDetailHeader>
                   ? Icons.expand_more_rounded
                   : Icons.chevron_right_rounded,
               size: 16,
-              color: theme.textPrimary.withValues(alpha: 0.6),
+              color: theme.textSecondary,
             ),
           ),
         ],

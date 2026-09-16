@@ -3662,6 +3662,18 @@
       }
     }
   },
+  "toolSummaryWebSearch": "web search",
+  "@toolSummaryWebSearch": {
+    "description": "Humanised label for web-search tool calls in the collapsed tool-call summary line (e.g. 'Explored web search (3)')."
+  },
+  "toolSummaryFetchUrl": "pages read",
+  "@toolSummaryFetchUrl": {
+    "description": "Humanised label for URL/page-fetch tool calls in the collapsed tool-call summary line."
+  },
+  "toolSummaryCodeExecution": "code run",
+  "@toolSummaryCodeExecution": {
+    "description": "Humanised label for code-execution tool calls in the collapsed tool-call summary line."
+  },
   "markdownDetailsGroupCompleteTitle": "Explored {summary}",
   "@markdownDetailsGroupCompleteTitle": {
     "description": "Title shown for a completed grouped tool-call details block.",

@@ -1506,6 +1506,9 @@
       }
     }
   },
+  "toolSummaryWebSearch": "web doorzocht",
+  "toolSummaryFetchUrl": "pagina's gelezen",
+  "toolSummaryCodeExecution": "code uitgevoerd",
   "markdownDetailsGroupCompleteTitle": "Verkend {summary}",
   "@markdownDetailsGroupCompleteTitle": {
     "description": "Title shown for a completed grouped tool-call details block.",

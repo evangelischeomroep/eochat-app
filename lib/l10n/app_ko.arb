@@ -1284,6 +1284,9 @@
       }
     }
   },
+  "toolSummaryWebSearch": "web search",
+  "toolSummaryFetchUrl": "pages read",
+  "toolSummaryCodeExecution": "code run",
   "markdownDetailsGroupCompleteTitle": "{summary} 탐색 완료",
   "@markdownDetailsGroupCompleteTitle": {
     "description": "Title shown for a completed grouped tool-call details block.",

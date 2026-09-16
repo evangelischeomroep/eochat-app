@@ -75,6 +75,15 @@ carried a branding-string swap. Current known inline-touch files:
   `AppTypography.listTitleStyle` (tighter leading) instead of `bodyMediumStyle`.
 - `lib/features/navigation/widgets/conversation_tile.dart` — tile title uses
   `AppTypography.listTitleStyle`; upstream's inline `height: 1.4` was dropped.
+- `lib/shared/widgets/markdown/renderer/details_group_widget.dart` and
+  `lib/features/chat/widgets/streaming_status_widget.dart` — the collapsed
+  tool-call summary is built through the fork-owned
+  `lib/shared/utils/tool_display_names.dart` (`ToolDisplayNames.summarize`)
+  instead of joining raw tool ids. Fork ARB keys: `toolSummaryWebSearch`,
+  `toolSummaryFetchUrl`, `toolSummaryCodeExecution`.
+- `lib/shared/widgets/assistant_detail_header.dart` — title styled as
+  metadata (`bodyMedium` + `textSecondary`) instead of `bodyLarge` at 60%
+  primary.
 
 If a new fork behavior needs another upstream file, document why in the PR.
 

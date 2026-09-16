@@ -2225,11 +2225,11 @@ After
 
     await tester.pumpWidget(buildHarness(content));
 
-    expect(find.text('Explored search, browser'), findsOneWidget);
+    expect(find.text('Explored web search, browser'), findsOneWidget);
     expect(find.text('View Result from search'), findsNothing);
     expect(find.text('View Result from browser'), findsNothing);
 
-    await tester.tap(find.text('Explored search, browser'));
+    await tester.tap(find.text('Explored web search, browser'));
     await tester.pumpAndSettle();
 
     expect(find.text('View Result from search'), findsOneWidget);
@@ -2250,12 +2250,12 @@ After
 
       await tester.pumpWidget(buildHarness(content));
 
-      expect(find.text('Explored search, browser'), findsOneWidget);
+      expect(find.text('Explored web search, browser'), findsOneWidget);
       expect(find.byKey(const ValueKey('tool-call-embed-0')), findsOneWidget);
       expect(find.text('View Result from search'), findsNothing);
       expect(find.text('View Result from browser'), findsNothing);
 
-      await tester.tap(find.text('Explored search, browser'));
+      await tester.tap(find.text('Explored web search, browser'));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('tool-call-embed-0')), findsOneWidget);
@@ -2275,7 +2275,7 @@ After
 
     await tester.pumpWidget(buildHarness(content, locale: const Locale('es')));
 
-    expect(find.text('Explorado search, browser'), findsOneWidget);
+    expect(find.text('Explorado web search, browser'), findsOneWidget);
   });
 
   testWidgets(
@@ -2323,7 +2323,7 @@ After
         ),
       );
 
-      await tester.tap(find.text('Explored search, browser'));
+      await tester.tap(find.text('Explored web search, browser'));
       await tester.pumpAndSettle();
 
       expect(find.text('View Result from search'), findsOneWidget);
@@ -4315,7 +4315,7 @@ Tail keeps growing
 
     await tester.pumpWidget(buildHarness(pendingContent));
 
-    expect(find.text('Exploring browser, search'), findsOneWidget);
+    expect(find.text('Exploring browser, web search'), findsOneWidget);
     expect(find.byKey(const ValueKey('tool-call-embed-0')), findsNothing);
 
     await tester.pumpWidget(buildHarness(completedContent));

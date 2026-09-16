@@ -8,6 +8,7 @@ import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/raster_media_policy.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
+import '../../../shared/utils/tool_display_names.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../../../shared/widgets/themed_sheets.dart';
 import 'assistant_detail_header.dart';
@@ -714,25 +715,21 @@ String _buildHermesToolGroupTitle(
   List<ChatStatusUpdate> updates,
   bool isStreaming,
 ) {
-  final counts = <String, int>{};
+  final l10n = AppLocalizations.of(context)!;
+  final names = <String>[];
   for (final update in updates) {
     final action = update.action!;
     final actionName = action.substring('hermes_tool_'.length);
     final description = update.description?.trim();
     final name = actionName.startsWith('opaque')
         ? description?.split(RegExp(r'\s(?:·|failed)')).first.trim() ??
-              AppLocalizations.of(context)!.markdownDetailsGroupUnnamedTool
+              l10n.markdownDetailsGroupUnnamedTool
         : actionName;
-    counts[name] = (counts[name] ?? 0) + 1;
+    names.add(name);
   }
 
-  final summary = counts.entries
-      .map(
-        (entry) =>
-            entry.value > 1 ? '${entry.key} (${entry.value})' : entry.key,
-      )
-      .join(', ');
-  final l10n = AppLocalizations.of(context)!;
+  // Fork: humanise raw tool ids and drop housekeeping tools.
+  final summary = ToolDisplayNames.summarize(names, l10n);
   return isStreaming && updates.any((update) => update.done != true)
       ? l10n.markdownDetailsGroupPendingTitle(summary)
       : l10n.markdownDetailsGroupCompleteTitle(summary);

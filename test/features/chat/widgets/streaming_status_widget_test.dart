@@ -181,7 +181,7 @@ void main() {
       ], isStreaming: false),
     );
 
-    expect(find.text('Explored web_search (2), terminal'), findsOneWidget);
+    expect(find.text('Explored web search (2), terminal'), findsOneWidget);
     expect(find.text('terminal'), findsNothing);
   });
 
@@ -203,7 +203,7 @@ void main() {
       ]),
     );
 
-    expect(find.text('Exploring web_search, terminal'), findsOneWidget);
+    expect(find.text('Exploring web search, terminal'), findsOneWidget);
   });
 
   testWidgets('reduced motion skips status-chip entrance effects', (

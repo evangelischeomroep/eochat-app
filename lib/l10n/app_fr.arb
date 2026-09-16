@@ -1506,6 +1506,9 @@
       }
     }
   },
+  "toolSummaryWebSearch": "web search",
+  "toolSummaryFetchUrl": "pages read",
+  "toolSummaryCodeExecution": "code run",
   "markdownDetailsGroupCompleteTitle": "Analyse terminée : {summary}",
   "@markdownDetailsGroupCompleteTitle": {
     "description": "Title shown for a completed grouped tool-call details block.",

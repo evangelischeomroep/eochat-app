@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 
 import '../../../theme/theme_extensions.dart';
+import '../../../utils/tool_display_names.dart';
 import '../../assistant_detail_header.dart';
 
 enum MarkdownDetailsGroupRenderMode { details, previewsOnly }
@@ -96,23 +97,14 @@ class _MarkdownDetailsGroupState extends State<MarkdownDetailsGroup> {
 
   String _buildSummaryText() {
     final l10n = AppLocalizations.of(context)!;
-    final toolNameCounts = <String, int>{};
-
-    for (final item in widget.items) {
-      final name = item.name.trim().isEmpty
+    final names = widget.items.map(
+      (item) => item.name.trim().isEmpty
           ? l10n.markdownDetailsGroupUnnamedTool
-          : item.name.trim();
-      toolNameCounts[name] = (toolNameCounts[name] ?? 0) + 1;
-    }
-
-    final parts = toolNameCounts.entries
-        .map(
-          (entry) =>
-              entry.value > 1 ? '${entry.key} (${entry.value})' : entry.key,
-        )
-        .toList(growable: false);
-
-    return parts.join(', ');
+          : item.name.trim(),
+    );
+    // Fork: humanise raw tool ids (search_web -> "web search") and drop
+    // housekeeping tools such as get_current_timestamp from the summary.
+    return ToolDisplayNames.summarize(names, l10n);
   }
 
   String _buildTitle() {
