@@ -170,7 +170,7 @@ class _UtilityRowState extends State<UtilityRow> {
                                 overflow: usesLargeText
                                     ? TextOverflow.visible
                                     : TextOverflow.ellipsis,
-                                style: AppTypography.bodyMediumStyle.copyWith(
+                                style: AppTypography.listTitleStyle.copyWith(
                                   color: foreground,
                                   fontWeight:
                                       widget.titleFontWeight ??

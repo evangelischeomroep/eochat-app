@@ -128,10 +128,16 @@ class AppColorTokens extends ThemeExtension<AppColorTokens> {
       variant.foreground,
       isLight ? 0.25 : 0.4,
     );
+    // Secondary text/icons. Upstream derived this from `foreground` nudged
+    // 6% (light) / 30% (dark) toward black/white, which lands within a hair
+    // of body text — secondary labels were the same weight as content. Derive
+    // it from the palette's `mutedForeground` instead, pulled toward
+    // `foreground` just past `neutralTone60` (tertiary) so the ladder stays
+    // body > secondary > tertiary while secondary is visibly lighter than body.
     final Color neutralTone80 = mix(
+      variant.mutedForeground,
       variant.foreground,
-      isLight ? Colors.black : Colors.white,
-      isLight ? 0.06 : 0.3,
+      isLight ? 0.4 : 0.5,
     );
     final Color neutralOnSurface = _ensureContrast(
       surface: neutralTone00,

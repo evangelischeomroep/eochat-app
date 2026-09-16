@@ -67,6 +67,14 @@ carried a branding-string swap. Current known inline-touch files:
   hides the create-folder affordance in that read-only view.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
+- `lib/shared/theme/theme_extensions.dart` — values-only token retunes
+  (`Spacing`, `AppBorderRadius`, `IconSize` aliases), `chatMessageStyle`
+  leading, and the fork-added `AppTypography.listTitleStyle` used by one-line
+  rows. Take upstream structure on conflict, then re-apply the values.
+- `lib/shared/widgets/utility/utility_rows.dart` — `UtilityRow` title uses
+  `AppTypography.listTitleStyle` (tighter leading) instead of `bodyMediumStyle`.
+- `lib/features/navigation/widgets/conversation_tile.dart` — tile title uses
+  `AppTypography.listTitleStyle`; upstream's inline `height: 1.4` was dropped.
 
 If a new fork behavior needs another upstream file, document why in the PR.
 

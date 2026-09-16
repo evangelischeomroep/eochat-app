@@ -271,14 +271,13 @@ class SidebarListTileContent extends StatelessWidget {
                     title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypography.sidebarTitleStyle.copyWith(
+                    style: AppTypography.listTitleStyle.copyWith(
                       color: titleIsPrimary
                           ? theme.textPrimary
                           : theme.textSecondary,
                       fontWeight:
                           titleFontWeight ??
                           (titleIsPrimary ? FontWeight.w600 : FontWeight.w400),
-                      height: 1.4,
                     ),
                   ),
                   if (hasSubtitle) ...[

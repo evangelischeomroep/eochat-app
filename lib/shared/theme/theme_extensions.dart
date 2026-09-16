@@ -772,14 +772,14 @@ class Spacing {
 
   // Enhanced spacing for specific components with better hierarchy
   static const double buttonPadding = 16.0;
-  static const double cardPadding = 20.0;
+  static const double cardPadding = 16.0;
   static const double inputPadding = 16.0;
   static const double modalPadding = 24.0;
   static const double messagePadding = 16.0;
   static const double navigationPadding = 12.0;
   static const double listItemPadding = 16.0;
   static const double sectionPadding = 24.0;
-  static const double pagePadding = 20.0;
+  static const double pagePadding = 16.0;
   static const double screenPadding = 16.0;
 
   // Spacing for different densities with improved hierarchy
@@ -793,7 +793,7 @@ class Spacing {
   static const double actionButtonPadding = 12.0;
   static const double floatingButtonPadding = 16.0;
   static const double bottomSheetPadding = 24.0;
-  static const double dialogPadding = 20.0;
+  static const double dialogPadding = 16.0;
   static const double snackbarPadding = 16.0;
 
   // Layout spacing with improved hierarchy
@@ -832,28 +832,28 @@ class AppBorderRadius {
   static const double button = 12.0;
   static const double card = 16.0;
   static const double input = 12.0;
-  static const double modal = 20.0;
+  static const double modal = 16.0;
   static const double messageBubble = 12.0;
   static const double navigation = 12.0;
   static const double avatar = 50.0;
-  static const double badge = 20.0;
-  static const double chip = 16.0;
-  static const double tooltip = 8.0;
+  static const double badge = round;
+  static const double chip = 12.0;
+  static const double tooltip = 12.0;
 
   // Border radius for different sizes with improved hierarchy
-  static const double small = 6.0;
+  static const double small = 12.0;
   static const double medium = 12.0;
-  static const double large = 18.0;
+  static const double large = 16.0;
   static const double extraLarge = 24.0;
   static const double pill = 999.0;
 
   // Specific component radius with better consistency
-  static const double chatBubble = 20.0;
-  static const double actionButton = 14.0;
+  static const double chatBubble = 16.0;
+  static const double actionButton = 12.0;
   static const double floatingButton = 28.0;
   static const double bottomSheet = 24.0;
   static const double dialog = 16.0;
-  static const double snackbar = 8.0;
+  static const double snackbar = 12.0;
 
   // Enhanced radius values for better visual hierarchy
   static const double micro = 2.0;
@@ -1237,6 +1237,13 @@ class AppTypography {
       bodyMediumStyle.copyWith(fontWeight: FontWeight.w300);
 
   static TextStyle get large => bodyLargeStyle;
+
+  // One-line UI rows (conversation tiles, settings rows, chip labels) use
+  // body size but tighter leading than prose: 1.5x leading on a single line
+  // only adds dead vertical space above and below the glyphs, which is why
+  // list rows looked taller than they needed to be. Message/body text keeps
+  // its 1.45-1.5 leading via chatMessageStyle / bodyLargeStyle.
+  static TextStyle get listTitleStyle => bodyLargeStyle.copyWith(height: 1.25);
 
   static TextStyle get sidebarTitleStyle => bodyLargeStyle;
 
