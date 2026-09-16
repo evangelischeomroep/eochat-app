@@ -2724,14 +2724,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         : AdaptiveButtonStyle.glass;
 
     if (conduitSupportsNativeGlass()) {
-      return NativeGlassIconButton(
-        onPressed: _userScrollToBottom,
-        symbol: SFSymbol(
-          'chevron.down',
-          size: iconSize,
-          color: theme.textPrimary,
+      // Fork: native glass alone nearly vanishes over light message text in
+      // light mode. Back it with a solid card disc + hairline border (and a
+      // soft shadow in light mode) so the control keeps contrast.
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: theme.cardBackground,
+          border: Border.all(
+            color: theme.cardBorder,
+            width: BorderWidth.regular,
+          ),
+          boxShadow: isDark ? null : ConduitShadows.small(context),
         ),
-        dimension: buttonSize,
+        child: NativeGlassIconButton(
+          onPressed: _userScrollToBottom,
+          symbol: SFSymbol(
+            'chevron.down',
+            size: iconSize,
+            color: theme.textPrimary,
+          ),
+          dimension: buttonSize,
+        ),
       );
     }
 
