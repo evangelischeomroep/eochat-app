@@ -639,7 +639,15 @@ private extension PccBridge {
             )
         } catch {
 #if CONDUIT_PCC_SDK
-            if let error = error as? LanguageModelError {
+            // LanguageModelError and onDeviceMessage(for:) are iOS 27+ APIs.
+            // CONDUIT_PCC_SDK is enabled whenever this target is compiled
+            // against the iOS 27 SDK (see PccSdk.xcconfig), but the app's
+            // deployment target (and this extension) is iOS 26.0, so a
+            // device can still be running iOS 26.x at runtime with this
+            // binary. Guard the cast so pre-27 runtimes fall through to the
+            // PccBridgeError/generic message below instead of hitting a
+            // "only available in iOS 27.0 or newer" compile error.
+            if #available(iOS 27.0, *), let error = error as? LanguageModelError {
                 await emitError(runId: request.runId, message: onDeviceMessage(for: error))
                 return
             }
