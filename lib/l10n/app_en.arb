@@ -1145,6 +1145,28 @@
   "@failedToDeleteFolder": {
     "description": "Error notice when deleting a folder fails."
   },
+  "sharedFolderOwner": "Shared by {name}",
+  "@sharedFolderOwner": {
+    "description": "Owner label on a folder another user shared with this account.",
+    "placeholders": {
+      "name": {
+        "type": "String",
+        "example": "Alex"
+      }
+    }
+  },
+  "readOnly": "Read-only",
+  "@readOnly": {
+    "description": "Marker for a shared folder or chat this user cannot edit."
+  },
+  "readOnlySharedChat": "This chat was shared with you. Only its owner can send messages.",
+  "@readOnlySharedChat": {
+    "description": "Composer replacement shown when viewing another user's chat from a shared folder."
+  },
+  "sharedBadge": "Shared",
+  "@sharedBadge": {
+    "description": "Short badge on a folder another user shared with this account."
+  },
   "aboutApp": "About",
   "@aboutApp": {
     "description": "Settings tile title to view app information."
@@ -3947,6 +3969,18 @@
   "@notificationsPermissionDenied": {
     "description": "Shown when the user enables notifications but the OS permission was denied."
   },
+  "notificationSystemSettingsTitle": "System notification settings",
+  "@notificationSystemSettingsTitle": {
+    "description": "Row that opens the OS notification settings for this app."
+  },
+  "notificationSystemSettingsDescription": "Change permission, sound, and banner options for EOchat.",
+  "@notificationSystemSettingsDescription": {
+    "description": "Subtitle for the row that opens the OS notification settings."
+  },
+  "notificationSystemSettingsOpenFailed": "Couldn't open system notification settings.",
+  "@notificationSystemSettingsOpenFailed": {
+    "description": "Shown when the OS notification settings screen could not be launched."
+  },
   "workspaceTitle": "Workspace",
   "workspaceSubtitle": "Manage server resources and access",
   "workspaceModels": "Models",
@@ -6344,6 +6378,23 @@
   "@hermesSessionLoadFailed": {
     "description": "Error shown when a Hermes conversation cannot be loaded."
   },
+  "hermesSessionTooLarge": "This conversation is too large to load on this device.",
+  "@hermesSessionTooLarge": {
+    "description": "Error shown when a Hermes conversation transcript exceeds the size the app can load."
+  },
+  "hermesSessionNotFound": "This conversation is no longer available on the Hermes server.",
+  "@hermesSessionNotFound": {
+    "description": "Error shown when the Hermes server reports that a conversation does not exist."
+  },
+  "hermesSessionLoadFailedDetail": "Could not load this conversation: {detail}",
+  "@hermesSessionLoadFailedDetail": {
+    "description": "Error shown when a Hermes conversation cannot be loaded and the server gave a reason.",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
   "hermesMemoryKeyFieldLabel": "Memory key",
   "@hermesMemoryKeyFieldLabel": {
     "description": "Label for the Hermes long-term memory key field."
@@ -7036,6 +7087,14 @@
   "directMcpInsecureCredentialsConfirm": "Send without encryption",
   "@directMcpInsecureCredentialsConfirm": {
     "description": "Action confirming MCP credentials may be sent over unencrypted HTTP."
+  },
+  "directBearerDescription": "Sends the credential as an Authorization: Bearer header. Most OpenAI-compatible servers (llama.cpp, vLLM, LM Studio, Ollama) expect this.",
+  "@directBearerDescription": {
+    "description": "Help text for the Bearer token authentication mode of a direct connection."
+  },
+  "directApiKeyHeaderAzureOnlyDescription": "Sends the credential in the api-key header. Use this only for Azure OpenAI; other OpenAI-compatible servers expect a Bearer token.",
+  "@directApiKeyHeaderAzureOnlyDescription": {
+    "description": "Help text for the Azure OpenAI api-key header authentication mode, noting it is Azure-only."
   },
   "themePaletteEochatLabel": "EOchat",
   "@themePaletteEochatLabel": {

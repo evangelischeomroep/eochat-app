@@ -37,7 +37,8 @@ import 'core/utils/tts_voice_utils.dart';
 import 'core/utils/current_localizations.dart';
 import 'features/chat/services/request_completion_runner.dart';
 import 'features/chat/providers/text_to_speech_provider.dart';
-import 'features/chat/providers/chat_providers.dart' show restoreDefaultModel;
+import 'features/chat/providers/chat_providers.dart'
+    show chatWakelockCoordinatorProvider, restoreDefaultModel;
 import 'core/config/fork_overrides.dart';
 import 'features/release_notes/release_notes_bootstrap.dart';
 import 'features/release_notes/release_notes_coordinator.dart';
@@ -167,10 +168,9 @@ void main() {
 
       const secureStorage = FlutterSecureStorage(
         aOptions: AndroidOptions(
-          // Keep legacy Android storage readable until a storageNamespace
-          // migration can move both encrypted data and wrapped keys.
-          // ignore: deprecated_member_use
-          sharedPreferencesName: 'conduit_secure_prefs',
+          // Same name as the pre-v11 sharedPreferencesName so the plugin's
+          // LegacyNamespaceKeyRecovery keeps existing Android data readable.
+          storageNamespace: 'conduit_secure_prefs',
           preferencesKeyPrefix: 'conduit_',
           resetOnError: false,
         ),
@@ -306,6 +306,7 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
     super.initState();
     ref.read(userScopedProviderCleanupProvider);
     ref.read(quickActionsCoordinatorProvider);
+    ref.read(chatWakelockCoordinatorProvider);
     _nativeSheetSubscription = NativeSheetBridge.instance.events.listen(
       _handleNativeSheetEvent,
     );
@@ -985,7 +986,7 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
         }
         final safeChild = child ?? const SizedBox.shrink();
 
-// On iOS, AdaptiveApp creates CupertinoApp which
+        // On iOS, AdaptiveApp creates CupertinoApp which
         // doesn't propagate Material ThemeExtensions.
         // Wrap with Theme to ensure all custom extensions
         // (ConduitThemeExtension, AppColorTokens, etc.)

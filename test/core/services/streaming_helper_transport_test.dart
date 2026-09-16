@@ -572,8 +572,10 @@ class _MockSocketService implements SocketService {
     handlerId: 'test-ch',
   );
 
+  final StreamController<void> reconnects = StreamController<void>.broadcast();
+
   @override
-  Stream<void> get onReconnect => const Stream.empty();
+  Stream<void> get onReconnect => reconnects.stream;
 
   @override
   bool get isConnected => true;
@@ -1299,6 +1301,146 @@ void main() {
     );
 
     test(
+      'httpStream renders Responses-style reasoning summaries mid-stream',
+      () async {
+        // Kimi via an Azure Responses endpoint streams typed events; the
+        // reasoning arrives as summary parts before the answer item starts.
+        final log = _CallbackLog(
+          initialMessages: fakeStreamingAssistantMessages(content: ''),
+        );
+        final byteStream = StreamController<List<int>>();
+
+        _attach(
+          session: ChatCompletionSession.httpStream(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            byteStream: byteStream.stream,
+            abort: () async {},
+          ),
+          log: log,
+        );
+
+        byteStream.add(
+          _sseFrame({
+            'type': 'response.output_item.added',
+            'output_index': 0,
+            'item': {'type': 'reasoning', 'id': 'rs_1', 'summary': []},
+          }),
+        );
+        byteStream.add(
+          _sseFrame({
+            'type': 'response.reasoning_summary_text.delta',
+            'item_id': 'rs_1',
+            'output_index': 0,
+            'summary_index': 0,
+            'delta': 'Checking each candidate',
+          }),
+        );
+        await pumpMicrotasks();
+
+        final pending = log.messages.last.content;
+        check(pending).contains('<details type="reasoning" done="false"');
+        check(pending).contains('Checking each candidate');
+
+        byteStream.add(
+          _sseFrame({
+            'type': 'response.output_item.added',
+            'output_index': 1,
+            'item': {
+              'type': 'message',
+              'id': 'msg_1',
+              'status': 'in_progress',
+              'content': [],
+            },
+          }),
+        );
+        byteStream.add(
+          _sseFrame({
+            'type': 'response.output_text.delta',
+            'item_id': 'msg_1',
+            'output_index': 1,
+            'content_index': 0,
+            'delta': 'There are 21 primes.',
+          }),
+        );
+        await pumpMicrotasks();
+
+        final streaming = log.messages.last.content;
+        check(streaming).contains('<details type="reasoning" done="true"');
+        check(streaming).contains('duration="');
+        check(streaming).endsWith('There are 21 primes.');
+
+        byteStream.add(_sseDone());
+        await byteStream.close();
+        await pumpMicrotasks();
+        await pumpMicrotasks();
+
+        check(log.messages.last.content).endsWith('There are 21 primes.');
+        check(log.finishCount).equals(1);
+      },
+    );
+
+    test(
+      'httpStream renders OpenRouter-style reasoning deltas mid-stream',
+      () async {
+        // The server relays provider chunks unchanged, so gpt-oss via an
+        // OpenRouter-style gateway arrives as `reasoning`, never
+        // `reasoning_content`. A pending reasoning block must still appear
+        // before the answer text streams.
+        final log = _CallbackLog(
+          initialMessages: fakeStreamingAssistantMessages(content: ''),
+        );
+        final byteStream = Stream<List<int>>.fromIterable([
+          _sseFrame({
+            'choices': [
+              {
+                'delta': {
+                  'reasoning': 'User wants a greeting',
+                  'reasoning_details': [
+                    {'type': 'reasoning.text', 'text': 'User wants a greeting'},
+                  ],
+                },
+              },
+            ],
+          }),
+          _sseFrame({
+            'choices': [
+              {
+                'delta': {'content': 'Hello'},
+              },
+            ],
+          }),
+          _sseDone(),
+        ]);
+
+        _attach(
+          session: ChatCompletionSession.httpStream(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            byteStream: byteStream,
+            abort: () async {},
+          ),
+          log: log,
+        );
+
+        await pumpMicrotasks();
+        await pumpMicrotasks();
+        await pumpMicrotasks();
+
+        check(log.replacedContents.first)
+            .contains('<details type="reasoning" done="false"');
+        check(log.messages.last.content).equals(
+          '<details type="reasoning" done="true" duration="0">\n'
+          '<summary>Thought for 0 seconds</summary>\n'
+          '&gt; User wants a greeting\n'
+          '</details>\n'
+          'Hello',
+        );
+        check(log.finishCount).equals(1);
+      },
+    );
+
+    test(
       'reasoning projections stay lazy until the visible cadence requests one',
       () async {
         final log = _CallbackLog(
@@ -1445,6 +1587,287 @@ void main() {
           'Answer',
         );
         check(log.finishCount).equals(1);
+      },
+    );
+
+    test(
+      'taskSocket renders response:completion reasoning and text deltas',
+      () async {
+        // Open WebUI 0.11 streams socket-bound completions as Responses-style
+        // events; the cumulative `output` snapshot only arrives at the end.
+        final log = _CallbackLog();
+        final registrar = FakeSocketInjector();
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          socketService: _MockSocketService(registrar),
+        );
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('response:completion', {
+          'type': 'response.reasoning_text.delta',
+          'item_id': 'r1',
+          'output_index': 0,
+          'content_index': 0,
+          'delta': 'User wants a greeting',
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        final pending = log.messages.last.content;
+        check(pending).contains('<details type="reasoning" done="false"');
+        check(pending).contains('User wants a greeting');
+
+        registrar.emitChatEvent('response:completion', {
+          'type': 'response.output_text.delta',
+          'item_id': 'msg1',
+          'output_index': 1,
+          'content_index': 0,
+          'delta': 'Hello',
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        final streaming = log.messages.last.content;
+        check(streaming).contains('<details type="reasoning" done="true"');
+        check(streaming).endsWith('Hello');
+
+        // The server then emits the cumulative snapshot without `done`,
+        // followed by the terminal frame that carries `output` and `title`
+        // but no `content` key.
+        final fullOutput = [
+          {
+            'type': 'reasoning',
+            'id': 'r1',
+            'status': 'completed',
+            'duration': 2,
+            'content': [
+              {'type': 'output_text', 'text': 'User wants a greeting'},
+            ],
+          },
+          {
+            'type': 'message',
+            'id': 'msg1',
+            'status': 'completed',
+            'content': [
+              {'type': 'output_text', 'text': 'Hello'},
+            ],
+          },
+        ];
+        registrar.emitChatEvent('chat:completion', {
+          'output': fullOutput,
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+        registrar.emitChatEvent('chat:completion', {
+          'done': true,
+          'output': fullOutput,
+          'title': 'Greeting',
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        final finalContent = log.messages.last.content;
+        check(finalContent).contains('duration="2"');
+        check(finalContent).endsWith('Hello');
+        check(log.finishCount).equals(1);
+      },
+    );
+
+    test(
+      'taskSocket response.incomplete keeps the answer without an error',
+      () async {
+        // Upstream passes the provider's response.incomplete through as a
+        // response:completion event but treats it as a no-op: the turn still
+        // ends with a normal done. Raising an error here flashed a banner
+        // under the answer until that done cleared it.
+        final log = _CallbackLog();
+        final registrar = FakeSocketInjector();
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          socketService: _MockSocketService(registrar),
+        );
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('response:completion', {
+          'type': 'response.output_text.delta',
+          'item_id': 'msg1',
+          'output_index': 0,
+          'content_index': 0,
+          'delta': 'Hello',
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('response:completion', {
+          'type': 'response.incomplete',
+          'response': {
+            'id': 'resp-1',
+            'output': [
+              {
+                'type': 'message',
+                'id': 'msg1',
+                'status': 'incomplete',
+                'content': [
+                  {'type': 'output_text', 'text': 'Hello'},
+                ],
+              },
+            ],
+          },
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        check(log.messages.last.error).isNull();
+        check(log.messages.last.content).endsWith('Hello');
+
+        registrar.emitChatEvent('chat:completion', {
+          'done': true,
+          'output': [
+            {
+              'type': 'message',
+              'id': 'msg1',
+              'status': 'completed',
+              'content': [
+                {'type': 'output_text', 'text': 'Hello'},
+              ],
+            },
+          ],
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        check(log.messages.every((message) => message.error == null)).isTrue();
+        check(log.finishCount).equals(1);
+      },
+    );
+
+    test(
+      'taskSocket response.failed still surfaces the provider error',
+      () async {
+        final log = _CallbackLog();
+        final registrar = FakeSocketInjector();
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          socketService: _MockSocketService(registrar),
+        );
+        await pumpMicrotasks();
+
+        registrar.emitChatEvent('response:completion', {
+          'type': 'response.failed',
+          'response': {
+            'id': 'resp-1',
+            'error': {'message': 'Provider rejected the request.'},
+          },
+        }, messageId: 'msg-1');
+        await pumpMicrotasks();
+
+        check(log.messages.last.error?.content)
+            .equals('Provider rejected the request.');
+      },
+    );
+
+    test('reconnect recovery does not finish a live stream from a mid-write snapshot', () async {
+      // Returning to the foreground reconnects the socket, which polls the
+      // server. Open WebUI persists the in-flight assistant with
+      // `done: false` and no `isStreaming` key, so the poll must not treat
+      // the missing flag as completion: the stream is still running.
+      final log = _CallbackLog(
+        initialMessages: fakeStreamingAssistantMessages(content: 'Hel'),
+      );
+      final registrar = FakeSocketInjector();
+      final socket = _MockSocketService(registrar);
+      final api = _buildFakeApi(
+        pollResponse: _serverConversationResponse(
+          messages: [
+            _serverAssistantMessage(content: 'Hello wor', done: false),
+          ],
+        ),
+      );
+
+      _attach(
+        session: ChatCompletionSession.taskSocket(
+          messageId: 'msg-1',
+          sessionId: 'sess-1',
+          taskId: 'task-1',
+        ),
+        log: log,
+        api: api,
+        socketService: socket,
+      );
+      await pumpMicrotasks();
+
+      socket.reconnects.add(null);
+      // The recovery poll adopts the longer server body; that adoption is the
+      // observable proof the reconnect recovery ran to completion.
+      await waitForCondition(
+        () => log.messages.last.content.endsWith('Hello wor'),
+        timeout: const Duration(seconds: 5),
+      );
+
+      check(log.finishCount).equals(0);
+      check(log.messages.last.isStreaming).isTrue();
+
+      // The live stream then completes normally.
+      registrar.emitChatEvent('chat:completion', {
+        'choices': [
+          {
+            'delta': {'content': 'lo'},
+          },
+        ],
+      }, messageId: 'msg-1');
+      registrar.emitChatEvent('chat:completion', {
+        'done': true,
+        'content': 'Hello',
+      }, messageId: 'msg-1');
+      await pumpMicrotasks();
+      check(log.finishCount).equals(1);
+    });
+
+    test(
+      'reconnect recovery still finishes on an explicit server done',
+      () async {
+        final log = _CallbackLog(
+          initialMessages: fakeStreamingAssistantMessages(content: 'Hel'),
+        );
+        final registrar = FakeSocketInjector();
+        final socket = _MockSocketService(registrar);
+        final api = _buildFakeApi(
+          pollResponse: _serverConversationResponse(
+            messages: [_serverAssistantMessage(content: 'Hello', done: true)],
+          ),
+        );
+
+        _attach(
+          session: ChatCompletionSession.taskSocket(
+            messageId: 'msg-1',
+            sessionId: 'sess-1',
+            taskId: 'task-1',
+          ),
+          log: log,
+          api: api,
+          socketService: socket,
+        );
+        await pumpMicrotasks();
+
+        socket.reconnects.add(null);
+        await waitForCondition(
+          () => log.finishCount == 1,
+          timeout: const Duration(seconds: 5),
+        );
+
+        check(log.finishCount).equals(1);
+        check(log.messages.last.content).endsWith('Hello');
       },
     );
 

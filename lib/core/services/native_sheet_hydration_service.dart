@@ -63,19 +63,6 @@ class NativeSheetPresentationAdmission {
 }
 
 @visibleForTesting
-Future<bool> waitForNativeReasoningEffortHydration(
-  Future<Object?> hydration, {
-  Duration timeout = const Duration(seconds: 1),
-}) async {
-  try {
-    await hydration.timeout(timeout);
-    return true;
-  } on TimeoutException {
-    return false;
-  }
-}
-
-@visibleForTesting
 ReasoningEffortPolicy nativeModelSelectorReasoningEffortPolicy(
   bool hydrated,
   ReasoningEffortPolicy hydratedPolicy,
@@ -87,6 +74,7 @@ nativeHydratedServerReasoningEffort({
   required Model model,
   required ServerModelReasoningEffort detail,
   String? personalizationEffort,
+  String? localEffort,
 }) {
   final modelEffort = detail.value ?? modelConfiguredReasoningEffort(model);
   final policy = model.supportsReasoningEffort || modelEffort != null
@@ -96,7 +84,7 @@ nativeHydratedServerReasoningEffort({
     policy: policy,
     value:
         policy.effectiveConfiguredEffort(
-          modelEffort ?? personalizationEffort,
+          localEffort ?? modelEffort ?? personalizationEffort,
         ) ??
         kAutomaticReasoningEffort,
   );
@@ -167,24 +155,21 @@ class NativeSheetHydrationService {
       final effortModel = orderedModels
           .where((model) => model.id == selectedModelId)
           .firstOrNull;
+      // Present without waiting on the reasoning-effort probe. The sheet
+      // already hydrates that row progressively, and blocking here made every
+      // open feel unresponsive on a cold cache (#692).
       Future<ServerModelReasoningEffort>? effortHydration;
       var effortHydrated = effortModel == null;
       if (effortModel != null) {
-        final pendingEffortHydration = _ref.read(
-          serverModelReasoningEffortProvider(effortModel).future,
+        final effortAsync = _ref.read(
+          serverModelReasoningEffortProvider(effortModel),
         );
-        effortHydration = pendingEffortHydration;
-        effortHydrated = await waitForNativeReasoningEffortHydration(
-          pendingEffortHydration,
-        );
+        effortHydrated = effortAsync.hasValue;
         if (!effortHydrated) {
-          DebugLogger.warning(
-            'reasoning-effort-hydration-timeout',
-            scope: 'native-sheet/models',
-            data: {'modelId': effortModel.id},
+          effortHydration = _ref.read(
+            serverModelReasoningEffortProvider(effortModel).future,
           );
         }
-        if (!context.mounted) return null;
       }
       final effortPolicy = nativeModelSelectorReasoningEffortPolicy(
         effortHydrated,
@@ -319,6 +304,10 @@ class NativeSheetHydrationService {
                       .asData
                       ?.value
                       .reasoningEffort,
+                  localEffort: localReasoningEffortForModel(
+                    _ref.read,
+                    lateEffortModel,
+                  ),
                 );
                 await bridge.updateModelSelectorReasoningEffort(
                   presentationId: presentationId,
