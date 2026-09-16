@@ -6579,5 +6579,21 @@
     }
   },
   "directBearerDescription": "Wysyła dane logowania w nagłówku Authorization: Bearer. Większość serwerów zgodnych z OpenAI (llama.cpp, vLLM, LM Studio, Ollama) tego oczekuje.",
-  "directApiKeyHeaderAzureOnlyDescription": "Wysyła dane logowania w nagłówku api-key. Używaj tego tylko dla Azure OpenAI; inne serwery zgodne z OpenAI oczekują tokenu Bearer."
+  "directApiKeyHeaderAzureOnlyDescription": "Wysyła dane logowania w nagłówku api-key. Używaj tego tylko dla Azure OpenAI; inne serwery zgodne z OpenAI oczekują tokenu Bearer.",
+  "aiAndMemoryTitle": "AI and Memory",
+  "chatsTitle": "Chats",
+  "composerHintForFolder": "Message {folderName}",
+  "markdownPreviewAfterStreaming": "Preview will be available after streaming completes.",
+  "markdownShowAllCharacters": "Show all ({count} characters)",
+  "pdfNoPagesToDisplay": "No pages to display.",
+  "profileTitle": "Profile",
+  "searchFailed": "Search failed",
+  "searchResultsHeader": "Results",
+  "settingsTitle": "Settings",
+  "share": "Share",
+  "themePaletteEochatDescription": "EO brand palette — purple, yellow and peach.",
+  "themePaletteEochatLabel": "EOchat",
+  "threadNoRepliesYet": "No replies yet",
+  "voiceExpand": "Expand",
+  "voiceMinimize": "Minimize"
 }

@@ -1631,6 +1631,7 @@
       }
     }
   },
+  "notificationSystemSettingsDescription": "Измените параметры разрешений, звука и баннеров для EOchat.",
   "notificationPermissionTitle": "Разрешение на уведомления",
   "@notificationPermissionTitle": {
     "description": "Title for the system notification permission prompt."
@@ -3506,5 +3507,11 @@
       }
     }
   },
-  "markdownPreviewAfterStreaming": "Предварительный просмотр будет доступен после завершения потоковой передачи."
+  "markdownPreviewAfterStreaming": "Предварительный просмотр будет доступен после завершения потоковой передачи.",
+  "notificationSystemSettingsOpenFailed": "Couldn't open system notification settings.",
+  "notificationSystemSettingsTitle": "System notification settings",
+  "readOnly": "Read-only",
+  "readOnlySharedChat": "This chat was shared with you. Only its owner can send messages.",
+  "sharedBadge": "Shared",
+  "sharedFolderOwner": "Shared by {name}"
 }

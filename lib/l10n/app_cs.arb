@@ -3415,6 +3415,7 @@
       }
     }
   },
+  "notificationSystemSettingsDescription": "Změňte oprávnění, zvuk a možnosti banneru pro EOchat.",
   "notificationPermissionTitle": "Oprávnění k oznámením",
   "@notificationPermissionTitle": {
     "description": "Title for the system notification permission prompt."
@@ -5081,5 +5082,36 @@
   "profileTitle": "Profil",
   "settingsTitle": "Nastavení",
   "themePaletteEochatDescription": "Značková paleta EO — fialová, žlutá a broskvová.",
-  "themePaletteEochatLabel": "EOchat"
+  "themePaletteEochatLabel": "EOchat",
+  "appleOnDeviceUnavailable": "Apple On-Device is not available on this device.",
+  "applePccContextSize": "{tokens} token context",
+  "applePccCurrentLanguageUnsupported": "The current device language may not be supported.",
+  "applePccOnDeviceFallback": "On-device fallback",
+  "applePccOnDeviceFallbackSubtitle": "Use Apple's smaller on-device model when PCC cannot be reached. Reasoning requests never fall back.",
+  "applePccQuotaApproaching": "Nearing the daily usage limit",
+  "applePccQuotaReached": "Daily usage limit reached",
+  "applePccQuotaResetsAt": "Resets {time}",
+  "applePccShowQuotaOptions": "Show usage options",
+  "applePccStatusAvailable": "Available",
+  "applePccUnavailable": "Apple Private Cloud Compute is not available on this device.",
+  "backendChooserAppleOnDeviceSubtitle": "Run Apple's private model on this device, even offline.",
+  "backendChooserAppleOnDeviceTitle": "Apple On-Device",
+  "backendChooserApplePccSubtitle": "Use Apple's private cloud model without an API key.",
+  "backendChooserApplePccTitle": "Apple Private Cloud Compute",
+  "backendChooserAppleSectionTitle": "Apple Intelligence",
+  "backendChooserModelApisSectionTitle": "Model APIs",
+  "backendChooserSelfHostedSectionTitle": "Self-hosted services",
+  "directContextCompactionDescription": "These models do not report a context window. EOchat uses the selected limit to compact older messages before requests get too large.",
+  "directContextCompactionPickerDescription": "Choose the context window EOchat should use for automatic compaction.",
+  "directContextCompactionTitle": "Context compaction",
+  "directContextLimit": "Context limit: {tokens}",
+  "notificationSystemSettingsOpenFailed": "Couldn't open system notification settings.",
+  "notificationSystemSettingsTitle": "System notification settings",
+  "readOnly": "Read-only",
+  "readOnlySharedChat": "This chat was shared with you. Only its owner can send messages.",
+  "reasoningEffortDeep": "Deep",
+  "reasoningEffortLight": "Light",
+  "reasoningEffortModerate": "Moderate",
+  "sharedBadge": "Shared",
+  "sharedFolderOwner": "Shared by {name}"
 }
