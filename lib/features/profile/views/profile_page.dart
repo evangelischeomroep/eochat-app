@@ -314,7 +314,12 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
     final connectionItems = <Widget>[
       _buildAccountOption(
         context,
-        iconAsset: 'assets/icons/hermes_agent.png',
+        // Line icon like every other settings row; the Hermes PNG is a
+        // full-colour illustration and was the one odd element in the list.
+        icon: UiUtils.platformIcon(
+          ios: CupertinoIcons.cube,
+          android: Icons.smart_toy_outlined,
+        ),
         title: l10n.hermesAgentSettingsTitle,
         subtitle: l10n.hermesAgentSettingsSubtitle,
         onTap: () => context.pushNamed(RouteNames.hermesSettings),

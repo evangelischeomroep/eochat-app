@@ -47,7 +47,7 @@ void main() {
     expect(find.text('Appearance'), findsOneWidget);
     expect(find.text('Chat'), findsOneWidget);
     expect(find.text('Hermes Agent'), findsOneWidget);
-    expect(find.byKey(const Key('hermes-settings-logo')), findsOneWidget);
+    expect(find.byKey(const Key('hermes-settings-logo')), findsNothing);
     expect(find.byKey(const Key('settings-category-account')), findsNothing);
     expect(find.byKey(const Key('settings-category-app')), findsNothing);
     expect(find.byKey(const Key('settings-category-ai')), findsNothing);
