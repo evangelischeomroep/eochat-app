@@ -1,12 +1,3 @@
-// The two keepAlive providers below intentionally expose long-lived
-// TextEditingController/FocusNode singletons for the sidebar header search
-// field, disposing them via ref.onDispose. riverpod_lint's
-// unsupported_provider_value rule is tuned for Future/Stream misuse and
-// false-positives on this controller-singleton pattern; suppressed at the
-// file level rather than restructuring pre-existing, unrelated provider
-// architecture.
-// ignore_for_file: unsupported_provider_value
-
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -23,15 +14,20 @@ class SidebarHeaderSearchExpanded extends _$SidebarHeaderSearchExpanded {
 }
 
 /// Shared search input for every searchable sidebar destination.
+///
+/// Wrapped in [Raw] because this intentionally returns a long-lived
+/// TextEditingController singleton that riverpod_generator doesn't manage
+/// itself - disposal is handled explicitly via [Ref.onDispose] below.
 @Riverpod(keepAlive: true)
-TextEditingController sidebarSearchFieldController(Ref ref) {
+Raw<TextEditingController> sidebarSearchFieldController(Ref ref) {
   final controller = TextEditingController();
   ref.onDispose(controller.dispose);
   return controller;
 }
 
+/// Wrapped in [Raw] for the same reason as [sidebarSearchFieldController].
 @Riverpod(keepAlive: true)
-FocusNode sidebarSearchFieldFocusNode(Ref ref) {
+Raw<FocusNode> sidebarSearchFieldFocusNode(Ref ref) {
   final node = FocusNode(debugLabel: 'sidebar_header_search');
   ref.onDispose(node.dispose);
   return node;

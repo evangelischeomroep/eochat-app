@@ -2,10 +2,10 @@
 // handles (loadConversationProvider, temporaryChatEnabledProvider, etc.)
 // via ref.read from within async/callback methods rather than ref.watch in
 // build(). riverpod_lint's only_use_keep_alive_inside_keep_alive rule flags
-// this defensively even though these reads don't retain a KeepAliveLink;
-// suppressed at the file level rather than restructuring pre-existing,
-// unrelated provider architecture.
-// ignore_for_file: only_use_keep_alive_inside_keep_alive
+// this defensively (see analysis_options.yaml, where it's suppressed
+// globally - this plugin-registered rule doesn't respect source-level
+// ignore comments) rather than restructuring pre-existing, unrelated
+// provider architecture.
 
 import 'dart:async';
 
