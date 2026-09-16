@@ -26,7 +26,7 @@ void main() {
     expect(find.byType(ShaderMask), findsNothing);
     expect(find.byType(DecoratedBox), findsWidgets);
     final fade = find.byType(ConduitChromeGradientFade);
-    expect(tester.getSize(fade).height, 110);
+    expect(tester.getSize(fade).height, 80 + kConduitChromeFadeHeight);
     expect(
       find.descendant(of: fade, matching: find.byType(IgnorePointer)),
       findsOneWidget,
