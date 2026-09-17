@@ -94,7 +94,11 @@ carried a branding-string swap. Current known inline-touch files:
   `IconButton` path when `ForkOverrides.plainSheetCloseButton` is set (default
   true), skipping the iOS 26 glass capsule.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
-  param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
+  param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names);
+  the native iOS 26 pill title (`resolveConduitNativeModelSelectorLabel`) drops a
+  trailing parenthesised qualifier and then tail-truncates instead of
+  middle-ellipsising (`_tailEllipsizeConduitNativeModelTitle` replaces
+  upstream's `_middleEllipsizeConduitNativeModelTitle`).
 - `lib/shared/theme/theme_extensions.dart` — values-only token retunes
   (`Spacing`, `AppBorderRadius`, `IconSize` aliases), `chatMessageStyle`
   leading, and the fork-added `AppTypography.listTitleStyle` used by one-line

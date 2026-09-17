@@ -803,7 +803,10 @@ double _measureConduitNativeModelTitle(
   return width;
 }
 
-String _middleEllipsizeConduitNativeModelTitle({
+/// Fork: tail-truncates the native pill title. Upstream kept both ends
+/// ("Standaa…evolen)"), which reads worse than a clean head for display
+/// names; the full name stays available in the sheet.
+String _tailEllipsizeConduitNativeModelTitle({
   required String value,
   required double maxWidth,
   required TextDirection textDirection,
@@ -827,13 +830,8 @@ String _middleEllipsizeConduitNativeModelTitle({
   var best = ellipsis;
   while (low <= high) {
     final visibleCount = (low + high) >> 1;
-    final leadingCount = (visibleCount + 1) >> 1;
-    final trailingCount = visibleCount - leadingCount;
-    final leading = graphemes.take(leadingCount).toString();
-    final trailing = trailingCount == 0
-        ? ''
-        : graphemes.takeLast(trailingCount).toString();
-    final candidate = '$leading$ellipsis$trailing';
+    final candidate =
+        '${graphemes.take(visibleCount).toString().trimRight()}$ellipsis';
     if (_measureConduitNativeModelTitle(
           candidate,
           textDirection,
@@ -847,6 +845,13 @@ String _middleEllipsizeConduitNativeModelTitle({
     }
   }
   return best;
+}
+
+/// Fork: drops one trailing parenthesised qualifier, e.g.
+/// "Standaard (aanbevolen)" → "Standaard", when the full name does not fit.
+String _withoutTrailingQualifier(String value) {
+  final match = RegExp(r'^(.*\S)\s*\([^()]*\)$').firstMatch(value);
+  return match == null ? value : match.group(1)!;
 }
 
 String _normalizedConduitNativeModelLabel(String label) =>
@@ -890,8 +895,9 @@ double resolveConduitNativeModelSelectorWidth({
   return desiredWidth.clamp(safeMinWidth, safeMaxWidth).toDouble();
 }
 
-/// Produces a single-line native button title while retaining both ends of a
-/// long model name and reserving the trailing disclosure chevron.
+/// Produces a single-line native button title, dropping a trailing
+/// parenthesised qualifier first and then tail-truncating, while reserving
+/// the trailing disclosure chevron.
 String resolveConduitNativeModelSelectorLabel({
   required String label,
   required bool isLoading,
@@ -919,8 +925,18 @@ String resolveConduitNativeModelSelectorLabel({
       guardedContentWidth) {
     return normalizedLabel;
   }
-  return _middleEllipsizeConduitNativeModelTitle(
-    value: normalizedLabel,
+  final withoutQualifier = _withoutTrailingQualifier(normalizedLabel);
+  if (withoutQualifier != normalizedLabel &&
+      _measureConduitNativeModelTitle(
+            withoutQualifier,
+            textDirection,
+            titleFontSize,
+          ) <=
+          guardedContentWidth) {
+    return withoutQualifier;
+  }
+  return _tailEllipsizeConduitNativeModelTitle(
+    value: withoutQualifier,
     maxWidth: guardedContentWidth,
     textDirection: textDirection,
     titleFontSize: titleFontSize,
