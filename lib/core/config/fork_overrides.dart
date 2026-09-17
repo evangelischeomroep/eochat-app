@@ -87,6 +87,15 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  /// When true, sheet close buttons render as a plain 36pt glyph on every
+  /// platform instead of an iOS 26 glass capsule. The glass variant drew a
+  /// purple ring (dark) or a drop shadow (light) that read as a different
+  /// control family from the rest of the sheet.
+  static const bool plainSheetCloseButton = bool.fromEnvironment(
+    'PLAIN_SHEET_CLOSE_BUTTON',
+    defaultValue: true,
+  );
+
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;
 

@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'dart:math' as math;
 
+import 'package:conduit/core/config/fork_overrides.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
@@ -445,7 +446,7 @@ class SheetCloseButton extends StatelessWidget {
       color: iconColor,
     );
 
-    if (!conduitSupportsNativeGlass()) {
+    if (!conduitSupportsNativeGlass() || ForkOverrides.plainSheetCloseButton) {
       return SizedBox.square(
         dimension: buttonSize,
         child: IconButton(
