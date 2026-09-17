@@ -294,10 +294,10 @@ List<ConduitContextMenuAction> buildConversationActionsWithFolders({
 
   return [
     ConduitContextMenuAction(
-      cupertinoIcon: isPinned
-          ? CupertinoIcons.pin_slash
-          : CupertinoIcons.pin_fill,
-      sfSymbol: isPinned ? 'pin.slash' : 'pin.fill',
+      // Fork: outline glyphs in menus; the filled pin/archive read heavier
+      // than the other rows.
+      cupertinoIcon: isPinned ? CupertinoIcons.pin_slash : CupertinoIcons.pin,
+      sfSymbol: isPinned ? 'pin.slash' : 'pin',
       materialIcon: isPinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
       label: isPinned ? l10n.unpin : l10n.pin,
       onBeforeClose: () => ConduitHaptics.lightImpact(),
@@ -305,9 +305,9 @@ List<ConduitContextMenuAction> buildConversationActionsWithFolders({
     ),
     ConduitContextMenuAction(
       cupertinoIcon: isArchived
-          ? CupertinoIcons.archivebox_fill
+          ? CupertinoIcons.tray_arrow_up
           : CupertinoIcons.archivebox,
-      sfSymbol: isArchived ? 'archivebox.fill' : 'archivebox',
+      sfSymbol: isArchived ? 'tray.and.arrow.up' : 'archivebox',
       materialIcon: isArchived
           ? Icons.unarchive_rounded
           : Icons.archive_rounded,

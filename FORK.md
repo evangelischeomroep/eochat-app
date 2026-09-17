@@ -65,6 +65,12 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/features/navigation/widgets/chats_drawer.dart` — search-results folder
   visibility only shows the Folders section when a folder actually matches, and
   hides the create-folder affordance in that read-only view.
+- `lib/shared/widgets/platform_ui/src/adaptive_controls.dart` — native popup
+  menu rows size their SF symbol at `kCupertinoNativeMenuItemSymbolExtent`
+  (17pt) instead of `CNSymbol`'s 24pt default; two extra entries in the
+  SF-symbol → CupertinoIcons fallback map (`pin`, `tray.and.arrow.up`).
+- `lib/shared/utils/conversation_context_menu.dart` — pin/archive actions use
+  outline glyphs (`pin`, `tray.and.arrow.up`) instead of the filled variants.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
 - `lib/shared/theme/theme_extensions.dart` — values-only token retunes

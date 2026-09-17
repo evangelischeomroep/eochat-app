@@ -10,6 +10,11 @@ import 'platform_ui_capabilities.dart';
 /// Native SF Symbol extent for 44-point iOS toolbar and composer controls.
 const double kCupertinoNativeControlSymbolExtent = 20;
 
+/// Fork: symbol point size for native popup-menu rows. CNSymbol defaults to
+/// 24pt, which outweighs the 17pt row label; UIKit's own menus draw symbols
+/// at roughly the body text size.
+const double kCupertinoNativeMenuItemSymbolExtent = 17;
+
 /// Flutter icon fallback for the SF Symbols used by Conduit's adaptive UI.
 IconData? cupertinoIconForSFSymbol(String symbol) => switch (symbol) {
   'bubble.left' => CupertinoIcons.chat_bubble,
@@ -22,10 +27,12 @@ IconData? cupertinoIconForSFSymbol(String symbol) => switch (symbol) {
   'sparkles' => CupertinoIcons.sparkles,
   'folder' => CupertinoIcons.folder,
   'folder.fill' => CupertinoIcons.folder_fill,
+  'pin' => CupertinoIcons.pin,
   'pin.fill' => CupertinoIcons.pin_fill,
   'pin.slash' => CupertinoIcons.pin_slash,
   'archivebox' => CupertinoIcons.archivebox,
   'archivebox.fill' => CupertinoIcons.archivebox_fill,
+  'tray.and.arrow.up' => CupertinoIcons.tray_arrow_up,
   'square.and.arrow.up' => CupertinoIcons.share,
   'pencil' => CupertinoIcons.pencil,
   'trash' => CupertinoIcons.delete,
@@ -586,7 +593,12 @@ class AdaptivePopupMenuButton<T> {
         else if (entry is AdaptivePopupMenuItem<T>)
           CNPopupMenuItem(
             label: entry.label,
-            icon: entry.icon is String ? CNSymbol(entry.icon as String) : null,
+            icon: entry.icon is String
+                ? CNSymbol(
+                    entry.icon as String,
+                    size: kCupertinoNativeMenuItemSymbolExtent,
+                  )
+                : null,
             customIcon: entry.icon is IconData ? entry.icon as IconData : null,
             enabled: entry.enabled,
             checked: entry.checked,
