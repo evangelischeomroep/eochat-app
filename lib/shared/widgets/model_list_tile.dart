@@ -346,14 +346,21 @@ class ModelListTile extends StatelessWidget {
                   size: IconSize.small,
                 ),
               ],
-              if (isSelected) ...[
-                const SizedBox(width: Spacing.xs),
-                Icon(
-                  Platform.isIOS ? CupertinoIcons.check_mark : Icons.check,
-                  color: theme.buttonPrimary,
-                  size: IconSize.medium,
-                ),
-              ],
+              // Fork: reserve the check slot on every row so the pin column
+              // does not jump left on the selected row.
+              const SizedBox(width: Spacing.xs),
+              SizedBox(
+                width: IconSize.medium,
+                child: isSelected
+                    ? Icon(
+                        Platform.isIOS
+                            ? CupertinoIcons.check_mark
+                            : Icons.check,
+                        color: theme.buttonPrimary,
+                        size: IconSize.medium,
+                      )
+                    : null,
+              ),
             ],
           ),
         ),

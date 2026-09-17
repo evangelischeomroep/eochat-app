@@ -75,6 +75,8 @@ carried a branding-string swap. Current known inline-touch files:
   Hermes-fast / more-models actions render as rows inside one grouped
   `ConduitCard` (`_ActionGroup`) with the same leading extent and insets as
   `ModelListTile`, instead of three stand-alone cards.
+- `lib/shared/widgets/model_list_tile.dart` — the trailing check slot is
+  reserved on every row (empty when unselected) so the pin column stays put.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
 - `lib/shared/theme/theme_extensions.dart` — values-only token retunes
