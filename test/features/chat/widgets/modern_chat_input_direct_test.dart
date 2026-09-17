@@ -1181,9 +1181,9 @@ void main() {
             ),
           )
           .size,
-      IconSize.large,
+      IconSize.medium,
     );
-    expect(tester.getSize(expandButton), const Size.square(32));
+    expect(tester.getSize(expandButton), const Size.square(28));
     final overflowButton = tester.widget<AdaptiveButton>(
       find.descendant(
         of: find.byKey(const ValueKey<String>('composer-overflow-button')),
@@ -1202,7 +1202,7 @@ void main() {
             ),
           )
           .size,
-      IconSize.large,
+      IconSize.medium,
     );
     final expandRect = tester.getRect(
       find.byKey(const ValueKey<String>('composer-expand-button')),
@@ -1305,7 +1305,7 @@ void main() {
     expect(tester.widget<AdaptiveButton>(nativePrimary()), same(nativeButton));
   });
 
-  testWidgets('pre-iOS 26 composer uses 24pt Cupertino add and close glyphs', (
+  testWidgets('pre-iOS 26 composer uses 20pt Cupertino add and close glyphs', (
     tester,
   ) async {
     PlatformUiCapabilities.debugPlatformOverride = TargetPlatform.iOS;
@@ -1330,7 +1330,7 @@ void main() {
     );
     expect(
       tester.widget<Icon>(find.byIcon(CupertinoIcons.add)).size,
-      IconSize.large,
+      IconSize.medium,
     );
     expect(
       tester.getSize(overflowButton),
@@ -1342,7 +1342,7 @@ void main() {
 
     expect(
       tester.widget<Icon>(find.byIcon(CupertinoIcons.xmark)).size,
-      IconSize.large,
+      IconSize.medium,
     );
     expect(
       tester.getSize(overflowButton),
@@ -1728,8 +1728,8 @@ void main() {
       final addIcon = tester.widget<Icon>(find.byIcon(Icons.add));
       final micIcon = tester.widget<Icon>(find.byIcon(Icons.mic));
       final voiceIcon = tester.widget<Icon>(find.byIcon(Icons.graphic_eq));
-      expect(addIcon.size, 28);
-      expect(micIcon.size, IconSize.large);
+      expect(addIcon.size, IconSize.large);
+      expect(micIcon.size, IconSize.medium);
       expect(voiceIcon.size, IconSize.medium);
 
       final addButton = find.byKey(
@@ -1827,7 +1827,7 @@ void main() {
     final compactCloseGlyphSize = tester
         .widget<Icon>(find.byIcon(Icons.close))
         .size;
-    expect(compactCloseGlyphSize, 28);
+    expect(compactCloseGlyphSize, IconSize.large);
     expect(compactCloseControlSize, addControlSize);
 
     await tester.enterText(find.byType(TextField), 'first line\nsecond line');

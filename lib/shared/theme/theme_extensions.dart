@@ -1580,12 +1580,13 @@ class IconSize {
   // Specific component icon sizes — aliases of the scale above.
   static const double chatBubble = chip;
   static const double actionButton = md;
-  static const double floatingButton = lg;
+  // Fork: 20pt glyphs in 44pt controls; 24 filled the circle.
+  static const double floatingButton = md;
   static const double bottomSheet = lg;
   static const double dialog = lg;
   static const double snackbar = md;
   static const double tabBar = md;
-  static const double appBar = lg;
+  static const double appBar = md;
   static const double listItem = md;
   static const double formField = md;
 }

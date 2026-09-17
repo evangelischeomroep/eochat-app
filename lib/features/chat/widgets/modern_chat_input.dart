@@ -381,8 +381,10 @@ TextStyle _composerInputTextStyle(bool isRecording) =>
     );
 
 const double _maxCompactComposerControlScale = 1.25;
-const double _cupertinoComposerOverflowIconExtent = IconSize.large;
-const double _materialComposerOverflowIconExtent = 28;
+// Fork: one glyph size per composer row. The add glyph matches the mic
+// (IconSize.medium) on iOS; Material's compact add glyph gets one step up.
+const double _cupertinoComposerOverflowIconExtent = IconSize.medium;
+const double _materialComposerOverflowIconExtent = IconSize.large;
 
 typedef _ComposerTypography = ({
   ui.TextDirection direction,
@@ -3402,7 +3404,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
               Padding(
                 padding: EdgeInsetsDirectional.only(
                   end: _showExpandButton && !_expandModalOpen
-                      ? conduitScaledIconExtent(context, IconSize.large) +
+                      ? conduitScaledIconExtent(context, IconSize.medium) +
                             (Spacing.xs * 3)
                       : 0,
                 ),
@@ -4128,7 +4130,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   }
 
   Widget _buildExpandButton(VoidCallback onTap) {
-    final iconSize = conduitScaledIconExtent(context, IconSize.large);
+    final iconSize = conduitScaledIconExtent(context, IconSize.medium);
     final iconColor = context.conduitTheme.textSecondary.withValues(alpha: 0.7);
     return AdaptiveTooltip(
       message: AppLocalizations.of(context)!.edit,
