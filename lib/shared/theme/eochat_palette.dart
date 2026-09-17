@@ -84,7 +84,9 @@ final TweakcnThemeVariant _eochatDark = TweakcnThemeVariant(
   accentForeground: const Color(0xFF2B213D),
   destructive: EOchatBrand.red,
   destructiveForeground: const Color(0xFFFFFFFF),
-  border: const Color(0xFF3A2C58),
+  // Barely lighter than the background: dark surfaces separate by fill
+  // step, not by outline. 3A2C58 drew a visible purple hairline on every card.
+  border: const Color(0xFF2A1E40),
   input: const Color(0xFF3A1F63),
   ring: EOchatBrand.purple,
   sidebarBackground: const Color(0xFF351973),

@@ -4771,6 +4771,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     bool isRecording = false,
   }) {
     final theme = context.conduitTheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final recordingBorderColor = theme.buttonPrimary.withValues(alpha: 0.56);
     final recordingSurfaceColor = Color.alphaBlend(
       theme.buttonPrimary.withValues(alpha: 0.045),
@@ -4826,7 +4827,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       foregroundDecoration: BoxDecoration(
         borderRadius: borderRadius,
         border: Border.all(
-          color: isRecording ? recordingBorderColor : theme.cardBorder,
+          // Fork: in dark the fill step already separates the shell; the
+          // hairline on top read as a wireframe outline.
+          color: isRecording
+              ? recordingBorderColor
+              : (isDark ? Colors.transparent : theme.cardBorder),
           width: isRecording ? BorderWidth.thin * 1.5 : BorderWidth.thin,
         ),
       ),
