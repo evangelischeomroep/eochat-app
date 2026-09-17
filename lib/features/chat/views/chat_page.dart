@@ -4073,6 +4073,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Fork: the chrome scrims must fade from the colour the scaffold actually
+    // paints. AdaptiveScaffold uses a CupertinoPageScaffold on iOS (tone 10),
+    // while the fade widget defaults to surfaceBackground (tone 00), which
+    // showed up as a lighter band behind the app bar and above the composer.
+    final chromeFadeColor = PlatformUiCapabilities.isIOS
+        ? CupertinoTheme.of(context).scaffoldBackgroundColor
+        : theme.scaffoldBackgroundColor;
     final l10n = AppLocalizations.of(context)!;
     final selectedModel = ref.watch(
       selectedModelProvider.select((model) => model),
@@ -4170,6 +4177,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   contentHeight:
                       MediaQuery.viewPaddingOf(context).top +
                       conduitAdaptiveToolbarHeightOf(context),
+                  backgroundColor: chromeFadeColor,
                 ),
               ),
               Positioned(
@@ -4185,6 +4193,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   ),
                   fadeHeight: Spacing.md,
+                  backgroundColor: chromeFadeColor,
                 ),
               ),
               Positioned(
