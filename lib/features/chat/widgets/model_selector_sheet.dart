@@ -478,7 +478,8 @@ class _ModelGroup extends ConsumerWidget {
         if (!isLast)
           Divider(
             height: 1,
-            indent: 52,
+            indent:
+                Spacing.xs + Spacing.sm + kModelTileLeadingExtent + Spacing.sm,
             color: context.conduitTheme.dividerColor,
           ),
       ],
@@ -501,7 +502,11 @@ class _ActionGroup extends StatelessWidget {
           if (index < children.length - 1)
             Divider(
               height: 1,
-              indent: 52,
+              indent:
+                  Spacing.xs +
+                  Spacing.sm +
+                  kModelTileLeadingExtent +
+                  Spacing.sm,
               color: context.conduitTheme.dividerColor,
             ),
         ],
@@ -541,11 +546,11 @@ class _ActionCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: kModelTileLeadingExtent,
+                height: kModelTileLeadingExtent,
                 decoration: BoxDecoration(
                   color: theme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.sm),
                 ),
                 alignment: Alignment.center,
                 child: Icon(

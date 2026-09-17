@@ -76,7 +76,8 @@ carried a branding-string swap. Current known inline-touch files:
   `ConduitCard` (`_ActionGroup`) with the same leading extent and insets as
   `ModelListTile`, instead of three stand-alone cards.
 - `lib/shared/widgets/model_list_tile.dart` — the trailing check slot is
-  reserved on every row (empty when unselected) so the pin column stays put.
+  reserved on every row (empty when unselected) so the pin column stays put;
+  leading tiles are `kModelTileLeadingExtent` (28pt) instead of 32.
 - `lib/shared/widgets/chat_action_button.dart` — footer action glyphs at
   `IconSize.md` in `iconSecondary` (disabled: 45% alpha) instead of 16pt
   `textPrimary` at 80%.

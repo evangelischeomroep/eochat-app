@@ -34,6 +34,10 @@ String? directModelSourceLabel(Model model) {
 }
 
 /// Small chip that displays a model capability (e.g. multimodal, reasoning).
+/// Leading tile extent shared by model rows and the model-sheet action rows.
+const double kModelTileLeadingExtent = 28;
+const double _kModelTileLeadingExtent = kModelTileLeadingExtent;
+
 class ModelCapabilityChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -205,12 +209,13 @@ class ModelListTile extends StatelessWidget {
 
     final Widget leading;
     if (isAutoSelect) {
+      // Fork: 28pt leading tiles; 32 read heavy next to 16pt text.
       leading = Container(
-        width: 32,
-        height: 32,
+        width: _kModelTileLeadingExtent,
+        height: _kModelTileLeadingExtent,
         decoration: BoxDecoration(
           color: theme.buttonPrimary.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+          borderRadius: BorderRadius.circular(AppBorderRadius.sm),
         ),
         child: Icon(
           Platform.isIOS ? CupertinoIcons.wand_stars : Icons.auto_awesome,
@@ -219,7 +224,11 @@ class ModelListTile extends StatelessWidget {
         ),
       );
     } else {
-      leading = ModelAvatar(size: 32, imageUrl: iconUrl, label: model.name);
+      leading = ModelAvatar(
+        size: _kModelTileLeadingExtent,
+        imageUrl: iconUrl,
+        label: model.name,
+      );
     }
 
     final hasCapabilities =
