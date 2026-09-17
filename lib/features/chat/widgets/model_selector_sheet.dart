@@ -144,6 +144,36 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
         isHermesModel(selectedModel) &&
         selectedModel.metadata?['hermesFast'] == true;
 
+    final actionRows = <Widget>[
+      if (effortPolicy.visible)
+        _ActionCard(
+          icon: Platform.isIOS ? CupertinoIcons.timer : Icons.schedule_rounded,
+          title: l10n.reasoningEffort,
+          subtitle: _effortLabel(l10n, ref.watch(reasoningEffortProvider)),
+          onTap: _showEffortSelector,
+        ),
+      if (supportsHermesFast)
+        _ActionCard(
+          icon: Platform.isIOS ? CupertinoIcons.bolt : Icons.bolt_rounded,
+          title: l10n.hermesFastTier,
+          subtitle: ref.watch(hermesFastTierSelectionProvider)
+              ? l10n.hermesFastTierOn
+              : l10n.hermesFastTierOff,
+          onTap: () {
+            final enabled = ref.read(hermesFastTierSelectionProvider);
+            ref.read(hermesFastTierSelectionProvider.notifier).set(!enabled);
+          },
+        ),
+      if (layout.more.isNotEmpty)
+        _ActionCard(
+          icon: Platform.isIOS
+              ? CupertinoIcons.ellipsis
+              : Icons.more_horiz_rounded,
+          title: l10n.moreModels,
+          onTap: () => setState(() => _showMore = true),
+        ),
+    ];
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.72,
@@ -210,52 +240,12 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
                             models: layout.featured,
                             onTogglePinnedModel: _togglePinnedModel,
                           ),
-                          const SizedBox(height: Spacing.md),
-                          if (effortPolicy.visible) ...[
-                            _ActionCard(
-                              icon: Platform.isIOS
-                                  ? CupertinoIcons.timer
-                                  : Icons.schedule_rounded,
-                              title: l10n.reasoningEffort,
-                              subtitle: _effortLabel(
-                                l10n,
-                                ref.watch(reasoningEffortProvider),
-                              ),
-                              onTap: _showEffortSelector,
-                            ),
-                          ],
-                          if (supportsHermesFast) ...[
+                          // Fork: the actions render as rows in one grouped
+                          // card, like the model list above, instead of three
+                          // stand-alone 76pt cards.
+                          if (actionRows.isNotEmpty) ...[
                             const SizedBox(height: Spacing.md),
-                            _ActionCard(
-                              icon: Platform.isIOS
-                                  ? CupertinoIcons.bolt
-                                  : Icons.bolt_rounded,
-                              title: l10n.hermesFastTier,
-                              subtitle:
-                                  ref.watch(hermesFastTierSelectionProvider)
-                                  ? l10n.hermesFastTierOn
-                                  : l10n.hermesFastTierOff,
-                              onTap: () {
-                                final enabled = ref.read(
-                                  hermesFastTierSelectionProvider,
-                                );
-                                ref
-                                    .read(
-                                      hermesFastTierSelectionProvider.notifier,
-                                    )
-                                    .set(!enabled);
-                              },
-                            ),
-                          ],
-                          if (layout.more.isNotEmpty) ...[
-                            const SizedBox(height: Spacing.md),
-                            _ActionCard(
-                              icon: Platform.isIOS
-                                  ? CupertinoIcons.ellipsis
-                                  : Icons.more_horiz_rounded,
-                              title: l10n.moreModels,
-                              onTap: () => setState(() => _showMore = true),
-                            ),
+                            _ActionGroup(children: actionRows),
                           ],
                         ],
                       ),
@@ -496,6 +486,30 @@ class _ModelGroup extends ConsumerWidget {
   }
 }
 
+class _ActionGroup extends StatelessWidget {
+  const _ActionGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => ConduitCard(
+    padding: const EdgeInsets.all(Spacing.xs),
+    child: Column(
+      children: [
+        for (var index = 0; index < children.length; index++) ...[
+          children[index],
+          if (index < children.length - 1)
+            Divider(
+              height: 1,
+              indent: 52,
+              color: context.conduitTheme.dividerColor,
+            ),
+        ],
+      ],
+    ),
+  );
+}
+
 class _ActionCard extends StatelessWidget {
   const _ActionCard({
     required this.icon,
@@ -510,52 +524,72 @@ class _ActionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => ConduitCard(
-    onTap: onTap,
-    padding: const EdgeInsets.all(Spacing.md),
-    child: Row(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: context.conduitTheme.surfaceContainerHighest,
-            shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final theme = context.conduitTheme;
+    // Same leading extent, insets and type as ModelListTile so the two
+    // grouped cards share one row rhythm.
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xxs),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.sm,
+            vertical: Spacing.xs,
           ),
-          alignment: Alignment.center,
-          child: Icon(icon, color: context.conduitTheme.textPrimary),
-        ),
-        const SizedBox(width: Spacing.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                title,
-                style: AppTypography.bodyLargeStyle.copyWith(
-                  fontSize: 16,
-                  height: 1.35,
-                  fontWeight: FontWeight.w500,
-                  color: context.conduitTheme.textPrimary,
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: theme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(AppBorderRadius.xs),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  icon,
+                  size: IconSize.medium,
+                  color: theme.textPrimary,
                 ),
               ),
-              if (subtitle != null)
+              const SizedBox(width: Spacing.sm),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTypography.bodyLargeStyle.copyWith(
+                    fontSize: 16,
+                    height: 1.35,
+                    color: theme.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(width: Spacing.sm),
                 Text(
                   subtitle!,
                   style: AppTypography.bodyMediumStyle.copyWith(
                     fontSize: 14,
                     height: 1.35,
-                    color: context.conduitTheme.buttonPrimary,
+                    color: theme.textSecondary,
                   ),
                 ),
+              ],
+              const SizedBox(width: Spacing.xs),
+              Icon(
+                Platform.isIOS
+                    ? CupertinoIcons.chevron_right
+                    : Icons.chevron_right,
+                size: IconSize.small,
+                color: theme.iconSecondary,
+              ),
             ],
           ),
         ),
-        Icon(
-          Platform.isIOS ? CupertinoIcons.chevron_right : Icons.chevron_right,
-          color: context.conduitTheme.iconSecondary,
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

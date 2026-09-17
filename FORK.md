@@ -71,6 +71,10 @@ carried a branding-string swap. Current known inline-touch files:
   SF-symbol → CupertinoIcons fallback map (`pin`, `tray.and.arrow.up`).
 - `lib/shared/utils/conversation_context_menu.dart` — pin/archive actions use
   outline glyphs (`pin`, `tray.and.arrow.up`) instead of the filled variants.
+- `lib/features/chat/widgets/model_selector_sheet.dart` — the reasoning-effort /
+  Hermes-fast / more-models actions render as rows inside one grouped
+  `ConduitCard` (`_ActionGroup`) with the same leading extent and insets as
+  `ModelListTile`, instead of three stand-alone cards.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
 - `lib/shared/theme/theme_extensions.dart` — values-only token retunes
