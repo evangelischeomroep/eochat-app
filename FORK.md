@@ -86,6 +86,9 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/features/chat/widgets/sources/openwebui_sources.dart` — the sources
   chip is a filled `surfaceContainerHighest` pill on every platform with a
   `w500` `textSecondary` label (upstream: glass + primary tint, `w600`).
+- `lib/shared/theme/app_theme.dart` — the Cupertino theme's
+  `scaffoldBackgroundColor`/`barBackgroundColor` use `neutralTone00` (same as
+  the Material scaffold) instead of `neutralTone10`.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
 - `lib/shared/theme/theme_extensions.dart` — values-only token retunes

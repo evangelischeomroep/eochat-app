@@ -317,8 +317,12 @@ class AppTheme {
     return CupertinoThemeData(
       brightness: brightness,
       primaryColor: actionColor,
-      scaffoldBackgroundColor: tokens.neutralTone10,
-      barBackgroundColor: tokens.neutralTone10,
+      // Fork: the Material scaffold already paints tone 00; painting the
+      // Cupertino page in tone 10 gave iOS a third near-white tint between
+      // the page, the cards and the white sheets. One page colour, one card
+      // step, on both platforms.
+      scaffoldBackgroundColor: tokens.neutralTone00,
+      barBackgroundColor: tokens.neutralTone00,
       textTheme: CupertinoTextThemeData(
         textStyle: chromeTextTheme.bodyLarge,
         actionTextStyle: chromeTextTheme.bodyLarge?.copyWith(
