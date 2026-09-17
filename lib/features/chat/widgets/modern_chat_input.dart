@@ -3321,6 +3321,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         }
         if (tool != null) {
           final bool isSelected = selectedToolIds.contains(id);
+          if (ForkOverrides.hideInactiveComposerQuickPills && !isSelected) {
+            continue;
+          }
           final String label = tool.name;
           final IconData icon = Platform.isIOS
               ? CupertinoIcons.wrench
