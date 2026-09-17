@@ -3217,8 +3217,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
 
     final bool hasComposerFocus = _hasComposerFocus;
     final bool isActive = hasComposerFocus || _hasText || _isRecording;
-    final Color placeholderColor = context.conduitTheme.textSecondary
-        .withValues(alpha: 0.5);
+    // Fork: textSecondary at 50% nearly vanished on the card-coloured shell
+    // in light mode; the tertiary ink is the intended placeholder step.
+    final Color placeholderColor = context.conduitTheme.textTertiary;
     final Color placeholderBase = placeholderColor;
     final Color placeholderFocused = placeholderColor;
     final List<Widget> quickPills = <Widget>[];
