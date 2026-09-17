@@ -1967,8 +1967,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       };
     }
 
+    // Fork: outline speaker so the footer glyphs share one weight.
     final IconData listenIcon = Platform.isIOS
-        ? CupertinoIcons.speaker_2_fill
+        ? CupertinoIcons.speaker_2
         : Icons.volume_up;
     final IconData stopIcon = Platform.isIOS
         ? CupertinoIcons.stop_fill
@@ -1996,7 +1997,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           onTap: ttsOnTap,
           sfSymbol: (showStopState || showPreparingTtsState)
               ? 'stop.fill'
-              : 'speaker.wave.2.fill',
+              : 'speaker.wave.2',
         ),
       if (!widget.readOnly)
         _AssistantFooterAction(
@@ -2125,9 +2126,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
               }
             }
           },
-          tint: theme.textPrimary.withValues(alpha: 0.8),
+          tint: theme.iconSecondary,
           size: 32,
-          iconSize: IconSize.sm,
+          iconSize: IconSize.md,
           buttonStyle: PopupButtonStyle.plain,
         ),
       ),

@@ -24,9 +24,11 @@ class ChatActionButton extends StatelessWidget {
             onTap!();
           };
 
-    final foreground = theme.textPrimary.withValues(
-      alpha: handleTap == null ? 0.36 : 0.8,
-    );
+    // Fork: footer glyphs sit in secondary ink at the standard 20pt extent
+    // so they read as one quiet family under the answer text.
+    final foreground = handleTap == null
+        ? theme.iconSecondary.withValues(alpha: 0.45)
+        : theme.iconSecondary;
 
     return Tooltip(
       message: label,
@@ -42,7 +44,7 @@ class ChatActionButton extends StatelessWidget {
             width: 32,
             height: 32,
             child: Center(
-              child: Icon(icon, size: IconSize.sm, color: foreground),
+              child: Icon(icon, size: IconSize.md, color: foreground),
             ),
           ),
         ),

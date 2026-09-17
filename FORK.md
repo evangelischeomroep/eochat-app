@@ -77,6 +77,15 @@ carried a branding-string swap. Current known inline-touch files:
   `ModelListTile`, instead of three stand-alone cards.
 - `lib/shared/widgets/model_list_tile.dart` — the trailing check slot is
   reserved on every row (empty when unselected) so the pin column stays put.
+- `lib/shared/widgets/chat_action_button.dart` — footer action glyphs at
+  `IconSize.md` in `iconSecondary` (disabled: 45% alpha) instead of 16pt
+  `textPrimary` at 80%.
+- `lib/features/chat/widgets/assistant_message_widget.dart` — outline speaker
+  glyph for the listen action (`speaker.wave.2`); overflow button tint/size
+  match `ChatActionButton`.
+- `lib/features/chat/widgets/sources/openwebui_sources.dart` — the sources
+  chip is a filled `surfaceContainerHighest` pill on every platform with a
+  `w500` `textSecondary` label (upstream: glass + primary tint, `w600`).
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names).
 - `lib/shared/theme/theme_extensions.dart` — values-only token retunes

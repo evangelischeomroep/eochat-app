@@ -156,8 +156,8 @@ class OpenWebUISourcesWidget extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final labelStyle = AppTypography.labelMediumStyle.copyWith(
-          fontWeight: FontWeight.w600,
-          color: theme.textPrimary.withValues(alpha: 0.8),
+          fontWeight: FontWeight.w500,
+          color: theme.textSecondary,
         );
         final textPainter = TextPainter(
           text: TextSpan(
@@ -181,12 +181,12 @@ class OpenWebUISourcesWidget extends StatelessWidget {
           label: _sourceCountLabel(sources.length),
           child: AdaptiveButton.child(
             onPressed: () => _showSourcesBottomSheet(context),
-            style: usesOpaqueFallback
-                ? AdaptiveButtonStyle.filled
-                : AdaptiveButtonStyle.glass,
-            color: usesOpaqueFallback
-                ? theme.surfaceContainerHighest.withValues(alpha: 0.95)
-                : null,
+            // Fork: a quiet card-coloured chip on every platform. The glass
+            // variant picked up the primary tint and outweighed the answer.
+            style: AdaptiveButtonStyle.filled,
+            color: theme.surfaceContainerHighest.withValues(
+              alpha: usesOpaqueFallback ? 0.95 : 1,
+            ),
             size: AdaptiveButtonSize.small,
             padding: EdgeInsets.zero,
             minSize: Size(targetWidth, 28),
@@ -239,8 +239,8 @@ class OpenWebUISourcesWidget extends StatelessWidget {
         Text(
           _sourceCountLabel(sources.length),
           style: AppTypography.labelMediumStyle.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.textPrimary.withValues(alpha: 0.8),
+            fontWeight: FontWeight.w500,
+            color: theme.textSecondary,
           ),
         ),
       ],
