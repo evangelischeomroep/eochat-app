@@ -4766,13 +4766,19 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
         NativeSheetSettingsStyle.apply(to: tableView)
     }
 
-    override func numberOfSections(in tableView: UITableView) -> Int { 3 }
+    // Fork: reasoning effort and "more models" share one grouped section so
+    // the sheet reads as two cards (models, actions), like the Flutter sheet.
+    private enum ActionRow { case effort, more }
+    private var actionRows: [ActionRow] {
+        moreModels.isEmpty ? [.effort] : [.effort, .more]
+    }
+
+    override func numberOfSections(in tableView: UITableView) -> Int { 2 }
 
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         switch section {
         case 0: featuredModels.count
-        case 1: 1
-        case 2: moreModels.isEmpty ? 0 : 1
+        case 1: actionRows.count
         default: 0
         }
     }
@@ -4798,7 +4804,11 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
 
         let cell = UITableViewCell(style: .subtitle, reuseIdentifier: nil)
         var content = cell.defaultContentConfiguration()
-        if indexPath.section == 1 {
+        // Fork: same surface, insets and 24pt symbols as the settings rows;
+        // the default cell had no visible surface on the light sheet.
+        NativeSheetSettingsStyle.applyCellStyle(cell)
+        NativeSheetSettingsStyle.applyContentStyle(&content)
+        if actionRows[indexPath.row] == .effort {
             content.image = UIImage(systemName: "clock")
             content.text = configuration.reasoningEffortTitle
             content.secondaryText = effortLabel(reasoningEffortValue)
@@ -4824,10 +4834,10 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
         case 0:
             NativeSheetHaptics.selection()
             onSelect(featuredModels[indexPath.row].id)
-        case 1:
+        case 1 where actionRows[indexPath.row] == .effort:
             guard effortSelectionEnabled else { return }
             presentEffortSelector(sourceView: tableView.cellForRow(at: indexPath))
-        case 2:
+        case 1:
             let controller = NativeMoreModelsTableViewController(
                 title: configuration.moreModelsTitle,
                 searchPlaceholder: configuration.searchModelsTitle,
@@ -5314,12 +5324,21 @@ extension NativeOptionsSelectorTableViewController: UISearchResultsUpdating {
 }
 
 private final class NativeModelSelectorTableViewCell: UITableViewCell {
-    private let avatarView = NativeModelAvatarView(side: 32)
+    // Fork: 28pt tiles (was 32) next to 17pt text, matching the Flutter list.
+    private let avatarView = NativeModelAvatarView(side: 28)
+    // Fork: the check mark is a fixed-size accessory on every row so the pin
+    // column does not shift on the selected row.
+    private let checkView = UIImageView(
+        image: UIImage(
+            systemName: "checkmark",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
+        )
+    )
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let tagsStack = UIStackView()
     private let textStack = UIStackView()
-    private let pinImageView = UIImageView(image: UIImage(systemName: "pin.fill"))
+    private let pinImageView = UIImageView(image: UIImage(systemName: "pin"))
     private var pinWidthConstraint: NSLayoutConstraint?
     private var textTrailingToPinConstraint: NSLayoutConstraint?
 
@@ -5369,7 +5388,8 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
             avatarCacheIdentifier: avatarCacheIdentifier
         )
 
-        accessoryType = isSelected ? .checkmark : .none
+        accessoryView = checkView
+        checkView.alpha = isSelected ? 1 : 0
         pinImageView.isHidden = !isPinned
         pinWidthConstraint?.constant = isPinned ? 16 : 0
         textTrailingToPinConstraint?.constant = isPinned ? -NativeSheetSettingsStyle.iconSpacing : 0
@@ -5430,6 +5450,10 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
         tagsStack.alignment = .center
         tagsStack.distribution = .fill
         tagsStack.isHidden = true
+        checkView.tintColor = NativeSheetTheme.shared.accent
+        checkView.contentMode = .center
+        checkView.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
+        accessoryView = checkView
         pinImageView.translatesAutoresizingMaskIntoConstraints = false
         pinImageView.contentMode = .scaleAspectFit
         pinImageView.tintColor = NativeSheetTheme.shared.icon
@@ -5443,8 +5467,8 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
         NSLayoutConstraint.activate([
             avatarView.leadingAnchor.constraint(equalTo: contentView.layoutMarginsGuide.leadingAnchor),
             avatarView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            avatarView.widthAnchor.constraint(equalToConstant: 32),
-            avatarView.heightAnchor.constraint(equalToConstant: 32),
+            avatarView.widthAnchor.constraint(equalToConstant: 28),
+            avatarView.heightAnchor.constraint(equalToConstant: 28),
 
             textStack.leadingAnchor.constraint(
                 equalTo: avatarView.trailingAnchor,

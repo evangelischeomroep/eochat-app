@@ -93,6 +93,11 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/shared/widgets/themed_sheets.dart` — `SheetCloseButton` takes its plain
   `IconButton` path when `ForkOverrides.plainSheetCloseButton` is set (default
   true), skipping the iOS 26 glass capsule.
+- `ios/Runner/NativeSheetBridge.swift` — native model selector: 28pt avatar
+  tiles, outline pin glyph, a fixed-size check accessory on every row, and the
+  reasoning-effort / more-models rows in one grouped section styled with
+  `NativeSheetSettingsStyle` (upstream: 32pt, `pin.fill`, `.checkmark`
+  accessory, two sections of default cells).
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names);
   the native iOS 26 pill title (`resolveConduitNativeModelSelectorLabel`) drops a
