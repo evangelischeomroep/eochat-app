@@ -105,7 +105,7 @@ carried a branding-string swap. Current known inline-touch files:
   rows use `slider.horizontal.3`, `bubble.left` and `cube` (Hermes) instead of
   `paintpalette`, `bubble.left.and.bubble.right` and the Hermes logo asset.
 - `ios/Runner/NativeKeyboardAttachmentBridge.swift` — the attachment input
-  view takes `overrideUserInterfaceStyle` from the app window when activated
+  view takes `overrideUserInterfaceStyle` from `NativeSheetTheme.shared.isDark` when activated
   (it rendered dark in light mode inside the keyboard window) and its
   `tintColor` from `NativeSheetTheme.shared.accent` (was the keyboard window's
   system blue).

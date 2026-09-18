@@ -194,12 +194,12 @@ final class NativeKeyboardAttachmentBridge: NativeKeyboardAttachmentHostApi {
         reloadInputViews: Bool
     ) {
         shouldPresentOnNextFocus = false
-        // Fork: the input view is hosted in the keyboard window and inherited a
-        // dark appearance while the app was in light mode. Follow the app
-        // window's interface style instead.
-        let hostWindow = (responder as? UIView)?.window ?? keyWindow
+        // Fork: the input view is hosted in the keyboard window and did not
+        // follow the app's appearance (dark panel in light mode, and the
+        // window trait proved unreliable). Use the theme Dart syncs into
+        // NativeSheetTheme, the same source the native sheets use.
         attachmentInputView.overrideUserInterfaceStyle =
-            hostWindow?.traitCollection.userInterfaceStyle ?? .unspecified
+            NativeSheetTheme.shared.isDark ? .dark : .light
         // Fork: the keyboard window's tint is system blue; use the app accent
         // that Dart syncs into NativeSheetTheme so selected tools read purple
         // like every other selection in the app.
