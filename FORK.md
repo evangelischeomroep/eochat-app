@@ -104,6 +104,9 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/features/navigation/widgets/sidebar_user_pill.dart` — native settings
   rows use `slider.horizontal.3`, `bubble.left` and `cube` (Hermes) instead of
   `paintpalette`, `bubble.left.and.bubble.right` and the Hermes logo asset.
+- `ios/Runner/NativeKeyboardAttachmentBridge.swift` — the attachment input
+  view takes `overrideUserInterfaceStyle` from the app window when activated
+  (it rendered dark in light mode inside the keyboard window).
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names);
   the native iOS 26 pill title (`resolveConduitNativeModelSelectorLabel`) drops a

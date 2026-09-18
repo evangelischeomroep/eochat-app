@@ -194,6 +194,12 @@ final class NativeKeyboardAttachmentBridge: NativeKeyboardAttachmentHostApi {
         reloadInputViews: Bool
     ) {
         shouldPresentOnNextFocus = false
+        // Fork: the input view is hosted in the keyboard window and inherited a
+        // dark appearance while the app was in light mode. Follow the app
+        // window's interface style instead.
+        let hostWindow = (responder as? UIView)?.window ?? keyWindow
+        attachmentInputView.overrideUserInterfaceStyle =
+            hostWindow?.traitCollection.userInterfaceStyle ?? .unspecified
         attachmentInputView.update(actions: actions)
         attachmentInputView.updatePreferredHeight(
             measuredKeyboardHeight(for: responder)
