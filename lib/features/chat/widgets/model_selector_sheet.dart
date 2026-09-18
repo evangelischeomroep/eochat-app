@@ -239,6 +239,7 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
                           _ModelGroup(
                             models: layout.featured,
                             onTogglePinnedModel: _togglePinnedModel,
+                            showsPin: false,
                           ),
                           // Fork: the actions render as rows in one grouped
                           // card, like the model list above, instead of three
@@ -339,11 +340,16 @@ class _ModelGroup extends ConsumerWidget {
     required this.models,
     required this.onTogglePinnedModel,
     this.scrollController,
+    this.showsPin = true,
   });
 
   final List<Model> models;
   final Future<void> Function(String modelId) onTogglePinnedModel;
   final ScrollController? scrollController;
+
+  /// Fork: the featured group *is* the pinned list, so it hides the pin glyph;
+  /// the more-models list still marks pinned rows.
+  final bool showsPin;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -452,7 +458,7 @@ class _ModelGroup extends ConsumerWidget {
           child: ModelListTile(
             model: model,
             isSelected: selectedModelId == model.id,
-            isPinned: isPinned,
+            isPinned: isPinned && showsPin,
             isLoaded: isLoaded,
             iconUrl: resolveModelIconUrlForModel(api, model),
             trailing: lifecycleEnabled && profile != null
