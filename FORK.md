@@ -98,6 +98,9 @@ carried a branding-string swap. Current known inline-touch files:
   reasoning-effort / more-models rows in one grouped section styled with
   `NativeSheetSettingsStyle` (upstream: 32pt, `pin.fill`, `.checkmark`
   accessory, two sections of default cells).
+- `ios/Runner/NativeSheetUIFoundation.swift` — `makeNativeSheetCloseBarButton`
+  (plain close glyph, `hidesSharedBackground` on iOS 26); the three
+  `closeButton()` helpers in `NativeSheetBridge.swift` call it.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names);
   the native iOS 26 pill title (`resolveConduitNativeModelSelectorLabel`) drops a

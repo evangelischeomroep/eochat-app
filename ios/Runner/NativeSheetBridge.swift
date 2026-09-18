@@ -3325,10 +3325,7 @@ private final class NativeProfileMenuTableViewController: UITableViewController 
     }
 
     private func closeButton() -> UIBarButtonItem {
-        UIBarButtonItem(
-            systemItem: .close,
-            primaryAction: UIAction { [weak self] _ in self?.onClose() }
-        )
+        makeNativeSheetCloseBarButton { [weak self] in self?.onClose() }
     }
 }
 
@@ -4886,10 +4883,7 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
     }
 
     private func closeButton() -> UIBarButtonItem {
-        UIBarButtonItem(
-            systemItem: .close,
-            primaryAction: UIAction { [weak self] _ in self?.onClose() }
-        )
+        makeNativeSheetCloseBarButton { [weak self] in self?.onClose() }
     }
 
     private func togglePinnedModel(_ modelId: String) {
@@ -5300,10 +5294,7 @@ private final class NativeOptionsSelectorTableViewController: UITableViewControl
     }
 
     private func closeButton() -> UIBarButtonItem {
-        UIBarButtonItem(
-            systemItem: .close,
-            primaryAction: UIAction { [weak self] _ in self?.onClose() }
-        )
+        makeNativeSheetCloseBarButton { [weak self] in self?.onClose() }
     }
 }
 

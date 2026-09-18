@@ -202,3 +202,17 @@ enum NativeSheetSettingsStyle {
         headerFooter.textLabel?.numberOfLines = 0
     }
 }
+
+/// Fork: sheet close buttons render as a plain glyph, not an iOS 26 glass
+/// capsule. The capsule drew a tinted ring (dark) or a drop shadow (light)
+/// that read as a different control family from the sheet it closes.
+func makeNativeSheetCloseBarButton(_ onClose: @escaping () -> Void) -> UIBarButtonItem {
+    let item = UIBarButtonItem(
+        systemItem: .close,
+        primaryAction: UIAction { _ in onClose() }
+    )
+    if #available(iOS 26.0, *) {
+        item.hidesSharedBackground = true
+    }
+    return item
+}
