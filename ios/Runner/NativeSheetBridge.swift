@@ -4794,7 +4794,8 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
                 model: model,
                 isSelected: model.id == configuration.selectedModelId,
                 isPinned: pinnedModelIdSet.contains(model.id),
-                avatarCacheIdentifier: "\(configuration.presentationId):\(model.id)"
+                avatarCacheIdentifier: "\(configuration.presentationId):\(model.id)",
+                showsPin: false
             )
             return cell
         }
@@ -5325,6 +5326,7 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
             withConfiguration: UIImage.SymbolConfiguration(pointSize: 15, weight: .semibold)
         )
     )
+    private let checkSpacer = UIView(frame: CGRect(x: 0, y: 0, width: 20, height: 20))
     private let titleLabel = UILabel()
     private let subtitleLabel = UILabel()
     private let tagsStack = UIStackView()
@@ -5351,7 +5353,8 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
         model: NativeModelSelectorOption,
         isSelected: Bool,
         isPinned: Bool,
-        avatarCacheIdentifier: String
+        avatarCacheIdentifier: String,
+        showsPin: Bool = true
     ) {
         titleLabel.text = model.name
         titleLabel.font = .preferredFont(forTextStyle: .body)
@@ -5379,8 +5382,10 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
             avatarCacheIdentifier: avatarCacheIdentifier
         )
 
-        accessoryView = checkView
-        checkView.alpha = isSelected ? 1 : 0
+        accessoryView = isSelected ? checkView : checkSpacer
+        // Fork: the featured list *is* the pinned list, so a pin on every
+        // row is noise there; the more-models list still marks pinned rows.
+        let isPinned = isPinned && showsPin
         pinImageView.isHidden = !isPinned
         pinWidthConstraint?.constant = isPinned ? 16 : 0
         textTrailingToPinConstraint?.constant = isPinned ? -NativeSheetSettingsStyle.iconSpacing : 0
@@ -5444,7 +5449,7 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
         checkView.tintColor = NativeSheetTheme.shared.accent
         checkView.contentMode = .center
         checkView.frame = CGRect(x: 0, y: 0, width: 20, height: 20)
-        accessoryView = checkView
+        accessoryView = checkSpacer
         pinImageView.translatesAutoresizingMaskIntoConstraints = false
         pinImageView.contentMode = .scaleAspectFit
         pinImageView.tintColor = NativeSheetTheme.shared.icon
