@@ -500,13 +500,14 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
         id: NativeSheetRoutes.appearance,
         title: appearanceTitle,
         subtitle: l10n.settingsAppearanceSubtitle,
-        sfSymbol: 'paintpalette',
+        // Fork: lighter glyphs than upstream's palette / double bubble.
+        sfSymbol: 'slider.horizontal.3',
       ),
       NativeSheetItemConfig(
         id: NativeSheetRoutes.chats,
         title: chatsTitle,
         subtitle: l10n.settingsChatSubtitle,
-        sfSymbol: 'bubble.left.and.bubble.right',
+        sfSymbol: 'bubble.left',
       ),
       NativeSheetItemConfig(
         id: NativeSheetRoutes.voice,
@@ -534,9 +535,8 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
         id: NativeSheetRoutes.hermes,
         title: l10n.hermesAgentSettingsTitle,
         subtitle: l10n.hermesAgentSettingsSubtitle,
-        sfSymbol: 'sparkles',
-        iconAsset: 'assets/icons/hermes_agent.png',
-        iconSize: 26,
+        // Fork: line glyph like every other row instead of the Hermes logo.
+        sfSymbol: 'cube',
         dismissOnSelect: true,
         actionId: NativeSheetRoutes.hermes,
         actionValue: true,

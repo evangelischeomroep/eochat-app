@@ -101,6 +101,9 @@ carried a branding-string swap. Current known inline-touch files:
 - `ios/Runner/NativeSheetUIFoundation.swift` — `makeNativeSheetCloseBarButton`
   (plain close glyph, `hidesSharedBackground` on iOS 26); the three
   `closeButton()` helpers in `NativeSheetBridge.swift` call it.
+- `lib/features/navigation/widgets/sidebar_user_pill.dart` — native settings
+  rows use `slider.horizontal.3`, `bubble.left` and `cube` (Hermes) instead of
+  `paintpalette`, `bubble.left.and.bubble.right` and the Hermes logo asset.
 - `lib/shared/widgets/adaptive_toolbar_components.dart` — `useMiddleEllipsis`
   param on `ConduitAdaptiveAppBarModelSelector` (end-ellipsis for model names);
   the native iOS 26 pill title (`resolveConduitNativeModelSelectorLabel`) drops a
