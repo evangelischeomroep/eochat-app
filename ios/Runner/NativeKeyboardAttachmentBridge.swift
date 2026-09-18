@@ -642,6 +642,9 @@ private final class NativeKeyboardAttachmentTile: UIControl {
         self.style = style
         super.init(frame: .zero)
 
+        // Fork: the tile reads `tintColor` while building, before it joins the
+        // panel's hierarchy, so inheritance would still yield system blue.
+        tintColor = NativeSheetTheme.shared.accent
         isEnabled = action.enabled
         alpha = action.enabled ? 1 : 0.48
         backgroundColor = .clear
