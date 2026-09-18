@@ -1,6 +1,7 @@
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show ValueNotifier, kIsWeb, visibleForTesting;
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter/scheduler.dart';
@@ -514,6 +515,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   Widget? _cachedComposerGlassBackdrop;
   bool _pendingFocus = false;
   bool _isRecording = false;
+  // Server STT transcribes after the recording stops (manually or by voice
+  // activity detection); show that instead of leaving the composer stuck on
+  // "Recording…" (issue #707). Mirrors VoiceInputService.transcribing.
+  bool _isTranscribing = false;
+  ValueNotifier<bool>? _transcribingListenable;
   bool _hasText = false; // track locally without rebuilding on each keystroke
   bool _hasComposerFocus = false;
   bool _isMultiline = false; // track multiline for dynamic border radius
@@ -666,6 +672,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     _focusNode.dispose();
     _pendingFocus = false;
     _voiceStreamSubscription?.cancel();
+    _transcribingListenable?.removeListener(_handleTranscribingChanged);
     if (!kIsWeb && Platform.isIOS) {
       IosNativePasteService.instance.unregisterHandler(
         _nativePasteHandlerOwner,
@@ -1210,6 +1217,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     final l10n = AppLocalizations.of(context)!;
     final layoutText = text.isNotEmpty
         ? text
+        : _isTranscribing
+        ? l10n.transcribingAudio
         : _isRecording
         ? l10n.recordingAudio
         : widget.placeholder ?? l10n.messageHintText;
@@ -1276,6 +1285,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     final l10n = AppLocalizations.of(context)!;
     final layoutText = text.isNotEmpty
         ? text
+        : _isTranscribing
+        ? l10n.transcribingAudio
         : _isRecording
         ? l10n.recordingAudio
         : widget.placeholder ?? l10n.messageHintText;
@@ -3942,7 +3953,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
               final TextStyle baseChatStyle = _composerInputTextStyle(
                 _isRecording,
               );
-              final inputPlaceholder = _isRecording
+              final inputPlaceholder = _isTranscribing
+                  ? AppLocalizations.of(context)!.transcribingAudio
+                  : _isRecording
                   ? AppLocalizations.of(context)!.recordingAudio
                   : widget.placeholder ??
                         AppLocalizations.of(context)!.messageHintText;
@@ -5013,6 +5026,9 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       // Centralized permission + start
       final stream = await _voiceInputService.beginListening();
       if (!mounted) return;
+      _transcribingListenable?.removeListener(_handleTranscribingChanged);
+      _transcribingListenable = _voiceInputService.transcribing
+        ..addListener(_handleTranscribingChanged);
       setState(() {
         _isRecording = true;
         _baseTextAtStart = _controller.text;
@@ -5048,10 +5064,28 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     }
   }
 
+  void _handleTranscribingChanged() {
+    final value = _transcribingListenable?.value ?? false;
+    if (!mounted || value == _isTranscribing) return;
+    setState(() => _isTranscribing = value);
+  }
+
+  Future<void> _stopVoiceListening() async {
+    try {
+      await _voiceInputService.stopListening();
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTranscribing = false;
+          _isRecording = false;
+        });
+      }
+    }
+  }
+
   Future<void> _stopVoice() async {
-    await _voiceInputService.stopListening();
+    await _stopVoiceListening();
     if (!mounted) return;
-    setState(() => _isRecording = false);
     ConduitHaptics.selectionClick();
   }
 
@@ -5060,9 +5094,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       await _stopVoice();
       return;
     }
-    await _voiceInputService.stopListening();
+    await _stopVoiceListening();
     if (!mounted) return;
-    setState(() => _isRecording = false);
     ConduitHaptics.lightImpact();
     _sendMessage();
   }
