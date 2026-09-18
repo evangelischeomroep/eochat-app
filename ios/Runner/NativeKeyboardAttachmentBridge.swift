@@ -200,6 +200,10 @@ final class NativeKeyboardAttachmentBridge: NativeKeyboardAttachmentHostApi {
         let hostWindow = (responder as? UIView)?.window ?? keyWindow
         attachmentInputView.overrideUserInterfaceStyle =
             hostWindow?.traitCollection.userInterfaceStyle ?? .unspecified
+        // Fork: the keyboard window's tint is system blue; use the app accent
+        // that Dart syncs into NativeSheetTheme so selected tools read purple
+        // like every other selection in the app.
+        attachmentInputView.tintColor = NativeSheetTheme.shared.accent
         attachmentInputView.update(actions: actions)
         attachmentInputView.updatePreferredHeight(
             measuredKeyboardHeight(for: responder)
