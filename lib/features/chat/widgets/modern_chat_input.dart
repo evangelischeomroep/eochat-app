@@ -4191,9 +4191,17 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       context,
       baseExtent: baseSize,
     );
-    final iconSize = conduitScaledIconExtent(context, IconSize.medium);
+    // Fork: same 32pt filled circle inside a 44pt target as the send button,
+    // so the stop control no longer fills the whole shell height.
+    final visualSize = conduitScaledControlExtent(
+      context,
+      baseExtent: _composerPrimaryVisualSize,
+    );
+    final iconSize = conduitScaledIconExtent(
+      context,
+      Platform.isIOS ? IconSize.small : IconSize.medium,
+    );
     final background = theme.surfaceContainerHighest.withValues(alpha: 0.96);
-    final border = theme.cardBorder.withValues(alpha: 0.75);
 
     return AdaptiveTooltip(
       message: AppLocalizations.of(context)!.stopRecording,
@@ -4205,19 +4213,26 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                 unawaited(_stopVoice());
               }
             : null,
-        child: Container(
+        child: SizedBox(
           width: buttonSize,
           height: buttonSize,
-          decoration: BoxDecoration(
-            color: background,
-            shape: BoxShape.circle,
-            border: Border.all(color: border, width: BorderWidth.thin),
-          ),
           child: Center(
-            child: ConduitSystemAdaptiveIcon(
-              Platform.isIOS ? CupertinoIcons.stop_fill : Icons.stop_rounded,
-              size: iconSize,
-              color: theme.textPrimary.withValues(alpha: Alpha.strong),
+            child: Container(
+              width: visualSize,
+              height: visualSize,
+              decoration: BoxDecoration(
+                color: background,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: ConduitSystemAdaptiveIcon(
+                  Platform.isIOS
+                      ? CupertinoIcons.stop_fill
+                      : Icons.stop_rounded,
+                  size: iconSize,
+                  color: theme.textPrimary.withValues(alpha: Alpha.strong),
+                ),
+              ),
             ),
           ),
         ),
