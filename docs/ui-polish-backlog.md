@@ -81,13 +81,13 @@ the iPhone build. Ported where it matters (Swift files now in FORK.md §3).
 
 | # | Item | Commit | Notes |
 |---|------|--------|-------|
-| 24/25/31 (native) | Model sheet: 28pt tiles, fixed check accessory, grouped action rows with a visible surface | `f786bd75` | `NativeModelSelectorTableViewController` / `…Cell` in `NativeSheetBridge.swift` |
-| 30 (native) | Plain close glyph on native sheets | `2b2460e1` | `makeNativeSheetCloseBarButton`, `hidesSharedBackground` on iOS 26 |
-| 4/5 (native) | Settings row glyphs: sliders, single bubble, cube for Hermes | `1a8fa083` | symbols come from `sidebar_user_pill.dart` |
-| 34 | "Serverbestanden" wrapped mid-word in the attachment tile | `dcb1d2be` | soft hyphen in the NL value |
-| 35 | Attachment panel rendered dark in light mode | `d22c93ca`, `5206a8cc`, `953e7c8e` | Not a panel bug: the panel follows the keyboard appearance, and Flutter's `EditableText` only re-sends `keyboardAppearance` on reconnect, so a theme switch while the composer keeps focus leaves keyboard and panel in the old style until refocus. Overrides removed; documented in FORK.md. Only reproducible by toggling appearance mid-session. |
-| 36 | Attachment panel selection was system blue | `e5d3b8d5` + `feeb35b9` | `tintColor` = `NativeSheetTheme.shared.accent` on the panel and on each tile at construction (tiles read it before joining the hierarchy) |
-| 37 | Pin glyph on every featured model row | `6b7336be` + `d3d52307` | featured list is the pinned list; glyph hidden there (native + Flutter), kept in "more models". Also fixed the check slot (spacer, not alpha). |
+| 24/25/31 (native) | Model sheet: 28pt tiles, fixed check accessory, grouped action rows with a visible surface | `e40fe096` | `NativeModelSelectorTableViewController` / `…Cell` in `NativeSheetBridge.swift` |
+| 30 (native) | Plain close glyph on native sheets | `e8bf2bb3` | `makeNativeSheetCloseBarButton`, `hidesSharedBackground` on iOS 26 |
+| 4/5 (native) | Settings row glyphs: sliders, single bubble, cube for Hermes | `5dc74f8a` | symbols come from `sidebar_user_pill.dart` |
+| 34 | "Serverbestanden" wrapped mid-word in the attachment tile | `660a139b` | soft hyphen in the NL value |
+| 35 | Attachment panel rendered dark in light mode | `c809394d`, `4406649c`, `ae69c1fe` | Not a panel bug: the panel follows the keyboard appearance, and Flutter's `EditableText` only re-sends `keyboardAppearance` on reconnect, so a theme switch while the composer keeps focus leaves keyboard and panel in the old style until refocus. Overrides removed; documented in FORK.md. Only reproducible by toggling appearance mid-session. |
+| 36 | Attachment panel selection was system blue | `f6b3fd42` + `1be38558` | `tintColor` = `NativeSheetTheme.shared.accent` on the panel and on each tile at construction (tiles read it before joining the hierarchy) |
+| 37 | Pin glyph on every featured model row | `f3fcf2f0` + `c3899a5d` | featured list is the pinned list; glyph hidden there (native + Flutter), kept in "more models". Also fixed the check slot (spacer, not alpha). |
 
 Verified on device (both themes) after round 2: 1, 10, 13, 14, 20, 21, 22, 23,
 26, 27, 29, 33. Header ⋯ menu anchors over the model pill (UIKit placement),
@@ -100,11 +100,11 @@ untouched ("perfect").
 
 | # | Item | Commit | Notes |
 |---|------|--------|-------|
-| 38 | Temporary-chat eye too big for its circle | `c1f2b62e` | `ConduitNativeToolbarAction.iosSymbolSize`; eye at 14pt (shared extent stays 18) |
-| 39 | Waveform outweighed the mic | `9991f8c7` | `_composerVoiceSymbolExtent` = 14 on iOS |
-| 40 | Add glyph too far from the shell edge | `6d744006` | 2pt leading inset when the leading control is the add button; optical edges of glyph and trailing circle both 14pt from the shell (test updated `c6adfb8b`) |
-| 41 | Single-line text / placeholder sat low | `2748273e` | content padding 2pt top / 6pt bottom |
-| 42 | Recording controls | `e46d125f` | stop control is a 32pt filled circle in a 44pt target like the send button, no border, 16pt glyph. Verify on device: not yet screenshotted (simulator window unavailable at the time). |
+| 38 | Temporary-chat eye too big for its circle | `e01173ed` | `ConduitNativeToolbarAction.iosSymbolSize`; eye at 14pt (shared extent stays 18) |
+| 39 | Waveform outweighed the mic | `0b243def` | `_composerVoiceSymbolExtent` = 14 on iOS |
+| 40 | Add glyph too far from the shell edge | `da847a32` | 2pt leading inset when the leading control is the add button; optical edges of glyph and trailing circle both 14pt from the shell (test updated `46e00aa6`) |
+| 41 | Single-line text / placeholder sat low | `992472f6` | content padding 2pt top / 6pt bottom |
+| 42 | Recording controls | `b042f00e` | stop control is a 32pt filled circle in a 44pt target like the send button, no border, 16pt glyph. Verify on device: not yet screenshotted (simulator window unavailable at the time). |
 
 ---
 
