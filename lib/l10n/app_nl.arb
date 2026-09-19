@@ -3467,5 +3467,9 @@
   "reasoningEffortLight": "Licht",
   "reasoningEffortModerate": "Gemiddeld",
   "sharedBadge": "Gedeeld",
-  "sharedFolderOwner": "Gedeeld door {name}"
+  "sharedFolderOwner": "Gedeeld door {name}",
+  "transcribingAudio": "Transcriberen...",
+  "proxyAuthSignInAgain": "Opnieuw aanmelden via proxy",
+  "citationShowTitles": "Paginatitels in bronvermeldingen",
+  "citationShowTitlesDescription": "Gebruik paginatitels in plaats van websitedomeinen in bronvermeldingen"
 }

@@ -5116,5 +5116,9 @@
   "reasoningEffortLight": "Light",
   "reasoningEffortModerate": "Moderate",
   "sharedBadge": "Shared",
-  "sharedFolderOwner": "Shared by {name}"
+  "sharedFolderOwner": "Shared by {name}",
+  "transcribingAudio": "Transcribing...",
+  "proxyAuthSignInAgain": "Sign in through proxy again",
+  "citationShowTitles": "Show citation page titles",
+  "citationShowTitlesDescription": "Use page titles instead of website domains in citation badges"
 }
