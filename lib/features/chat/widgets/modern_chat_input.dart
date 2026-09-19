@@ -3440,9 +3440,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                   allUploadsComplete: allUploadsComplete,
                   placeholderBase: placeholderBase,
                   placeholderFocused: placeholderFocused,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: Spacing.sm,
-                    vertical: Spacing.xs,
+                  contentPadding: const EdgeInsets.fromLTRB(
+                    Spacing.sm,
+                    Spacing.xxs,
+                    Spacing.sm,
+                    Spacing.xs + Spacing.xxs,
                   ),
                   isActive: isActive,
                 ),
@@ -3625,8 +3627,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                     allUploadsComplete: allUploadsComplete,
                     placeholderBase: placeholderBase,
                     placeholderFocused: placeholderFocused,
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: Spacing.xs,
+                    // Fork: lift the line 2pt; the font's visual centre sits
+                    // below the line-box centre, so symmetric padding read low.
+                    contentPadding: const EdgeInsets.only(
+                      top: Spacing.xxs,
+                      bottom: Spacing.xs + Spacing.xxs,
                     ),
                     isActive: isActive,
                   ),
