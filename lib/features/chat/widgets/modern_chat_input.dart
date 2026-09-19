@@ -487,6 +487,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
 
   static const double _composerRadius = AppBorderRadius.card;
   static const double _composerHorizontalInset = Spacing.sm;
+  // Fork: the leading add glyph sits in a 44pt target with 12pt of its own
+  // air, so the shell inset shrinks there to keep it optically as close to the
+  // edge as the 32pt circles on the trailing side.
+  static const double _composerLeadingGlyphInset = Spacing.xxs;
   static const double _composerControlSize = TouchTarget.minimum;
   static const double _composerPrimaryVisualSize = 32;
   // Fork: see the voice-call button; balances the waveform with the mic.
@@ -3454,8 +3458,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         ),
         Padding(
           key: const ValueKey('composer-expanded-buttons'),
-          padding: const EdgeInsets.fromLTRB(
-            _composerHorizontalInset,
+          padding: EdgeInsets.fromLTRB(
+            showOverflowButton && !_isRecording
+                ? _composerLeadingGlyphInset
+                : _composerHorizontalInset,
             0,
             _composerHorizontalInset,
             _composerActionRowBottomInset,
@@ -3581,8 +3587,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           context,
           baseExtent: _composerControlSize,
         ),
-        padding: const EdgeInsets.fromLTRB(
-          _composerHorizontalInset,
+        padding: EdgeInsets.fromLTRB(
+          compactControls.showLeading && !_isRecording
+              ? _composerLeadingGlyphInset
+              : _composerHorizontalInset,
           0,
           _composerHorizontalInset,
           _composerActionRowBottomInset,
