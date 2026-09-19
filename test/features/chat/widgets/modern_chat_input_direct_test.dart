@@ -1125,7 +1125,9 @@ void main() {
     // Fork: the add glyph row gets a 2pt leading inset
     // (_composerLeadingGlyphInset); trailing stays 8pt.
     expect(actionInsets.left, 2);
-    expect(actionInsets.right, 8);
+    // Fork: the trailing 44pt target sits flush so its 32pt circle keeps a
+    // 6pt margin on every side.
+    expect(actionInsets.right, 0);
 
     await tester.enterText(find.byType(TextField), 'single line');
     await tester.pump();
@@ -1510,7 +1512,7 @@ void main() {
     expect(find.byKey(expandedShellKey), findsNothing);
   });
 
-  testWidgets('compact composer insets: 2pt leading glyph, 8pt trailing', (
+  testWidgets('compact composer insets: 2pt leading glyph, flush trailing', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1539,7 +1541,7 @@ void main() {
 
     // Fork: 2pt leading inset for the add glyph; trailing stays 8pt.
     expect(compactInsets.left, 2);
-    expect(compactInsets.right, 8);
+    expect(compactInsets.right, 0);
 
     final compactShell = find.byKey(const ValueKey('compact-composer-shell'));
     final overflowButton = find.byKey(
@@ -1560,15 +1562,13 @@ void main() {
     final primaryCenter = tester.getCenter(
       find.byKey(const ValueKey('primary-btn-send-muted')),
     );
-    // Fork: the two sides align on their optical edges, not their centres:
-    // the 20pt add glyph and the 32pt primary circle both sit 14pt from the
-    // shell edge.
+    // Fork: the 32pt primary circle keeps the same 6pt margin on its right
+    // as above and below it in the 44pt shell; the 20pt add glyph sits 14pt
+    // from the left edge (2pt inset + 12pt of target air).
     final addGlyphLeftEdge = overflowCenter.dx - IconSize.medium / 2;
     final primaryCircleRightEdge = primaryCenter.dx + 16;
-    expect(
-      addGlyphLeftEdge - shellRect.left,
-      closeTo(shellRect.right - primaryCircleRightEdge, 0.01),
-    );
+    expect(shellRect.right - primaryCircleRightEdge, closeTo(6, 0.01));
+    expect(addGlyphLeftEdge - shellRect.left, closeTo(14, 0.01));
 
     await tester.enterText(find.byType(TextField), 'Hi');
     await tester.pump();

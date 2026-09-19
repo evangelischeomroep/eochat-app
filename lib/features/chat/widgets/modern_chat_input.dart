@@ -491,6 +491,10 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   // air, so the shell inset shrinks there to keep it optically as close to the
   // edge as the 32pt circles on the trailing side.
   static const double _composerLeadingGlyphInset = Spacing.xxs;
+  // Fork: the 44pt targets around the 32pt circles (send / voice / stop) sit
+  // flush with the shell, so the circle keeps the same 6pt margin on every
+  // side of the 44pt shell.
+  static const double _composerCircleInset = 0;
   static const double _composerControlSize = TouchTarget.minimum;
   static const double _composerPrimaryVisualSize = 32;
   // Fork: see the voice-call button; balances the waveform with the mic.
@@ -3461,11 +3465,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
         Padding(
           key: const ValueKey('composer-expanded-buttons'),
           padding: EdgeInsets.fromLTRB(
-            showOverflowButton && !_isRecording
+            _isRecording
+                ? _composerCircleInset
+                : showOverflowButton
                 ? _composerLeadingGlyphInset
                 : _composerHorizontalInset,
             0,
-            _composerHorizontalInset,
+            _composerCircleInset,
             _composerActionRowBottomInset,
           ),
           child: Row(
@@ -3590,11 +3596,13 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           baseExtent: _composerControlSize,
         ),
         padding: EdgeInsets.fromLTRB(
-          compactControls.showLeading && !_isRecording
+          _isRecording
+              ? _composerCircleInset
+              : compactControls.showLeading
               ? _composerLeadingGlyphInset
               : _composerHorizontalInset,
           0,
-          _composerHorizontalInset,
+          _composerCircleInset,
           _composerActionRowBottomInset,
         ),
         alignment: Alignment.center,
