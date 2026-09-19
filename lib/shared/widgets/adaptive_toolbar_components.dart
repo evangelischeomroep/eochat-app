@@ -603,6 +603,7 @@ class ConduitNativeToolbarAction {
     this.menuItems = const <ConduitNativeToolbarMenuItem>[],
     this.tintColor,
     this.enabled = true,
+    this.iosSymbolSize,
   }) : assert(onPressed != null || menuItems.length > 0 || !enabled);
 
   final String iosSymbol;
@@ -611,6 +612,11 @@ class ConduitNativeToolbarAction {
   final List<ConduitNativeToolbarMenuItem> menuItems;
   final Color? tintColor;
   final bool enabled;
+
+  /// Fork: per-action symbol point size. Wide glyphs such as `eye` need a
+  /// smaller size than `kConduitNativeSingleActionSymbolExtent` to sit in the
+  /// same 44pt circle as the other actions.
+  final double? iosSymbolSize;
 }
 
 /// Serializes native toolbar actions without leaking their Dart callbacks.
@@ -696,7 +702,8 @@ class ConduitNativeToolbarActionGroup extends StatelessWidget {
         child: CNButton.icon(
           icon: CNSymbol(
             action.iosSymbol,
-            size: kConduitNativeSingleActionSymbolExtent,
+            size:
+                action.iosSymbolSize ?? kConduitNativeSingleActionSymbolExtent,
           ),
           onPressed: action.onPressed,
           enabled: action.enabled,

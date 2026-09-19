@@ -244,6 +244,9 @@ HermesBotChatPresentation? chatHermesBotPresentation(
   );
 }
 
+/// Fork: symbol point size for the wide `eye` / `eye.slash` toolbar glyphs.
+const double _kTemporaryChatSymbolExtent = 14;
+
 class _HermesBotToolbarTitle extends StatelessWidget {
   const _HermesBotToolbarTitle({
     required this.bot,
@@ -4530,6 +4533,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     required String accessibilityLabel,
     required Color tintColor,
     required VoidCallback? onPressed,
+    double? iosSymbolSize,
   }) {
     final iosSymbol = conduitToolbarSfSymbolForIcon(icon);
     assert(iosSymbol != null);
@@ -4546,6 +4550,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         tintColor: tintColor,
         enabled: onPressed != null,
         onPressed: onPressed,
+        iosSymbolSize: iosSymbolSize,
       ),
     );
   }
@@ -4581,6 +4586,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           : (Platform.isIOS ? CupertinoIcons.eye : Icons.visibility_outlined),
       accessibilityLabel: AppLocalizations.of(context)!.temporaryChat,
       tintColor: isTemporary ? context.conduitTheme.info : tintColor,
+      // Fork: the eye glyph is ~1.6x wider than tall; at the shared 18pt it
+      // filled its circle next to the hamburger.
+      iosSymbolSize: _kTemporaryChatSymbolExtent,
       onPressed: () {
         ConduitHaptics.selectionClick();
         final current = ref.read(temporaryChatEnabledProvider);
