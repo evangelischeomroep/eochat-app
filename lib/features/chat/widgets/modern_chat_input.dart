@@ -489,6 +489,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
   static const double _composerHorizontalInset = Spacing.sm;
   static const double _composerControlSize = TouchTarget.minimum;
   static const double _composerPrimaryVisualSize = 32;
+  // Fork: see the voice-call button; balances the waveform with the mic.
+  static const double _composerVoiceSymbolExtent = 14;
   static const double _composerActionRowBottomInset = 0;
   static const double _composerTrailingAccessoryInset =
       Spacing.xs + Spacing.xxs;
@@ -4470,7 +4472,11 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           size: buttonSize,
           visualSize: primaryVisualSize,
           semanticLabel: AppLocalizations.of(context)!.voiceCallTitle,
-          iosSymbolSize: primaryIconSize,
+          // Fork: the waveform symbol is wide; at the shared 16pt it outweighed
+          // the 20pt mic glyph beside it.
+          iosSymbolSize: Platform.isIOS
+              ? _composerVoiceSymbolExtent
+              : primaryIconSize,
           isProminent: true,
           iosSymbol: 'waveform',
           iosSymbolColor: enabledVoiceCall
