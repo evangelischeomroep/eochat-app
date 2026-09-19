@@ -1122,7 +1122,9 @@ void main() {
         .resolve(TextDirection.ltr);
     expect(inputInsets.left, 8);
     expect(inputInsets.right, 8);
-    expect(actionInsets.left, 8);
+    // Fork: the add glyph row gets a 2pt leading inset
+    // (_composerLeadingGlyphInset); trailing stays 8pt.
+    expect(actionInsets.left, 2);
     expect(actionInsets.right, 8);
 
     await tester.enterText(find.byType(TextField), 'single line');
@@ -1508,7 +1510,7 @@ void main() {
     expect(find.byKey(expandedShellKey), findsNothing);
   });
 
-  testWidgets('compact composer uses symmetric horizontal insets', (
+  testWidgets('compact composer insets: 2pt leading glyph, 8pt trailing', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1535,7 +1537,8 @@ void main() {
         .padding!
         .resolve(TextDirection.ltr);
 
-    expect(compactInsets.left, 8);
+    // Fork: 2pt leading inset for the add glyph; trailing stays 8pt.
+    expect(compactInsets.left, 2);
     expect(compactInsets.right, 8);
 
     final compactShell = find.byKey(const ValueKey('compact-composer-shell'));
@@ -1557,9 +1560,14 @@ void main() {
     final primaryCenter = tester.getCenter(
       find.byKey(const ValueKey('primary-btn-send-muted')),
     );
+    // Fork: the two sides align on their optical edges, not their centres:
+    // the 20pt add glyph and the 32pt primary circle both sit 14pt from the
+    // shell edge.
+    final addGlyphLeftEdge = overflowCenter.dx - IconSize.medium / 2;
+    final primaryCircleRightEdge = primaryCenter.dx + 16;
     expect(
-      overflowCenter.dx - shellRect.left,
-      closeTo(shellRect.right - primaryCenter.dx, 0.01),
+      addGlyphLeftEdge - shellRect.left,
+      closeTo(shellRect.right - primaryCircleRightEdge, 0.01),
     );
 
     await tester.enterText(find.byType(TextField), 'Hi');
