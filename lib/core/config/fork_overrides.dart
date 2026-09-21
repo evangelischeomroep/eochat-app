@@ -106,6 +106,14 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  /// When false, the model selector (native iOS 26 sheet and the Flutter
+  /// sheet) hides the reasoning-effort row. On chat.eo.nl the effort is
+  /// configured per model by admins; end users have no reason to change it.
+  static const bool showReasoningEffortInModelSelector = bool.fromEnvironment(
+    'SHOW_REASONING_EFFORT_IN_MODEL_SELECTOR',
+    defaultValue: false,
+  );
+
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;
 

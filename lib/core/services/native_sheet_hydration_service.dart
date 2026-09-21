@@ -173,10 +173,14 @@ class NativeSheetHydrationService {
           );
         }
       }
-      final effortPolicy = nativeModelSelectorReasoningEffortPolicy(
-        effortHydrated,
-        reasoningEffortPolicyForModel(_ref.read, effortModel),
-      );
+      // Fork: with the effort row hidden, send no options so the native
+      // sheet drops the row (it hides when nothing is selectable).
+      final effortPolicy = ForkOverrides.showReasoningEffortInModelSelector
+          ? nativeModelSelectorReasoningEffortPolicy(
+              effortHydrated,
+              reasoningEffortPolicyForModel(_ref.read, effortModel),
+            )
+          : ReasoningEffortPolicy.unsupported;
       final allowsCustomEffort = effortPolicy.allowsCustom;
       final effortOptions = effortPolicy.options;
 
@@ -298,6 +302,8 @@ class NativeSheetHydrationService {
                     !identical(_ref.read(apiServiceProvider), api)) {
                   return;
                 }
+                // Fork: see the effortPolicy note above.
+                if (!ForkOverrides.showReasoningEffortInModelSelector) return;
                 final hydrated = nativeHydratedServerReasoningEffort(
                   model: lateEffortModel,
                   detail: detail,

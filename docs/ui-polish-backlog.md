@@ -114,6 +114,7 @@ untouched ("perfect").
 |---|------|--------|-------|
 | 43 | Tinted box beside the last quick pill, both modes | `4585eb53` | `HorizontalOverflowFade` masks the row's alpha (`ShaderMask`, `dstIn`) instead of painting `surfaceContainerHighest` at 90%. On iOS 26 the shell is Liquid Glass, so no painted colour could match it. Verified on the simulator in light and dark with the Web pill active. |
 | 44 | Model rows: description instead of tags, tighter rows | _pending_ | `ForkOverrides.modelSelectorShowsDescription`: subtitle is the Open WebUI `info.meta.description` reduced to one line (`singleLineModelDescription`), tag chips gone, in the native sheet (both lists) and the Flutter tile. Native row margins 8→5pt, title/subtitle gap 2→1pt, subtitle in footnote. |
+| 45 | "Redeneerniveau" row in the model selector | _pending_ | Hidden via `ForkOverrides.showReasoningEffortInModelSelector` (default false): Flutter sheet skips the row, Dart sends no effort options natively and the Swift `actionRows` drops the row when nothing is selectable. |
 
 ---
 

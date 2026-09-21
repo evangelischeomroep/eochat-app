@@ -74,7 +74,8 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/features/chat/widgets/model_selector_sheet.dart` — the reasoning-effort /
   Hermes-fast / more-models actions render as rows inside one grouped
   `ConduitCard` (`_ActionGroup`) with the same leading extent and insets as
-  `ModelListTile`, instead of three stand-alone cards.
+  `ModelListTile`, instead of three stand-alone cards. The effort row is also
+  gated on `ForkOverrides.showReasoningEffortInModelSelector`.
 - `lib/shared/widgets/model_list_tile.dart` — the trailing check slot is
   reserved on every row (empty when unselected) so the pin column stays put;
   leading tiles are `kModelTileLeadingExtent` (28pt) instead of 32. Under
@@ -104,13 +105,19 @@ carried a branding-string swap. Current known inline-touch files:
   footnote line with tail truncation (upstream: two subheadline lines), row
   layout margins 5pt top/bottom (upstream 8 via `applyCellStyle`), title to
   subtitle gap 1pt (upstream 2). Tags are still parsed for search; Dart sends
-  none when `ForkOverrides.modelSelectorShowsDescription` is on.
+  none when `ForkOverrides.modelSelectorShowsDescription` is on. `actionRows`
+  omits the effort row when `effortSelectionEnabled` is false (upstream
+  renders it disabled); Dart sends no options under
+  `ForkOverrides.showReasoningEffortInModelSelector == false`.
 - `lib/core/services/native_sheet_hydration_service.dart` — model options
   take `subtitle` from `singleLineModelDescription` and an empty `tags` list
   under `ForkOverrides.modelSelectorShowsDescription` (two helper functions
   at the end of the file; upstream sends `model.description` and
   `model.modelTags`). The helper lives in the fork-only
-  `lib/shared/utils/model_description.dart`.
+  `lib/shared/utils/model_description.dart`. The effort policy sent to the
+  native sheet is `ReasoningEffortPolicy.unsupported` and the progressive
+  effort hydration returns early when
+  `ForkOverrides.showReasoningEffortInModelSelector` is false.
 - `ios/Runner/NativeSheetUIFoundation.swift` — `makeNativeSheetCloseBarButton`
   (plain close glyph, `hidesSharedBackground` on iOS 26); the three
   `closeButton()` helpers in `NativeSheetBridge.swift` call it.

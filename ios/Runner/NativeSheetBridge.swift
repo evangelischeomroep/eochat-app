@@ -4765,9 +4765,15 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
 
     // Fork: reasoning effort and "more models" share one grouped section so
     // the sheet reads as two cards (models, actions), like the Flutter sheet.
+    // Fork: no effort row at all when nothing is selectable (upstream shows
+    // it disabled). Dart sends no options when the row is hidden by
+    // ForkOverrides.showReasoningEffortInModelSelector.
     private enum ActionRow { case effort, more }
     private var actionRows: [ActionRow] {
-        moreModels.isEmpty ? [.effort] : [.effort, .more]
+        var rows: [ActionRow] = []
+        if effortSelectionEnabled { rows.append(.effort) }
+        if !moreModels.isEmpty { rows.append(.more) }
+        return rows
     }
 
     override func numberOfSections(in tableView: UITableView) -> Int { 2 }

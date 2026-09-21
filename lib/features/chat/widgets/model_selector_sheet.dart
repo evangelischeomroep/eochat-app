@@ -6,6 +6,7 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/fork_overrides.dart';
 import '../../../core/models/model.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/services/api_service.dart';
@@ -145,7 +146,9 @@ class ModelSelectorSheetState extends ConsumerState<ModelSelectorSheet> {
         selectedModel.metadata?['hermesFast'] == true;
 
     final actionRows = <Widget>[
-      if (effortPolicy.visible)
+      // Fork: hidden for EOchat users, see ForkOverrides.
+      if (effortPolicy.visible &&
+          ForkOverrides.showReasoningEffortInModelSelector)
         _ActionCard(
           icon: Platform.isIOS ? CupertinoIcons.timer : Icons.schedule_rounded,
           title: l10n.reasoningEffort,
