@@ -77,7 +77,10 @@ carried a branding-string swap. Current known inline-touch files:
   `ModelListTile`, instead of three stand-alone cards.
 - `lib/shared/widgets/model_list_tile.dart` — the trailing check slot is
   reserved on every row (empty when unselected) so the pin column stays put;
-  leading tiles are `kModelTileLeadingExtent` (28pt) instead of 32.
+  leading tiles are `kModelTileLeadingExtent` (28pt) instead of 32. Under
+  `ForkOverrides.modelSelectorShowsDescription` the metadata chip row is
+  replaced by the one-line model description (`else if (description != null)`
+  branch before the upstream `hasMetadataRow` branch).
 - `lib/shared/widgets/chat_action_button.dart` — footer action glyphs at
   `IconSize.md` in `iconSecondary` (disabled: 45% alpha) instead of 16pt
   `textPrimary` at 80%.
@@ -97,7 +100,17 @@ carried a branding-string swap. Current known inline-touch files:
   tiles, outline pin glyph, a fixed-size check accessory on every row, and the
   reasoning-effort / more-models rows in one grouped section styled with
   `NativeSheetSettingsStyle` (upstream: 32pt, `pin.fill`, `.checkmark`
-  accessory, two sections of default cells).
+  accessory, two sections of default cells). Model cell subtitle is one
+  footnote line with tail truncation (upstream: two subheadline lines), row
+  layout margins 5pt top/bottom (upstream 8 via `applyCellStyle`), title to
+  subtitle gap 1pt (upstream 2). Tags are still parsed for search; Dart sends
+  none when `ForkOverrides.modelSelectorShowsDescription` is on.
+- `lib/core/services/native_sheet_hydration_service.dart` — model options
+  take `subtitle` from `singleLineModelDescription` and an empty `tags` list
+  under `ForkOverrides.modelSelectorShowsDescription` (two helper functions
+  at the end of the file; upstream sends `model.description` and
+  `model.modelTags`). The helper lives in the fork-only
+  `lib/shared/utils/model_description.dart`.
 - `ios/Runner/NativeSheetUIFoundation.swift` — `makeNativeSheetCloseBarButton`
   (plain close glyph, `hidesSharedBackground` on iOS 26); the three
   `closeButton()` helpers in `NativeSheetBridge.swift` call it.

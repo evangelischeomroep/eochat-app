@@ -96,6 +96,16 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  /// When true, model rows in the model selector (native iOS 26 sheet and
+  /// the Flutter tile) show the model's Open WebUI description, clipped to
+  /// one line, as the subtitle and hide the tag chips. Tags are an admin
+  /// concept on chat.eo.nl; the description is what tells a user which
+  /// model to pick.
+  static const bool modelSelectorShowsDescription = bool.fromEnvironment(
+    'MODEL_SELECTOR_SHOWS_DESCRIPTION',
+    defaultValue: true,
+  );
+
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;
 

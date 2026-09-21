@@ -5,8 +5,10 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:conduit/core/services/haptic_service.dart';
 
+import '../../core/config/fork_overrides.dart';
 import '../../core/models/model.dart';
 import '../theme/theme_extensions.dart';
+import '../utils/model_description.dart';
 import 'model_avatar.dart';
 import 'horizontal_gesture_ownership.dart';
 import 'horizontal_overflow_fade.dart';
@@ -249,7 +251,12 @@ class ModelListTile extends StatelessWidget {
     final modelTags = modelTagsByLowercase.values.toList()
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     final hasTags = modelTags.isNotEmpty;
-    final hasMetadataRow = hasCapabilities || hasTags || isLoaded;
+    // Fork: the one-line Open WebUI description replaces the chip row.
+    final description = ForkOverrides.modelSelectorShowsDescription
+        ? singleLineModelDescription(model)
+        : null;
+    final hasMetadataRow =
+        description == null && (hasCapabilities || hasTags || isLoaded);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.xxs),
@@ -300,6 +307,16 @@ class ModelListTile extends StatelessWidget {
                           color: theme.textSecondary,
                         ),
                         maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ] else if (description != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        description,
+                        style: AppTypography.labelSmallStyle.copyWith(
+                          color: theme.textSecondary,
+                        ),
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ] else if (hasMetadataRow) ...[

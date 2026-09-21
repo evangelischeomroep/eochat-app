@@ -106,9 +106,10 @@ gh run list -R evangelischeomroep/eochat-app --commit $(git rev-parse HEAD) \
 
 Pass the full SHA; a short hash returns nothing. The riverpod_lint plugin
 occasionally emits a transient info on upstream code that passed before;
-`gh run rerun --failed <id>` once is the fix, not a code change. Local
-`flutter run` dirties `ios/Podfile.lock` and `project.pbxproj` (Xcode
-reformatting); `git checkout --` them rather than committing.
+`gh run rerun --failed <id>` once is the fix, not a code change. If a local
+build dirties `ios/Podfile.lock` or `project.pbxproj`, check the diff is a
+checksum or Xcode formatting only, then commit it once (see pitfalls);
+restoring it on every run just hides it.
 
 Direct pushes to main are allowed for this workflow (rule bypass is logged),
 but leave main clean and equal to origin/main when you stop.

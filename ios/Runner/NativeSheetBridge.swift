@@ -5364,10 +5364,14 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
 
         let subtitle = model.subtitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         subtitleLabel.text = subtitle
-        subtitleLabel.font = .preferredFont(forTextStyle: .subheadline)
+        // Fork: the subtitle is the model's one-line description, in the
+        // same footnote style as every other sheet subtitle, clipped so a
+        // long description never grows the row.
+        subtitleLabel.font = .preferredFont(forTextStyle: .footnote)
         subtitleLabel.textColor = NativeSheetTheme.shared.secondaryForeground
         subtitleLabel.adjustsFontForContentSizeCategory = true
-        subtitleLabel.numberOfLines = 2
+        subtitleLabel.numberOfLines = 1
+        subtitleLabel.lineBreakMode = .byTruncatingTail
         subtitleLabel.isHidden = subtitle.isEmpty
 
         configureTags(model.tags)
@@ -5392,6 +5396,10 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
         selectionStyle = .default
         isUserInteractionEnabled = true
         NativeSheetSettingsStyle.applyCellStyle(self)
+        // Fork: tighter rows than the settings cells (8pt); a 28pt tile with
+        // title + one-line subtitle reads as a list, not as cards.
+        directionalLayoutMargins.top = 5
+        directionalLayoutMargins.bottom = 5
     }
 
     private func configureTags(_ tags: [String]) {
@@ -5435,7 +5443,7 @@ private final class NativeModelSelectorTableViewCell: UITableViewCell {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         textStack.translatesAutoresizingMaskIntoConstraints = false
         textStack.axis = .vertical
-        textStack.spacing = 2
+        textStack.spacing = 1
         textStack.alignment = .fill
         textStack.addArrangedSubview(titleLabel)
         textStack.addArrangedSubview(subtitleLabel)
@@ -5560,7 +5568,7 @@ private final class NativeSheetOptionTableViewCell: UITableViewCell {
         subtitleLabel.adjustsFontForContentSizeCategory = true
 
         textStack.axis = .vertical
-        textStack.spacing = 2
+        textStack.spacing = 1
         textStack.alignment = .fill
         textStack.addArrangedSubview(titleLabel)
         textStack.addArrangedSubview(subtitleLabel)

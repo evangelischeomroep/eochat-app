@@ -11,6 +11,8 @@ import '../../features/chat/models/model_selector_layout.dart';
 import '../../features/chat/providers/reasoning_effort_provider.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/theme/tweakcn_themes.dart';
+import '../../shared/utils/model_description.dart';
+import '../config/fork_overrides.dart';
 import '../models/model.dart';
 import '../models/tool.dart';
 import '../network/image_header_utils.dart';
@@ -202,9 +204,9 @@ class NativeSheetHydrationService {
             return NativeSheetModelOption(
               id: model.id,
               name: model.name,
-              subtitle: model.description,
+              subtitle: _modelSubtitle(model),
               avatarBytes: hermesAvatarBytes,
-              tags: model.modelTags,
+              tags: _modelTags(model),
             );
           }
           final avatarUrl = resolveModelIconUrlForModel(api, model);
@@ -215,10 +217,10 @@ class NativeSheetHydrationService {
           return NativeSheetModelOption(
             id: model.id,
             name: model.name,
-            subtitle: model.description,
+            subtitle: _modelSubtitle(model),
             avatarUrl: avatarUrl,
             avatarHeaders: avatarHeaders,
-            tags: model.modelTags,
+            tags: _modelTags(model),
           );
         }),
       ];
@@ -1849,3 +1851,14 @@ class NativeSheetHydrationService {
     );
   }
 }
+
+// Fork: one-line Open WebUI description as the row subtitle, no tag chips.
+String? _modelSubtitle(Model model) =>
+    ForkOverrides.modelSelectorShowsDescription
+    ? singleLineModelDescription(model)
+    : model.description;
+
+List<String> _modelTags(Model model) =>
+    ForkOverrides.modelSelectorShowsDescription
+    ? const <String>[]
+    : model.modelTags;

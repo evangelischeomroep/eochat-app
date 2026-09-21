@@ -15,6 +15,16 @@ const _reasoningModel = Model(
   id: 'reasoning-model',
   name: 'Reasoning model',
   supportedParameters: ['reasoning'],
+  metadata: {
+    'info': {
+      'meta': {
+        'description': 'Denkt langer na over lastige vragen.\nTweede regel hoort niet in de lijst.',
+        'tags': [
+          {'name': 'reasoning'},
+        ],
+      },
+    },
+  },
 );
 
 Future<ConduitThemeExtension> _pumpTile(
@@ -47,28 +57,21 @@ Future<ConduitThemeExtension> _pumpTile(
 }
 
 void main() {
-  testWidgets(
-    'overflow fade masks the row alpha instead of painting a colour',
-    (tester) async {
-      await _pumpTile(tester, isSelected: false);
+  testWidgets('subtitle is the one-line model description, not the tags', (
+    tester,
+  ) async {
+    await _pumpTile(tester, isSelected: false);
 
-      // Fork: a painted overlay can only match an opaque surface. The mask has
-      // no colour of its own, so it sits on glass, cards and highlights alike.
-      final fade = find.byType(HorizontalOverflowFade);
-      final mask = tester.widget<ShaderMask>(
-        find.descendant(of: fade, matching: find.byType(ShaderMask)),
-      );
-      check(mask.blendMode).equals(BlendMode.dstIn);
-      final paintedGradients = tester
-          .widgetList<DecoratedBox>(
-            find.descendant(of: fade, matching: find.byType(DecoratedBox)),
-          )
-          .map((box) => box.decoration)
-          .whereType<BoxDecoration>()
-          .where((decoration) => decoration.gradient != null);
-      check(paintedGradients).isEmpty();
-    },
-  );
+    // Fork: ForkOverrides.modelSelectorShowsDescription replaces the tag
+    // chip row with the Open WebUI description, clipped to a single line.
+    final subtitle = tester.widget<Text>(
+      find.text('Denkt langer na over lastige vragen.'),
+    );
+    check(subtitle.maxLines).equals(1);
+    check(subtitle.overflow).equals(TextOverflow.ellipsis);
+    expect(find.byType(HorizontalOverflowFade), findsNothing);
+    expect(find.text('reasoning'), findsNothing);
+  });
 
   testWidgets('selected row highlight paints against the card surface', (
     tester,
