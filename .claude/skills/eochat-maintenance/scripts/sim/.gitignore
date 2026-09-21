@@ -1,0 +1,5 @@
+simtap
+shots/
+.offset
+flutter_run.log
+flutter_run.pid
