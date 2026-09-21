@@ -3490,9 +3490,6 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
               if (quickPills.isNotEmpty)
                 Expanded(
                   child: HorizontalOverflowFade(
-                    // Fork: fade in the composer shell colour, not the page
-                    // colour, or the fade paints a box next to the last pill.
-                    color: context.conduitTheme.surfaceContainerHighest,
                     child: HorizontalScrollGestureBoundary(
                       child: SingleChildScrollView(
                         key: const ValueKey('composer-quick-pills'),

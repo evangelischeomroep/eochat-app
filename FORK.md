@@ -136,7 +136,16 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/features/chat/widgets/modern_chat_input.dart` — quick-pill loop
   `continue`s past inactive pills when
   `ForkOverrides.hideInactiveComposerQuickPills` is set (three one-line
-  guards: web, image, filter).
+  guards: web, image, filter). The quick-pill `HorizontalOverflowFade` no
+  longer passes a colour (see the fade entry below).
+- `lib/shared/widgets/horizontal_overflow_fade.dart` — the trailing fade is
+  a `ShaderMask` (`BlendMode.dstIn`) over the child instead of a painted
+  gradient in a theme colour. Upstream's painted overlay can only match an
+  opaque surface; on iOS 26 the composer shell is translucent Liquid Glass,
+  so it read as a tinted box beside the last pill. The `color` parameter is
+  gone; `model_list_tile.dart` dropped its `rowSurface` argument and
+  `test/shared/widgets/model_list_tile_test.dart` asserts the mask instead
+  of gradient colours.
 - `lib/features/chat/widgets/composer_overflow_menu.dart` — `ToggleTile`
   trails a check icon instead of an `AdaptiveSwitch`; attachment action
   buttons are 64x44 filled `surfaceContainerHighest` pills without outline.

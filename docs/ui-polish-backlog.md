@@ -108,6 +108,14 @@ untouched ("perfect").
 
 ---
 
+## Done (round 5, 2026-09-21): composer pill fade
+
+| # | Item | Commit | Notes |
+|---|------|--------|-------|
+| 43 | Tinted box beside the last quick pill, both modes | `d89e4ca9` | `HorizontalOverflowFade` masks the row's alpha (`ShaderMask`, `dstIn`) instead of painting `surfaceContainerHighest` at 90%. On iOS 26 the shell is Liquid Glass, so no painted colour could match it. Verified on the simulator in light and dark with the Web pill active. |
+
+---
+
 ## Still open from round 1
 
 - `workspace*` NL translations (~250 admin-only strings) still English.

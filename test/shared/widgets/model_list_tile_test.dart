@@ -46,35 +46,31 @@ Future<ConduitThemeExtension> _pumpTile(
   return theme;
 }
 
-List<Color> _fadeColors(WidgetTester tester) {
-  final fade = find.byType(HorizontalOverflowFade);
-  final gradient = tester
-      .widgetList<DecoratedBox>(
-        find.descendant(of: fade, matching: find.byType(DecoratedBox)),
-      )
-      .map((box) => box.decoration)
-      .whereType<BoxDecoration>()
-      .map((decoration) => decoration.gradient)
-      .whereType<LinearGradient>()
-      .single;
-  return gradient.colors;
-}
-
 void main() {
-  testWidgets('unselected overflow fade derives from the card background', (
-    tester,
-  ) async {
-    final theme = await _pumpTile(tester, isSelected: false);
-    final card = theme.cardBackground;
+  testWidgets(
+    'overflow fade masks the row alpha instead of painting a colour',
+    (tester) async {
+      await _pumpTile(tester, isSelected: false);
 
-    check(card).not((it) => it.equals(theme.surfaceBackground));
+      // Fork: a painted overlay can only match an opaque surface. The mask has
+      // no colour of its own, so it sits on glass, cards and highlights alike.
+      final fade = find.byType(HorizontalOverflowFade);
+      final mask = tester.widget<ShaderMask>(
+        find.descendant(of: fade, matching: find.byType(ShaderMask)),
+      );
+      check(mask.blendMode).equals(BlendMode.dstIn);
+      final paintedGradients = tester
+          .widgetList<DecoratedBox>(
+            find.descendant(of: fade, matching: find.byType(DecoratedBox)),
+          )
+          .map((box) => box.decoration)
+          .whereType<BoxDecoration>()
+          .where((decoration) => decoration.gradient != null);
+      check(paintedGradients).isEmpty();
+    },
+  );
 
-    final colors = _fadeColors(tester);
-    check(colors)
-        .deepEquals([card.withValues(alpha: 0), card.withValues(alpha: 0.9)]);
-  });
-
-  testWidgets('selected overflow fade matches the highlighted row surface', (
+  testWidgets('selected row highlight paints against the card surface', (
     tester,
   ) async {
     final theme = await _pumpTile(tester, isSelected: true);
@@ -88,12 +84,6 @@ void main() {
     );
 
     check(highlighted).not((it) => it.equals(surfaceHighlighted));
-
-    final colors = _fadeColors(tester);
-    check(colors).deepEquals([
-      highlighted.withValues(alpha: 0),
-      highlighted.withValues(alpha: 0.9),
-    ]);
 
     // The highlight itself paints against the card surface.
     final tile = find.byType(ModelListTile);
