@@ -12,9 +12,17 @@ Each of these produced a broken commit, a silent no-op, or a wasted run.
   commits went in with failing tests because of this. Run the test command
   alone or use `set -o pipefail`.
 - zsh does not word-split `$FILES`; use `${=FILES}` or an array.
-- `flutter run` rewrites `ios/Podfile.lock` (checksum) and
-  `ios/Runner.xcodeproj/project.pbxproj` (Xcode reformatting). Restore both
-  before committing.
+- A local build may rewrite `ios/Podfile.lock` (Podfile checksum) and
+  `ios/Runner.xcodeproj/project.pbxproj` (newer Xcode reformats the
+  synchronized-folder entries). Both were committed on 2026-09-21 so they
+  stop re-dirtying. If they show up again after an upstream sync, check
+  that the diff is only a checksum or formatting, then commit it once
+  rather than restoring it on every run. Do not commit real `$(EOCHAT_*)`
+  changes by accident (FORK.md §5).
+- The `openwebui-src` submodule is an API reference only. If it shows as
+  `m` (modified content) with hundreds of files, its working tree drifted
+  from the pinned commit; `git -C openwebui-src checkout -- .` restores it.
+  Nothing local is authored there.
 - After an upstream sync landed via the scheduled task, local polish commits
   were rebased and their hashes changed. Remap doc references by subject.
 
