@@ -185,8 +185,8 @@ class OpenWebUiAccountStorageIsolation extends Notifier<void> {
     );
   }
 
-  /// Completes when the current account-storage isolation operation settles.
   // ignore: riverpod_lint/avoid_public_notifier_properties
+  /// Completes when the current account-storage isolation operation settles.
   Future<void> get settled => _settled;
 
   _OpenWebUiAccountIdentity? _identityFrom(AsyncValue<AuthState> value) {

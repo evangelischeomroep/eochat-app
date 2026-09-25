@@ -35,7 +35,9 @@ Widget _buildCard({
 }) {
   return ProviderScope(
     overrides: [
+      // ignore: scoped_providers_should_specify_dependencies
       activeServerProvider.overrideWith((ref) async => _server(activeServerId)),
+      // ignore: scoped_providers_should_specify_dependencies
       backendConfigProvider.overrideWith(
         () => _FixedBackendConfigNotifier(config),
       ),

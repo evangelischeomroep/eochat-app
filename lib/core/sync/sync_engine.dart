@@ -425,8 +425,8 @@ class SyncEngine extends _$SyncEngine {
   /// Stream of committed local->server id remaps (Wiring C). The route/active
   /// chat consumer (`remapRouteSyncProvider`) listens here to swap ids in place.
   /// Backed by a long-lived controller ([_remapEvents]) so the consumer's single
-  /// startup subscription survives session rebinds that replace [_remapper].
   // ignore: riverpod_lint/avoid_public_notifier_properties
+  /// startup subscription survives session rebinds that replace [_remapper].
   Stream<RemapEvent> get remapEvents => _remapEvents.stream;
 
   /// The engine's single [IdRemapper] (the same instance feeding [remapEvents]
