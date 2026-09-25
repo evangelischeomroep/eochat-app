@@ -4,12 +4,17 @@ import 'package:conduit/features/direct_connections/models/direct_mcp_app.dart';
 import 'package:conduit/features/direct_connections/services/direct_mcp_apps_protocol.dart';
 import 'package:conduit/features/direct_connections/widgets/direct_mcp_app_view.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const _fixtureOrigin = String.fromEnvironment('MCP_APP_FIXTURE_ORIGIN');
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MaterialApp(home: _Harness()));
+  // This harness doesn't read any providers itself, but the widget tree it
+  // hosts (direct_mcp_app_view.dart) is part of the main app and may, so it
+  // still needs a ProviderScope ancestor. Also satisfies riverpod_lint's
+  // missing_provider_scope check for any Flutter entrypoint in the project.
+  runApp(const ProviderScope(child: MaterialApp(home: _Harness())));
 }
 
 final class _Harness extends StatefulWidget {

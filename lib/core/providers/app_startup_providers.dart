@@ -186,6 +186,7 @@ class OpenWebUiAccountStorageIsolation extends Notifier<void> {
   }
 
   /// Completes when the current account-storage isolation operation settles.
+  // ignore: avoid_public_notifier_properties
   Future<void> get settled => _settled;
 
   _OpenWebUiAccountIdentity? _identityFrom(AsyncValue<AuthState> value) {
