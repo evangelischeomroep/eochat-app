@@ -64,6 +64,9 @@ void main() {
 
     // Fork: ForkOverrides.modelSelectorShowsDescription replaces the tag
     // chip row with the Open WebUI description, clipped to a single line.
+    // Because that override is on by default, the tags/capabilities row
+    // (and upstream's new overflow-cue behavior for it) never renders for
+    // this fixture, so there is nothing to test there beyond this.
     final subtitle = tester.widget<Text>(
       find.text('Denkt langer na over lastige vragen.'),
     );
@@ -73,7 +76,7 @@ void main() {
     expect(find.text('reasoning'), findsNothing);
   });
 
-  testWidgets('selected row highlight paints against the card surface', (
+  testWidgets('the selected row highlight paints against the card surface', (
     tester,
   ) async {
     final theme = await _pumpTile(tester, isSelected: true);
@@ -88,7 +91,6 @@ void main() {
 
     check(highlighted).not((it) => it.equals(surfaceHighlighted));
 
-    // The highlight itself paints against the card surface.
     final tile = find.byType(ModelListTile);
     final containers = tester.widgetList<Container>(
       find.descendant(of: tile, matching: find.byType(Container)),
