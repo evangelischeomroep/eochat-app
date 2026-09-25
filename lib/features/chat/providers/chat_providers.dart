@@ -1664,7 +1664,7 @@ class ChatMessagesNotifier extends Notifier<List<ChatMessage>>
   bool _initialized = false;
   bool _disposed = false;
 
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   List<ChatMessage> get messagesSnapshot => state;
 
   @override

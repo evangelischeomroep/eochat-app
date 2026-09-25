@@ -662,13 +662,13 @@ final class IncompleteLogoutFence extends _$IncompleteLogoutFence {
 
   /// Latest requested durable state, including a write that is queued or
   /// currently blocked before SharedPreferences reflects it.
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   bool get desiredSuppressed => _desiredSuppressed;
 
   /// Identifies whether an asynchronous completion still belongs to the most
   /// recent fence request. Older failures must not enqueue a fail-closed write
   /// over a newer checked clear that is establishing a valid session.
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   int get requestGeneration => _writeGeneration;
 
   bool ownsRequest(int generation) => generation == _writeGeneration;
@@ -1368,7 +1368,7 @@ class SocketServiceManager extends _$SocketServiceManager {
   /// would otherwise drop consumers to HTTP-only sends mid-session. Null only
   /// when there is genuinely no service (reviewer mode / no active server /
   /// disposed).
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   SocketService? get currentService => _service;
 
   @override
@@ -5880,7 +5880,7 @@ class PersonalizationSettings extends _$PersonalizationSettings {
         const ServerUserSettings();
   }
 
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   bool get canTogglePinnedModels {
     final api = ref.read(apiServiceProvider);
     return api == null ||

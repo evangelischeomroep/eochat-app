@@ -426,12 +426,14 @@ class SyncEngine extends _$SyncEngine {
   /// chat consumer (`remapRouteSyncProvider`) listens here to swap ids in place.
   /// Backed by a long-lived controller ([_remapEvents]) so the consumer's single
   /// startup subscription survives session rebinds that replace [_remapper].
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   Stream<RemapEvent> get remapEvents => _remapEvents.stream;
 
   /// The engine's single [IdRemapper] (the same instance feeding [remapEvents]
   /// and shared with PushSync/PullSync). Exposed for tests to drive a committed
   /// remap and assert the [remapRouteSyncProvider] consumer reacts.
   @visibleForTesting
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   IdRemapper? get remapperForTesting => _ensureRemapper();
 
   @visibleForTesting

@@ -182,9 +182,9 @@ final directContextLengthOverridesProvider =
 abstract class _QueuedBoolPreferenceController extends Notifier<bool> {
   Future<void> _mutationQueue = Future<void>.value();
 
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   String get preferenceKey;
-  // ignore: avoid_public_notifier_properties
+  // ignore: riverpod_lint/avoid_public_notifier_properties
   bool get defaultValue => false;
 
   @override
