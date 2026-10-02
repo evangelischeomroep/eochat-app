@@ -216,8 +216,11 @@ carried a branding-string swap. Current known inline-touch files:
   `ForkOverrides.chatImageMaxScreenHeightFraction` of the screen height
   (ratio clamped to 0.5–3.0, beyond that a light cover crop). Upstream draws
   every image as a fixed box with `BoxFit.cover`, which cut generated
-  portraits and landscapes into near-squares. Multi-image grids in
-  `assistant_message_widget.dart` and `user_message_bubble.dart` pass
+  portraits and landscapes into near-squares. In
+  `assistant_message_widget.dart` a pair of images stacks as two full-width
+  ratio previews (upstream's 245pt square tiles never fit side by side on a
+  phone), and 3+ images stay 160pt tiles, each in its own ratio. The user
+  bubble's 2/3+ grids in `user_message_bubble.dart` pass
   `preserveAspectRatio: false` to keep uniform tiles.
 
 If a new fork behavior needs another upstream file, document why in the PR.

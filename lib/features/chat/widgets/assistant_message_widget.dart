@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/fork_overrides.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/markdown/streaming_markdown_widget.dart';
 import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
@@ -1758,6 +1759,38 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       );
     }
 
+    // Fork: two 245pt tiles don't fit side by side on a phone anyway, so with
+    // ForkOverrides.chatImagesKeepAspectRatio a pair stacks as two full-width
+    // images in their own ratio, like a single image.
+    if (imageCount == 2 && ForkOverrides.chatImagesKeepAspectRatio) {
+      return Column(
+        key: const ValueKey('assistant-file-image-pair'),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final file in imageFiles)
+            if (getFileUrl(file) case final String imageUrl)
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: identical(file, imageFiles.last) ? 0 : Spacing.sm,
+                ),
+                child: RepaintBoundary(
+                  child: EnhancedImageAttachment(
+                    key: ValueKey('gen_attachment_$imageUrl'),
+                    attachmentId: imageUrl,
+                    isMarkdownFormat: true,
+                    constraints: const BoxConstraints(
+                      maxWidth: 500,
+                      maxHeight: 400,
+                    ),
+                    disableAnimation: false,
+                    httpHeaders: _headersForFile(file),
+                  ),
+                ),
+              ),
+        ],
+      );
+    }
+
     return Wrap(
       key: const ValueKey('assistant-file-image-grid'),
       spacing: Spacing.sm,
@@ -1771,8 +1804,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
             key: ValueKey('gen_attachment_$imageUrl'),
             attachmentId: imageUrl,
             isMarkdownFormat: true,
-            // Fork: grid tiles stay uniform; only single images keep ratio.
-            preserveAspectRatio: false,
+            // Fork: 3+ images stay small tiles, each in its own ratio.
             constraints: BoxConstraints(
               maxWidth: imageCount == 2 ? 245 : 160,
               maxHeight: imageCount == 2 ? 245 : 160,
