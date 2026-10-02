@@ -114,6 +114,18 @@ class ForkOverrides {
     defaultValue: false,
   );
 
+  /// When true, a single image in a conversation (generated, attached or
+  /// inline in markdown) keeps its own aspect ratio instead of a fixed box
+  /// with a cover crop. Multi-image grids keep uniform tiles.
+  static const bool chatImagesKeepAspectRatio = bool.fromEnvironment(
+    'CHAT_IMAGES_KEEP_ASPECT_RATIO',
+    defaultValue: true,
+  );
+
+  /// Cap for an aspect-ratio image preview's height, as a fraction of the
+  /// screen height, so portrait images don't take over the conversation.
+  static const double chatImageMaxScreenHeightFraction = 0.45;
+
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;
 

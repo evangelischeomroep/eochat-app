@@ -296,6 +296,8 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                           attachmentId: imageUrl,
                           isUserMessage: true,
                           isMarkdownFormat: false,
+                          // Fork: grid tiles stay uniform.
+                          preserveAspectRatio: false,
                           constraints: const BoxConstraints(
                             maxWidth: 135,
                             maxHeight: 180,
@@ -341,6 +343,8 @@ class _UserMessageBubbleState extends ConsumerState<UserMessageBubble> {
                           attachmentId: imageUrl,
                           isUserMessage: true,
                           isMarkdownFormat: false,
+                          // Fork: grid tiles stay uniform.
+                          preserveAspectRatio: false,
                           constraints: BoxConstraints(
                             maxWidth: imageCount == 3 ? 135 : 90,
                             maxHeight: imageCount == 3 ? 135 : 90,

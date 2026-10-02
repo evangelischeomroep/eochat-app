@@ -1771,6 +1771,8 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
             key: ValueKey('gen_attachment_$imageUrl'),
             attachmentId: imageUrl,
             isMarkdownFormat: true,
+            // Fork: grid tiles stay uniform; only single images keep ratio.
+            preserveAspectRatio: false,
             constraints: BoxConstraints(
               maxWidth: imageCount == 2 ? 245 : 160,
               maxHeight: imageCount == 2 ? 245 : 160,

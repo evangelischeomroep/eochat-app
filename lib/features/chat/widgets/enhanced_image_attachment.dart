@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -11,6 +12,7 @@ import 'package:dio/dio.dart' as dio;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/config/fork_overrides.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_page_route.dart';
 import '../../../shared/widgets/jovial_svg_image.dart';
@@ -479,6 +481,12 @@ class EnhancedImageAttachment extends ConsumerStatefulWidget {
   final bool disableAnimation;
   final Map<String, String>? httpHeaders;
 
+  /// EOchat fork: when true the preview keeps the image's own aspect ratio
+  /// (fitted inside [constraints] and capped at a fraction of the screen
+  /// height) instead of a fixed box with a cover crop. Multi-image grids
+  /// pass false so their tiles stay uniform.
+  final bool preserveAspectRatio;
+
   const EnhancedImageAttachment({
     super.key,
     required this.attachmentId,
@@ -488,6 +496,7 @@ class EnhancedImageAttachment extends ConsumerStatefulWidget {
     this.isUserMessage = false,
     this.disableAnimation = false,
     this.httpHeaders,
+    this.preserveAspectRatio = ForkOverrides.chatImagesKeepAspectRatio,
   });
 
   @override
@@ -568,7 +577,101 @@ class _EnhancedImageAttachmentState
   void dispose() {
     _loadGeneration += 1;
     _retryLoadTimer?.cancel();
+    _disposeAspectRatioStream();
     super.dispose();
+  }
+
+  // EOchat fork: aspect-ratio-preserving previews. The ratio comes from the
+  // decoded preview image (the cover resize scales, it never crops), and is
+  // remembered per attachment so a remount lays out at the right size
+  // straight away instead of jumping from the fixed box.
+  static final Map<String, double> _aspectRatioCache = <String, double>{};
+  static const int _aspectRatioCacheLimit = 512;
+  ImageStream? _aspectRatioStream;
+  ImageStreamListener? _aspectRatioListener;
+  String? _aspectRatioTrackedFor;
+
+  bool get _keepsAspectRatio => widget.preserveAspectRatio && !_isSvg;
+
+  double? get _knownAspectRatio => _aspectRatioCache[widget.attachmentId];
+
+  static void _rememberAspectRatio(String attachmentId, double ratio) {
+    if (_aspectRatioCache.length >= _aspectRatioCacheLimit &&
+        !_aspectRatioCache.containsKey(attachmentId)) {
+      _aspectRatioCache.remove(_aspectRatioCache.keys.first);
+    }
+    _aspectRatioCache[attachmentId] = ratio;
+  }
+
+  void _disposeAspectRatioStream() {
+    final listener = _aspectRatioListener;
+    if (listener != null) {
+      _aspectRatioStream?.removeListener(listener);
+    }
+    _aspectRatioStream = null;
+    _aspectRatioListener = null;
+  }
+
+  void _trackAspectRatio(ImageProvider<Object> provider) {
+    if (!_keepsAspectRatio || _knownAspectRatio != null) return;
+    if (_aspectRatioTrackedFor == widget.attachmentId) return;
+    _aspectRatioTrackedFor = widget.attachmentId;
+    _disposeAspectRatioStream();
+    final attachmentId = widget.attachmentId;
+    final stream = provider.resolve(createLocalImageConfiguration(context));
+    final listener = ImageStreamListener(
+      (info, _) {
+        final width = info.image.width;
+        final height = info.image.height;
+        info.dispose();
+        _disposeAspectRatioStream();
+        if (width <= 0 || height <= 0) return;
+        _rememberAspectRatio(attachmentId, width / height);
+        // The listener can fire synchronously while this widget builds (the
+        // image was already cached), so rebuild after the current frame task.
+        scheduleMicrotask(() {
+          if (mounted && widget.attachmentId == attachmentId) {
+            setState(() {});
+          }
+        });
+      },
+      onError: (_, _) => _disposeAspectRatioStream(),
+    );
+    _aspectRatioStream = stream;
+    _aspectRatioListener = listener;
+    stream.addListener(listener);
+  }
+
+  /// The box an aspect-ratio preview is fitted into, or null to use the
+  /// fixed preview box (ratio unknown yet, SVG, or the feature is off).
+  ({double maxWidth, double maxHeight, double ratio})? _aspectRatioBox() {
+    if (!_keepsAspectRatio) return null;
+    final ratio = _knownAspectRatio;
+    if (ratio == null || !ratio.isFinite || ratio <= 0) return null;
+    final stable = _stablePreviewSize;
+    final screenCap =
+        MediaQuery.sizeOf(context).height *
+        ForkOverrides.chatImageMaxScreenHeightFraction;
+    return (
+      maxWidth: stable.width,
+      maxHeight: math.min(stable.height, screenCap),
+      // Very tall or very wide images get a light cover crop rather than
+      // becoming a sliver.
+      ratio: ratio.clamp(0.5, 3.0).toDouble(),
+    );
+  }
+
+  Widget _fitToAspectRatio(
+    ({double maxWidth, double maxHeight, double ratio}) box,
+    Widget child,
+  ) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: box.maxWidth,
+        maxHeight: box.maxHeight,
+      ),
+      child: AspectRatio(aspectRatio: box.ratio, child: child),
+    );
   }
 
   void _scheduleLoadIfNeeded({bool immediate = false}) {
@@ -854,6 +957,21 @@ class _EnhancedImageAttachmentState
   }
 
   Widget _buildLoadingState() {
+    final ratioBox = _aspectRatioBox();
+    if (ratioBox != null) {
+      return KeyedSubtree(
+        key: const ValueKey('loading'),
+        child: Padding(
+          padding: widget.isMarkdownFormat
+              ? const EdgeInsets.symmetric(vertical: Spacing.sm)
+              : EdgeInsets.zero,
+          child: _fitToAspectRatio(
+            ratioBox,
+            _buildSkeletonPlaceholder(showProgressIndicator: true),
+          ),
+        ),
+      );
+    }
     return KeyedSubtree(
       key: const ValueKey('loading'),
       child: SizedBox.fromSize(
@@ -929,20 +1047,23 @@ class _EnhancedImageAttachmentState
     final previewSize = _stablePreviewSize;
 
     final cacheManager = ref.watch(selfSignedImageCacheManagerProvider);
+    final provider = RasterMediaPolicy.resizeProviderForCover(
+      CachedNetworkImageProvider(
+        _cachedImageData!,
+        cacheKey: networkCacheKey,
+        cacheManager: cacheManager,
+        headers: headers,
+      ),
+      dimensions,
+      profile: RasterDecodeProfile.inline,
+    );
+    _trackAspectRatio(provider);
+    final ratioBox = _aspectRatioBox();
     final imageWidget = Image(
       key: ValueKey('image_${widget.attachmentId}'),
-      image: RasterMediaPolicy.resizeProviderForCover(
-        CachedNetworkImageProvider(
-          _cachedImageData!,
-          cacheKey: networkCacheKey,
-          cacheManager: cacheManager,
-          headers: headers,
-        ),
-        dimensions,
-        profile: RasterDecodeProfile.inline,
-      ),
-      width: previewSize.width,
-      height: previewSize.height,
+      image: provider,
+      width: ratioBox == null ? previewSize.width : null,
+      height: ratioBox == null ? previewSize.height : null,
       fit: BoxFit.cover,
       gaplessPlayback: true,
       frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
@@ -959,7 +1080,9 @@ class _EnhancedImageAttachmentState
       },
     );
 
-    return _wrapImage(imageWidget);
+    return _wrapImage(
+      ratioBox == null ? imageWidget : _fitToAspectRatio(ratioBox, imageWidget),
+    );
   }
 
   Widget _buildNetworkSvg() {
@@ -1001,15 +1124,19 @@ class _EnhancedImageAttachmentState
     final dimensions = _cacheDimensions(context);
     final previewSize = _stablePreviewSize;
 
+    final provider = RasterMediaPolicy.resizeProviderForCover(
+      MemoryImage(bytes),
+      dimensions,
+      profile: RasterDecodeProfile.inline,
+    );
+    _trackAspectRatio(provider);
+    final ratioBox = _aspectRatioBox();
+
     final imageWidget = Image(
       key: ValueKey('image_${widget.attachmentId}'),
-      image: RasterMediaPolicy.resizeProviderForCover(
-        MemoryImage(bytes),
-        dimensions,
-        profile: RasterDecodeProfile.inline,
-      ),
-      width: previewSize.width,
-      height: previewSize.height,
+      image: provider,
+      width: ratioBox == null ? previewSize.width : null,
+      height: ratioBox == null ? previewSize.height : null,
       fit: BoxFit.cover,
       gaplessPlayback: true, // Prevents flashing during rebuilds
       errorBuilder: (context, error, stackTrace) {
@@ -1018,7 +1145,9 @@ class _EnhancedImageAttachmentState
       },
     );
 
-    return _wrapImage(imageWidget);
+    return _wrapImage(
+      ratioBox == null ? imageWidget : _fitToAspectRatio(ratioBox, imageWidget),
+    );
   }
 
   Widget _buildBase64Svg() {
@@ -1044,7 +1173,11 @@ class _EnhancedImageAttachmentState
 
   Widget _wrapImage(Widget imageWidget) {
     final wrappedImage = Container(
-      constraints: _previewConstraints,
+      // EOchat fork: an aspect-ratio preview may be smaller than the caller's
+      // minimum box, so only the maximums apply to it.
+      constraints: _aspectRatioBox() == null
+          ? _previewConstraints
+          : _previewConstraints.loosen(),
       margin: widget.isMarkdownFormat
           ? const EdgeInsets.symmetric(vertical: Spacing.sm)
           : EdgeInsets.zero,

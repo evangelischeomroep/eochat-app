@@ -209,6 +209,16 @@ carried a branding-string swap. Current known inline-touch files:
   `Builder`), resolves server-relative image URLs against `api.baseUrl`, and
   shows a snackbar on failure. Upstream omitted the origin and swallowed the
   error, so share/download on generated images silently did nothing.
+  Inline previews keep the image's own aspect ratio
+  (`ForkOverrides.chatImagesKeepAspectRatio`, `preserveAspectRatio` param):
+  the ratio is read from the decoded preview, cached per attachment id, and
+  the preview is fitted inside the caller's max box and capped at
+  `ForkOverrides.chatImageMaxScreenHeightFraction` of the screen height
+  (ratio clamped to 0.5–3.0, beyond that a light cover crop). Upstream draws
+  every image as a fixed box with `BoxFit.cover`, which cut generated
+  portraits and landscapes into near-squares. Multi-image grids in
+  `assistant_message_widget.dart` and `user_message_bubble.dart` pass
+  `preserveAspectRatio: false` to keep uniform tiles.
 
 If a new fork behavior needs another upstream file, document why in the PR.
 
