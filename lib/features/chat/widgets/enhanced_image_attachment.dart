@@ -1320,11 +1320,17 @@ class FullScreenImageViewer extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                ConduitIconButton(
-                  icon: Platform.isIOS ? Icons.ios_share : Icons.share_outlined,
-                  iconColor: iconColor,
-                  tooltip: AppLocalizations.of(context)!.shareSystemSheet,
-                  onPressed: () => _shareImage(context, ref),
+                // EOchat fork: Builder gives the button its own context so
+                // the share sheet can anchor to it (sharePositionOrigin).
+                Builder(
+                  builder: (buttonContext) => ConduitIconButton(
+                    icon: Platform.isIOS
+                        ? Icons.ios_share
+                        : Icons.share_outlined,
+                    iconColor: iconColor,
+                    tooltip: AppLocalizations.of(context)!.shareSystemSheet,
+                    onPressed: () => _shareImage(buttonContext, ref),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ConduitIconButton(
@@ -1343,25 +1349,40 @@ class FullScreenImageViewer extends ConsumerWidget {
 
   Future<void> _shareImage(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
+    // EOchat fork: capture the anchor and messenger before any await. iOS
+    // needs a non-empty sharePositionOrigin for the share sheet (iPad, and
+    // recent iOS/share_plus versions); without it the share call throws and
+    // the catch below used to swallow it, so the button appeared dead.
+    final shareOrigin = _shareOriginFor(context);
+    final messenger = ScaffoldMessenger.maybeOf(context);
     try {
       Uint8List bytes;
       String? fileExtension;
+      final api = ref.read(apiServiceProvider);
+      final rawData = imageData;
+      // EOchat fork: resolve server-relative URLs (e.g. /api/v1/files/...)
+      // the same way the loader does, instead of base64-decoding them.
+      final sourceData =
+          (rawData != null && rawData.startsWith('/') && api != null)
+          ? api.baseUrl + rawData
+          : rawData;
 
       // If we have raw bytes, use them directly
-      if (imageData == null && imageBytes != null) {
+      if (sourceData == null && imageBytes != null) {
         bytes = imageBytes!;
         fileExtension = isSvg ? 'svg' : 'png';
-      } else if (imageData!.startsWith('http')) {
-        final api = ref.read(apiServiceProvider);
+      } else if (sourceData == null) {
+        throw StateError('No image data available to share');
+      } else if (sourceData.startsWith('http')) {
         final defaultHeaders = readImageHeadersForUrlFromWidgetRef(
           ref,
-          imageData!,
+          sourceData,
         );
         final mergedHeaders = _mergeHeaders(defaultHeaders, customHeaders);
 
         final client = api?.dio ?? dio.Dio();
         final response = await client.get<List<int>>(
-          imageData!,
+          sourceData,
           options: dio.Options(
             responseType: dio.ResponseType.bytes,
             headers: mergedHeaders,
@@ -1378,7 +1399,7 @@ class FullScreenImageViewer extends ConsumerWidget {
           fileExtension = contentType.split('/').last;
           if (fileExtension == 'jpeg') fileExtension = 'jpg';
         } else {
-          final uri = Uri.tryParse(imageData!);
+          final uri = Uri.tryParse(sourceData);
           final lastSegment = uri?.pathSegments.isNotEmpty == true
               ? uri!.pathSegments.last
               : '';
@@ -1390,23 +1411,20 @@ class FullScreenImageViewer extends ConsumerWidget {
             }
           }
         }
-      } else if (imageData != null) {
-        String actualBase64 = imageData!;
-        if (imageData!.startsWith('data:')) {
-          final commaIndex = imageData!.indexOf(',');
-          final meta = imageData!.substring(5, commaIndex); // image/png;base64
+      } else {
+        String actualBase64 = sourceData;
+        if (sourceData.startsWith('data:')) {
+          final commaIndex = sourceData.indexOf(',');
+          final meta = sourceData.substring(5, commaIndex); // image/png;base64
           final slashIdx = meta.indexOf('/');
           final semicolonIdx = meta.indexOf(';');
           if (slashIdx != -1 && semicolonIdx != -1 && slashIdx < semicolonIdx) {
             final subtype = meta.substring(slashIdx + 1, semicolonIdx);
             fileExtension = subtype == 'jpeg' ? 'jpg' : subtype;
           }
-          actualBase64 = imageData!.substring(commaIndex + 1);
+          actualBase64 = sourceData.substring(commaIndex + 1);
         }
         bytes = base64.decode(actualBase64);
-      } else {
-        // No image data available
-        return;
       }
 
       fileExtension ??= 'png';
@@ -1416,13 +1434,30 @@ class FullScreenImageViewer extends ConsumerWidget {
       final file = File(filePath);
       await file.writeAsBytes(bytes);
 
-      await SharePlus.instance.share(ShareParams(files: [XFile(file.path)]));
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          sharePositionOrigin: shareOrigin,
+        ),
+      );
     } catch (e) {
-      // Swallowing UI feedback per requirements; keep a log for debugging
       DebugLogger.log(
         'Failed to share image: $e',
         scope: 'chat/image-attachment',
       );
+      // EOchat fork: tell the user instead of failing silently.
+      messenger?.showSnackBar(SnackBar(content: Text(l10n.errorMessage)));
     }
+  }
+
+  /// EOchat fork: the tapped button's global rect, used as the share sheet
+  /// anchor. Falls back to a small rect at the top-right of the screen.
+  Rect _shareOriginFor(BuildContext context) {
+    final renderObject = context.findRenderObject();
+    if (renderObject is RenderBox && renderObject.hasSize) {
+      return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+    }
+    final size = MediaQuery.sizeOf(context);
+    return Rect.fromLTWH(size.width - 48, 48, 1, 1);
   }
 }

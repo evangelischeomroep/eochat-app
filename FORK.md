@@ -175,6 +175,11 @@ carried a branding-string swap. Current known inline-touch files:
   (`ForkOverrides.hideRedundantModelHeader`).
 - `lib/shared/widgets/chrome_gradient_fade.dart` — scrim held stop 0.7 and
   `kConduitChromeFadeHeight` 24 (upstream 0.92 / 30).
+- `lib/features/chat/widgets/enhanced_image_attachment.dart` — the full-screen
+  viewer's share button passes `sharePositionOrigin` (the button's rect, via a
+  `Builder`), resolves server-relative image URLs against `api.baseUrl`, and
+  shows a snackbar on failure. Upstream omitted the origin and swallowed the
+  error, so share/download on generated images silently did nothing.
 
 If a new fork behavior needs another upstream file, document why in the PR.
 
