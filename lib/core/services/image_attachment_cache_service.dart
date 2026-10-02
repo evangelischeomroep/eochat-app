@@ -2,12 +2,15 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:typed_data';
 
-import '../providers/app_providers.dart';
-import 'api_service.dart';
-import 'raster_media_policy.dart';
+import 'package:riverpod/riverpod.dart';
+import 'package:meta/meta.dart';
+
+import 'package:conduit_core/providers/app_providers.dart';
+import 'package:conduit_core/services/api_service.dart';
+
+import '../../shared/services/raster_media_policy.dart';
 
 final _imageAttachmentCacheStore = ImageAttachmentCacheStore();
 
@@ -463,12 +466,16 @@ bool imageAttachmentUrlIsSvg(String url) {
   return pathPart.endsWith('.svg') || queryPart.contains('image/svg+xml');
 }
 
+/// Whether [bytes] hold an SVG document rather than a raster image.
+///
+/// Only a document that starts with markup can be SVG. Raster formats can
+/// carry `<svg` in their metadata: the C2PA manifest in OpenRouter-generated
+/// PNGs embeds an SVG icon within the first kilobyte (issue #768).
 bool imageAttachmentBytesAreSvg(Uint8List bytes) {
   final checkLength = bytes.length < 1024 ? bytes.length : 1024;
-  final header = utf8.decode(
-    bytes.sublist(0, checkLength),
-    allowMalformed: true,
-  );
+  var header = utf8.decode(bytes.sublist(0, checkLength), allowMalformed: true);
+  if (header.startsWith('\uFEFF')) header = header.substring(1);
+  if (!header.trimLeft().startsWith('<')) return false;
   return header.toLowerCase().contains('<svg');
 }
 

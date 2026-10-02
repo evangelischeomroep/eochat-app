@@ -4,149 +4,41 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_callkit_incoming/entities/call_event.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import '../../../core/models/chat_message.dart';
-import '../../../core/models/model.dart';
-import '../../../core/providers/app_providers.dart'
+import 'package:conduit_core/voice/voice_session.dart';
+import 'package:conduit_core/models/chat_message.dart';
+import 'package:conduit_core/models/model.dart';
+
+import 'package:conduit_core/providers/app_providers.dart'
     show selectedModelProvider, socketServiceProvider;
+
 import '../../../core/services/background_streaming_handler.dart';
 import '../../../core/services/callkit_service.dart';
-import '../../../core/services/settings_service.dart';
-import '../../../core/services/socket_service.dart'
+
+import 'package:conduit_core/services/settings_service.dart';
+import 'package:conduit_core/services/socket_service.dart'
     show SocketBackgroundActivityLease, SocketService;
-import '../../../core/utils/debug_logger.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../providers/chat_providers.dart';
 import '../providers/text_to_speech_provider.dart';
 import '../services/text_to_speech_service.dart';
 import '../services/voice_input_service.dart';
 import '../voice_call/voice_call_eligibility.dart';
 import 'chat_voice_audio_session_coordinator.dart';
-import '../../tools/providers/tools_providers.dart';
 
-enum ChatVoiceModePhase {
-  idle,
-  starting,
-  listening,
-  sending,
-  speaking,
-  paused,
-  muted,
-  ending,
-  ended,
-  error,
-}
+import 'package:conduit_core/features/tools/providers/tools_providers.dart';
 
-enum ChatVoiceModeStartResult { started, alreadyActive, cancelled, failed }
+/// Re-exported so the move of the voice session model into
+/// `conduit_core` is invisible to callers: these names were public here
+/// before the extraction.
+export 'package:conduit_core/voice/voice_session.dart';
 
 final class _ChatVoiceModeStartCancelled implements Exception {
   const _ChatVoiceModeStartCancelled();
-}
-
-@immutable
-class ChatVoiceModeSnapshot {
-  const ChatVoiceModeSnapshot({
-    this.phase = ChatVoiceModePhase.idle,
-    this.transcript = '',
-    this.assistantPreview = '',
-    this.spokenResponse = '',
-    this.spokenWordStart,
-    this.spokenWordEnd,
-    this.intensity = 0,
-    this.elapsed = Duration.zero,
-    this.startedAt,
-    this.activeCallId,
-    this.errorMessage,
-    this.isCollapsed = false,
-    this.isMuted = false,
-    this.isSpeakerphoneEnabled = false,
-  });
-
-  final ChatVoiceModePhase phase;
-  final String transcript;
-  final String assistantPreview;
-  final String spokenResponse;
-  final int? spokenWordStart;
-  final int? spokenWordEnd;
-  final int intensity;
-  final Duration elapsed;
-  final DateTime? startedAt;
-  final String? activeCallId;
-  final String? errorMessage;
-  final bool isCollapsed;
-  final bool isMuted;
-  final bool isSpeakerphoneEnabled;
-
-  bool get isActive {
-    return switch (phase) {
-      ChatVoiceModePhase.idle ||
-      ChatVoiceModePhase.ended ||
-      ChatVoiceModePhase.error => false,
-      _ => true,
-    };
-  }
-
-  bool get canPause {
-    return phase == ChatVoiceModePhase.listening ||
-        phase == ChatVoiceModePhase.sending ||
-        phase == ChatVoiceModePhase.speaking;
-  }
-
-  bool get canResume {
-    return phase == ChatVoiceModePhase.paused ||
-        phase == ChatVoiceModePhase.muted;
-  }
-
-  ChatVoiceModeSnapshot copyWith({
-    ChatVoiceModePhase? phase,
-    String? transcript,
-    String? assistantPreview,
-    String? spokenResponse,
-    bool clearSpokenResponse = false,
-    int? spokenWordStart,
-    int? spokenWordEnd,
-    bool clearSpokenProgress = false,
-    int? intensity,
-    Duration? elapsed,
-    DateTime? startedAt,
-    bool clearStartedAt = false,
-    String? activeCallId,
-    bool clearActiveCallId = false,
-    String? errorMessage,
-    bool clearErrorMessage = false,
-    bool? isCollapsed,
-    bool? isMuted,
-    bool? isSpeakerphoneEnabled,
-  }) {
-    return ChatVoiceModeSnapshot(
-      phase: phase ?? this.phase,
-      transcript: transcript ?? this.transcript,
-      assistantPreview: assistantPreview ?? this.assistantPreview,
-      spokenResponse: clearSpokenResponse
-          ? ''
-          : spokenResponse ?? this.spokenResponse,
-      spokenWordStart: clearSpokenResponse || clearSpokenProgress
-          ? null
-          : spokenWordStart ?? this.spokenWordStart,
-      spokenWordEnd: clearSpokenResponse || clearSpokenProgress
-          ? null
-          : spokenWordEnd ?? this.spokenWordEnd,
-      intensity: intensity ?? this.intensity,
-      elapsed: elapsed ?? this.elapsed,
-      startedAt: clearStartedAt ? null : startedAt ?? this.startedAt,
-      activeCallId: clearActiveCallId
-          ? null
-          : activeCallId ?? this.activeCallId,
-      errorMessage: clearErrorMessage
-          ? null
-          : errorMessage ?? this.errorMessage,
-      isCollapsed: isCollapsed ?? this.isCollapsed,
-      isMuted: isMuted ?? this.isMuted,
-      isSpeakerphoneEnabled:
-          isSpeakerphoneEnabled ?? this.isSpeakerphoneEnabled,
-    );
-  }
 }
 
 final chatVoiceModeControllerProvider =
@@ -618,11 +510,12 @@ class ChatVoiceModeController extends Notifier<ChatVoiceModeSnapshot> {
     return result;
   }
 
-  /// Starts accessory-free calls on the loudspeaker, and follows the
-  /// coordinator when hardware comes and goes mid-call.
+  /// Starts accessory-free calls on the loudspeaker, and follows the route the
+  /// coordinator reads back for the rest of the call.
   ///
   /// The snapshot only ever moves on a route the coordinator confirms, so the
-  /// overlay's speaker button never lights up for a move the platform refused.
+  /// overlay's speaker button never lights up for a move the platform refused,
+  /// and goes back down when the platform moves the call off the loudspeaker.
   Future<void> _applyDefaultSpeakerphoneRoute() async {
     final coordinator = _audioSessionCoordinator;
     if (coordinator == null) {
@@ -633,6 +526,8 @@ class ChatVoiceModeController extends Notifier<ChatVoiceModeSnapshot> {
       enabled,
     ) {
       if (_disposed || !state.isActive) return;
+      // Every configure pass reports the route, mostly unchanged.
+      if (state.isSpeakerphoneEnabled == enabled) return;
       state = state.copyWith(isSpeakerphoneEnabled: enabled);
     });
     await coordinator.applyDefaultSpeakerphoneRoute();
@@ -825,6 +720,10 @@ class ChatVoiceModeController extends Notifier<ChatVoiceModeSnapshot> {
       if (_disposed) return;
       // A route the platform refused leaves audio where it was, so the button
       // stays where it was too rather than promising a route nobody is hearing.
+      // That holds both ways: the coordinator reads the route back on and off
+      // the loudspeaker, and reports the route it finds on every configure
+      // pass, so the button shows the real route and the next press always
+      // asks for the other one.
       if (!applied) return;
       state = state.copyWith(isSpeakerphoneEnabled: enabled);
     });

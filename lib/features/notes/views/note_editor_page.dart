@@ -17,17 +17,25 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
 
-import '../../../core/auth/api_auth_interceptor.dart';
-import '../../../core/database/app_database.dart';
-import '../../../core/database/database_provider.dart';
-import '../../../core/database/mappers/note_mapper.dart';
-import '../../../core/models/note.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/services/connectivity_service.dart';
+import 'package:conduit_core/auth/api_auth_interceptor.dart';
+
+import 'package:conduit_core/database/app_database.dart';
+
+import 'package:conduit_core/database/database_provider.dart';
+
+import 'package:conduit_core/database/mappers/note_mapper.dart';
+import 'package:conduit_core/models/note.dart';
+
+import 'package:conduit_core/providers/app_providers.dart';
+import 'package:conduit_core/services/connectivity_service.dart';
+
 import '../../../core/services/ios_native_dropdown_bridge.dart';
-import '../../../core/sync/sync_engine.dart';
-import '../../../core/sync/chat_locks.dart';
-import '../../../core/utils/debug_logger.dart';
+
+import 'package:conduit_core/sync/sync_engine.dart';
+import 'package:conduit_core/sync/chat_locks.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../shared/theme/conduit_input_styles.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/adaptive_glass.dart';
@@ -41,7 +49,9 @@ import '../../../shared/widgets/conduit_loading.dart';
 import '../../../shared/widgets/middle_ellipsis_text.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../../shared/widgets/themed_sheets.dart';
-import '../../auth/providers/unified_auth_providers.dart';
+
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+
 import '../../chat/services/voice_input_service.dart';
 import '../providers/notes_providers.dart';
 import '../services/note_audio_upload_service.dart';
@@ -941,18 +951,14 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
         children: [
           // Dictation option
           AdaptiveListTile(
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: conduitTheme.buttonPrimary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppBorderRadius.md),
-              ),
+            leading: SizedBox(
+              width: IconSize.xl,
+              height: IconSize.xl,
               child: Icon(
                 Platform.isIOS
                     ? CupertinoIcons.keyboard
                     : Icons.keyboard_voice_rounded,
-                color: conduitTheme.buttonPrimary,
+                color: conduitTheme.textPrimary,
                 size: IconSize.md,
               ),
             ),
@@ -977,16 +983,12 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
           const SizedBox(height: Spacing.xs),
           // Audio recording option
           AdaptiveListTile(
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppBorderRadius.md),
-              ),
+            leading: SizedBox(
+              width: IconSize.xl,
+              height: IconSize.xl,
               child: Icon(
-                Platform.isIOS ? CupertinoIcons.mic_fill : Icons.mic_rounded,
-                color: Colors.red,
+                Platform.isIOS ? CupertinoIcons.mic : Icons.mic_none_rounded,
+                color: conduitTheme.textPrimary,
                 size: IconSize.md,
               ),
             ),
@@ -1710,6 +1712,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
       leading: ConduitAdaptiveAppBarIconButton(
         icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
         iosSymbol: 'line.3.horizontal',
+        semanticLabel: AppLocalizations.of(context)!.sidebarButtonLabel,
         onPressed: () =>
             SidebarDrawerControllerScope.maybeOf(context)?.toggle(),
         iconColor: tintColor,
@@ -2908,7 +2911,7 @@ class _NoteEditorPageState extends ConsumerState<NoteEditorPage> {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: sidebarTheme.accent.withValues(alpha: 0.5),
+                color: sidebarTheme.tint.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppBorderRadius.xl),
               ),
               child: Icon(

@@ -2,14 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:checks/checks.dart';
-import 'package:conduit/core/auth/api_auth_interceptor.dart';
-import 'package:conduit/core/models/chat_message.dart';
-import 'package:conduit/core/services/api_service.dart';
-import 'package:conduit/core/services/chat_completion_transport.dart';
-import 'package:conduit/core/services/socket_service.dart';
-import 'package:conduit/core/services/streaming_helper.dart';
-import 'package:conduit/core/services/worker_manager.dart';
-import 'package:conduit/core/models/server_config.dart';
+import 'package:conduit_core/auth/api_auth_interceptor.dart';
+import 'package:conduit_core/models/chat_message.dart';
+import 'package:conduit_core/services/api_service.dart';
+import 'package:conduit_core/services/chat_completion_transport.dart';
+import 'package:conduit_core/services/socket_service.dart';
+import 'package:conduit_core/services/streaming_helper.dart';
+import 'package:conduit_core/services/worker_manager.dart';
+import 'package:conduit_core/models/server_config.dart';
 import 'package:conduit/features/chat/services/chat_transport_dispatch.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,17 +60,6 @@ class _TrackingApiService extends ApiService {
   }) async {
     chatCompletedCalls += 1;
     return const <String, dynamic>{};
-  }
-
-  @override
-  Future<void> syncConversationMessages(
-    String conversationId,
-    List<ChatMessage> messages, {
-    String? title,
-    String? model,
-    String? systemPrompt,
-  }) async {
-    syncCalls += 1;
   }
 }
 
@@ -632,7 +621,10 @@ void main() {
       // The local message id is preserved; cumulative content is the latest.
       check(log.messages.last.id).equals('local-msg-1');
       check(log.messages.last.content).equals('Hello');
-      check(log.replacedContents.last).equals('Hello');
+      // The first snapshot replaces the local content; one that extends it
+      // only streams its new text (issue #751), never a duplicate.
+      check(log.replacedContents).deepEquals(['Hel']);
+      check(log.appendedChunks).deepEquals(['lo']);
 
       registrar.emitChatEvent(
         'chat:completion',
@@ -947,7 +939,7 @@ void main() {
     );
 
     test(
-      'chat:message:error fires onChatActiveChanged(chatId, false)',
+      'terminal chat:message:error fires onChatActiveChanged(chatId, false)',
       () async {
         final log = _CallbackLog();
         final registrar = FakeSocketInjector();
@@ -971,6 +963,7 @@ void main() {
           'chat:message:error',
           {
             'error': {'content': 'boom'},
+            'done': true,
           },
           conversationId: 'conv-1',
           sessionId: 'sess-1',

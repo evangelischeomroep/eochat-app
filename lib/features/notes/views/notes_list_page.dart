@@ -11,13 +11,16 @@ import 'package:intl/intl.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
 
-import '../../../core/models/note.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/services/navigation_service.dart';
+import 'package:conduit_core/models/note.dart';
+import 'package:conduit_core/providers/app_providers.dart';
+
+import '../../../shared/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/platform_scroll_physics.dart';
 import '../../../shared/utils/locale_display_formatters.dart';
-import '../../../shared/widgets/markdown/markdown_preprocessor.dart';
+
+import 'package:conduit_markdown/conduit_markdown.dart';
+
 import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/conduit_loading.dart';
@@ -323,13 +326,13 @@ class _NotesListPageState extends ConsumerState<NotesListPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: theme.buttonPrimary.withValues(alpha: 0.12),
+              color: theme.surfaceContainer,
               borderRadius: BorderRadius.circular(AppBorderRadius.pill),
             ),
             child: Text(
               LocaleDisplayFormatters.integer(context, count),
               style: AppTypography.labelMediumStyle.copyWith(
-                color: theme.buttonPrimary.withValues(alpha: 0.9),
+                color: theme.textSecondary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -399,13 +402,13 @@ class _NotesListPageState extends ConsumerState<NotesListPage> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: theme.buttonPrimary.withValues(alpha: 0.12),
+                color: theme.surfaceContainer,
                 borderRadius: BorderRadius.circular(AppBorderRadius.pill),
               ),
               child: Text(
                 LocaleDisplayFormatters.integer(context, count),
                 style: AppTypography.labelMediumStyle.copyWith(
-                  color: theme.buttonPrimary.withValues(alpha: 0.9),
+                  color: theme.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -436,7 +439,7 @@ class _NotesListPageState extends ConsumerState<NotesListPage> {
 
     // Compute opaque background for proper context menu snapshot rendering
     final cardBackground = Color.alphaBlend(
-      sidebarTheme.accent.withValues(alpha: 0.5),
+      sidebarTheme.tint.withValues(alpha: 0.5),
       sidebarTheme.background,
     );
 
@@ -485,7 +488,7 @@ class _NotesListPageState extends ConsumerState<NotesListPage> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: sidebarTheme.accent,
+                      color: sidebarTheme.tint,
                       borderRadius: BorderRadius.circular(AppBorderRadius.sm),
                       border: Border.all(
                         color: sidebarTheme.border.withValues(alpha: 0.2),
@@ -657,7 +660,7 @@ class _NotesListPageState extends ConsumerState<NotesListPage> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: sidebarTheme.accent.withValues(alpha: 0.6),
+                color: sidebarTheme.tint.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(AppBorderRadius.lg),
               ),
               child: Icon(
@@ -752,7 +755,7 @@ class _NotesListPageState extends ConsumerState<NotesListPage> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: sidebarTheme.accent.withValues(alpha: 0.6),
+                color: sidebarTheme.tint.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(AppBorderRadius.lg),
               ),
               child: Icon(

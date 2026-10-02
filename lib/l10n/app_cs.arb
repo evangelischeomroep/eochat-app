@@ -70,13 +70,7 @@
   },
   "releaseNotesTitle": "Novinky",
   "releaseNotesAnnouncementTitle": "Novinky v {version}",
-  "@releaseNotesAnnouncementTitle": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
+  "@releaseNotesAnnouncementTitle": {"placeholders": {"version": {"type": "String"}}},
   "releaseNotesLearnMore": "Zjistit více",
   "releaseNotesReviewButton": "Ohodnotit EOchat",
   "releaseNotesDoneButton": "Hotovo",
@@ -2209,21 +2203,13 @@
   },
   "sidebarChannelsTab": "Kanály",
   "sidebarResizeHandle": "Změnit šířku postranního panelu",
-  "@sidebarResizeHandle": {
-    "description": "Accessibility label for the draggable tablet sidebar divider."
-  },
+  "@sidebarResizeHandle": {"description": "Accessibility label for the draggable tablet sidebar divider."},
   "sidebarResizeResetHint": "Dvojitým klepnutím obnovíte šířku postranního panelu",
-  "@sidebarResizeResetHint": {
-    "description": "Accessibility hint for resetting the tablet sidebar width."
-  },
+  "@sidebarResizeResetHint": {"description": "Accessibility hint for resetting the tablet sidebar width."},
   "sidebarWidthValue": "{width} bodů",
   "@sidebarWidthValue": {
     "description": "Accessibility value describing the current tablet sidebar width.",
-    "placeholders": {
-      "width": {
-        "type": "int"
-      }
-    }
+    "placeholders": {"width": {"type": "int"}}
   },
   "@sidebarChannelsTab": {
     "description": "Label for the Channels tab in the sidebar"
@@ -3418,7 +3404,6 @@
       }
     }
   },
-  "notificationSystemSettingsDescription": "Změňte oprávnění, zvuk a možnosti banneru pro EOchat.",
   "notificationPermissionTitle": "Oprávnění k oznámením",
   "@notificationPermissionTitle": {
     "description": "Title for the system notification permission prompt."
@@ -3595,9 +3580,7 @@
   },
   "workspaceModelBaseModelNone": "None (custom)",
   "workspaceModelBaseModelRequired": "Vyberte základní model.",
-  "@workspaceModelBaseModelRequired": {
-    "description": "Validation shown when a non-admin model create or protected edit has no base model."
-  },
+  "@workspaceModelBaseModelRequired": {"description": "Validation shown when a non-admin model create or protected edit has no base model."},
   "@workspaceModelBaseModelNone": {
     "description": "Base-model option meaning no base model is used."
   },
@@ -4532,13 +4515,7 @@
   "workspaceToolSpecs": "Generated specifications",
   "workspaceToolDetails": "Podrobnosti nástroje",
   "workspaceToolFunctionCount": "Počet funkcí: {count}",
-  "@workspaceToolFunctionCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@workspaceToolFunctionCount": {"placeholders":{"count":{"type":"int"}}},
   "workspaceToolSpecsEmpty": "No specifications were generated for this tool.",
   "workspaceToolIncompatible": "This tool requires Open WebUI v{required}, but the server is v{current}. Update the server to save.",
   "workspaceToolValves": "Valves",
@@ -4591,17 +4568,11 @@
   "hermesApprovalRequired": "Approval required",
   "hermesApprovalFallback": "The agent is requesting permission to continue.",
   "openWebUiPromptOther": "Jiné",
-  "@openWebUiPromptOther": {
-    "description": "Label for a free-form answer to an Open WebUI ask-user question."
-  },
+  "@openWebUiPromptOther": {"description": "Label for a free-form answer to an Open WebUI ask-user question."},
   "openWebUiPromptAnswerHint": "Napište svou odpověď",
-  "@openWebUiPromptAnswerHint": {
-    "description": "Placeholder for a free-form Open WebUI ask-user answer."
-  },
+  "@openWebUiPromptAnswerHint": {"description": "Placeholder for a free-form Open WebUI ask-user answer."},
   "openWebUiPromptSubmit": "Odeslat",
-  "@openWebUiPromptSubmit": {
-    "description": "Action that submits all answers to an Open WebUI ask-user prompt."
-  },
+  "@openWebUiPromptSubmit": {"description": "Action that submits all answers to an Open WebUI ask-user prompt."},
   "hermesApprovalApproved": "Approved ✓",
   "hermesApprovalDenied": "Denied",
   "hermesApprovalApproveAction": "Approve",
@@ -4664,17 +4635,12 @@
   "openWebUiDirectConnectionsUnavailable": "Připojení Open WebUI nejsou dostupná.",
   "directConnectionNoLongerExists": "Toto připojení už neexistuje.",
   "openWebUiDirectConnectionDeleteMessage": "Připojení {name} bude odebráno z vašeho účtu Open WebUI i z ostatních přihlášených klientů.",
-  "@openWebUiDirectConnectionDeleteMessage": {
-    "description": "Confirmation message shown before deleting an Open WebUI-synced direct connection.",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@openWebUiDirectConnectionDeleteMessage": {"description":"Confirmation message shown before deleting an Open WebUI-synced direct connection.","placeholders":{"name":{"type":"String"}}},
   "addDirectConnection": "Add connection",
   "editDirectConnection": "Edit connection",
   "directConnectionName": "Connection name",
+  "directDefaultConnectionName": "Můj poskytovatel",
+  "sidebarButtonLabel": "Postranní panel",
   "directConnectionNameRequired": "Enter a connection name.",
   "directConnectionUrlInvalid": "Use a valid http:// or https:// URL.",
   "directConnectionCredentialsReentryRequired": "Re-enter credentials when changing servers.",
@@ -4715,9 +4681,7 @@
   "directCustomHeaders": "Custom headers",
   "directManualModelIds": "Manual model IDs",
   "directManualModelIdsDescription": "Volitelné. Pokud server nedokáže vypsat modely, zadejte jedno ID na řádek.",
-  "@directManualModelIdsDescription": {
-    "placeholders": {}
-  },
+  "@directManualModelIdsDescription": {"placeholders":{}},
   "directModelIdPrefix": "Model ID prefix",
   "directModelIdPrefixDescription": "Optional. Adds a visible namespace such as studio.model-name without changing the model ID sent to the provider.",
   "directModelTags": "Model tags",
@@ -4808,13 +4772,7 @@
   "hermesMemoryKeyShortDescription": "Přiřadí dlouhodobou paměť agenta k vám. Nechte prázdné a Conduit klíč vytvoří.",
   "hermesConnectAction": "Připojit Hermes",
   "hermesToolCount": "{count, plural, one{1 nástroj} few{{count} nástroje} other{{count} nástrojů}}",
-  "@hermesToolCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@hermesToolCount": {"placeholders":{"count":{"type":"int"}}},
   "hermesNoToolsets": "Server neohlásil žádné sady nástrojů.",
   "hermesToolsetsNewSessions": "Změny se projeví v nových relacích Hermes. Stávající chaty si ponechají své současné nástroje.",
   "hermesServerStatusTitle": "Stav serveru",
@@ -4867,13 +4825,7 @@
   "hermesTurnControlsUnsupported": "Aktualizujte Hermes, abyste povolili bezpečné ovládání tahů.",
   "sidebarHermesTab": "Hermes",
   "markdownShowMoreLines": "{count, plural, one{Zobrazit další řádek} few{Zobrazit další {count} řádky} other{Zobrazit dalších {count} řádků}}",
-  "@markdownShowMoreLines": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@markdownShowMoreLines": {"placeholders":{"count":{"type":"int"}}},
   "markdownShowLess": "Zobrazit méně",
   "voiceBargeIn": "Skákat do řeči",
   "voiceBargeInDescription": "Naslouchá i během mluvení asistenta, takže ho můžete přerušit.",
@@ -4934,127 +4886,46 @@
   "hermesSessionDeleteFailed": "Konverzaci se nepodařilo smazat.",
   "hermesSessionLoadFailed": "Tuto konverzaci se nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu.",
   "hermesMemoryKeyFieldLabel": "Klíč paměti",
-  "directMcpServersTitle": "MCP servers",
-  "directMcpEmptyTitle": "No MCP servers yet",
-  "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.",
-  "directMcpEditorTitle": "Edit MCP server",
-  "directMcpAddTitle": "Add MCP server",
-  "directMcpName": "Server name",
-  "directMcpEndpoint": "Streamable HTTP endpoint",
-  "directMcpBearerToken": "Bearer token (optional)",
-  "directMcpCustomHeaders": "Custom headers (optional)",
-  "directMcpCustomHeadersHint": "One per line: Name: Value",
-  "directMcpTestConnection": "Test connection",
-  "directMcpTesting": "Testing connection…",
-  "directMcpTestSucceeded": "Connected — {count} tools found.",
-  "directMcpTestFailed": "Could not list tools from this MCP server.",
-  "directMcpSaveFailed": "Could not save this MCP server.",
-  "directMcpLoadFailed": "Could not load MCP servers from secure storage.",
-  "directMcpMissing": "This MCP server no longer exists.",
-  "directMcpCredentialTransferTitle": "Use credentials with new server?",
-  "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.",
-  "directMcpCredentialTransferConfirm": "Use credentials",
-  "directMcpDeleteTitle": "Delete MCP server?",
-  "directMcpDeleteMessage": "This removes {name} and its credentials from this device.",
-  "directMcpDeleteFailed": "Could not delete this MCP server.",
-  "directMcpAuthMode": "Authentication",
-  "directMcpAuthNone": "None",
-  "directMcpAuthBearer": "Bearer token",
-  "directMcpAuthOAuth": "OAuth",
-  "directMcpOAuthConnect": "Connect in browser",
-  "directMcpOAuthReconnect": "Reconnect in browser",
-  "directMcpOAuthDisconnect": "Disconnect OAuth",
-  "directMcpOAuthPending": "Waiting for authorization in the browser…",
-  "directMcpOAuthConnected": "OAuth connected.",
-  "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}",
-  "directMcpOAuthNoScopes": "No scopes reported",
-  "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.",
-  "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.",
-  "directMcpApprovalTitle": "Tool approval",
-  "directMcpApprovalAllowOnce": "Allow once",
-  "directMcpApprovalAllowSession": "Allow for session",
-  "directMcpApprovalAllowAlways": "Always allow",
-  "directMcpApprovalAlwaysTitle": "Always allow this tool?",
-  "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.",
-  "@directMcpApprovalAlwaysMessage": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "toolName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.",
-  "directMcpApprovalDeny": "Deny",
-  "directMcpApprovalAllowed": "Allowed once",
-  "directMcpApprovalAllowedSession": "Allowed for session",
-  "directMcpApprovalAllowedAlways": "Always allowed",
-  "directMcpApprovalDenied": "Denied",
-  "directMcpApprovalExpired": "Approval expired",
-  "directMcpRememberedApprovalsTitle": "Always allowed tools",
-  "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.",
-  "directMcpRememberedApprovalRevoke": "Revoke",
-  "directMcpRememberedApprovalsRevokeAll": "Revoke all",
-  "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval.",
-  "directMcpContentAction": "MCP content",
-  "directMcpContentTitle": "MCP content",
-  "directMcpContentServer": "MCP server",
-  "directMcpContentSearch": "Search prompts and resources",
-  "directMcpContentPrompts": "Prompts",
-  "directMcpContentResources": "Resources",
-  "directMcpContentEmpty": "This server has no prompts or resources.",
-  "directMcpContentNoMatches": "No matching prompts or resources.",
-  "directMcpContentLoadFailed": "Could not load content from this MCP server.",
-  "directMcpContentRefresh": "Refresh MCP content",
-  "directMcpContentPreviewTitle": "Preview",
-  "directMcpContentInsert": "Insert",
-  "directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}",
-  "@directMcpContentPromptHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "promptName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}",
-  "@directMcpContentResourceHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "resourceUri": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentRoleUser": "User",
-  "directMcpContentRoleAssistant": "Assistant",
-  "directMcpContentRequestFailed": "Could not load this MCP content. Try again.",
-  "directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource.",
-  "directMcpContentChanged": "This item changed on the server. Refresh and choose it again.",
-  "directMcpContentTooLarge": "This content is too large to insert.",
-  "directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again.",
-  "directMcpContentLoading": "Loading MCP content…",
-  "directMcpInsecureCredentialsTitle": "Send credentials without encryption?",
-  "directMcpInsecureCredentialsMessage": "This server uses unencrypted HTTP. Your bearer token, OAuth token, and custom headers could be read or changed on the network.",
-  "directMcpInsecureCredentialsConfirm": "Send without encryption",
-  "hermesSessionTooLarge": "Tato konverzace je příliš velká na načtení v tomto zařízení.",
-  "hermesSessionNotFound": "Tato konverzace už není na serveru Hermes dostupná.",
-  "hermesSessionLoadFailedDetail": "Tuto konverzaci se nepodařilo načíst: {detail}",
-  "@hermesSessionLoadFailedDetail": {
+  "directMcpServersTitle": "MCP servers", "directMcpEmptyTitle": "No MCP servers yet", "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.", "directMcpEditorTitle": "Edit MCP server", "directMcpAddTitle": "Add MCP server", "directMcpName": "Server name", "directMcpEndpoint": "Streamable HTTP endpoint", "directMcpBearerToken": "Bearer token (optional)", "directMcpCustomHeaders": "Custom headers (optional)", "directMcpCustomHeadersHint": "One per line: Name: Value", "directMcpTestConnection": "Test connection", "directMcpTesting": "Testing connection…", "directMcpTestSucceeded": "Connected — {count} tools found.", "directMcpTestFailed": "Could not list tools from this MCP server.", "directMcpSaveFailed": "Could not save this MCP server.", "directMcpLoadFailed": "Could not load MCP servers from secure storage.", "directMcpMissing": "This MCP server no longer exists.", "directMcpCredentialTransferTitle": "Use credentials with new server?", "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.", "directMcpCredentialTransferConfirm": "Use credentials", "directMcpDeleteTitle": "Delete MCP server?", "directMcpDeleteMessage": "This removes {name} and its credentials from this device.", "directMcpDeleteFailed": "Could not delete this MCP server.", "directMcpAuthMode": "Authentication", "directMcpAuthNone": "None", "directMcpAuthBearer": "Bearer token", "directMcpAuthOAuth": "OAuth", "directMcpOAuthConnect": "Connect in browser", "directMcpOAuthReconnect": "Reconnect in browser", "directMcpOAuthDisconnect": "Disconnect OAuth", "directMcpOAuthPending": "Waiting for authorization in the browser…", "directMcpOAuthConnected": "OAuth connected.", "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}", "directMcpOAuthNoScopes": "No scopes reported", "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.", "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.", "directMcpApprovalTitle": "Tool approval", "directMcpApprovalAllowOnce": "Allow once", "directMcpApprovalAllowSession": "Allow for session", "directMcpApprovalAllowAlways": "Always allow", "directMcpApprovalAlwaysTitle": "Always allow this tool?", "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.", "@directMcpApprovalAlwaysMessage": {"placeholders":{"serverName":{"type":"String"},"toolName":{"type":"String"}}}, "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.", "directMcpApprovalDeny": "Deny", "directMcpApprovalAllowed": "Allowed once", "directMcpApprovalAllowedSession": "Allowed for session", "directMcpApprovalAllowedAlways": "Always allowed", "directMcpApprovalDenied": "Denied", "directMcpApprovalExpired": "Approval expired", "directMcpRememberedApprovalsTitle": "Always allowed tools", "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.", "directMcpRememberedApprovalRevoke": "Revoke", "directMcpRememberedApprovalsRevokeAll": "Revoke all", "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval."
+  ,"directMcpContentAction": "MCP content"
+  ,"directMcpContentTitle": "MCP content"
+  ,"directMcpContentServer": "MCP server"
+  ,"directMcpContentSearch": "Search prompts and resources"
+  ,"directMcpContentPrompts": "Prompts"
+  ,"directMcpContentResources": "Resources"
+  ,"directMcpContentEmpty": "This server has no prompts or resources."
+  ,"directMcpContentNoMatches": "No matching prompts or resources."
+  ,"directMcpContentLoadFailed": "Could not load content from this MCP server."
+  ,"directMcpContentRefresh": "Refresh MCP content"
+  ,"directMcpContentPreviewTitle": "Preview"
+  ,"directMcpContentInsert": "Insert"
+  ,"directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}"
+  ,"@directMcpContentPromptHeading": {"placeholders":{"serverName":{"type":"String"},"promptName":{"type":"String"}}}
+  ,"directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}"
+  ,"@directMcpContentResourceHeading": {"placeholders":{"serverName":{"type":"String"},"resourceUri":{"type":"String"}}}
+  ,"directMcpContentRoleUser": "User"
+  ,"directMcpContentRoleAssistant": "Assistant"
+  ,"directMcpContentRequestFailed": "Could not load this MCP content. Try again."
+  ,"directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource."
+  ,"directMcpContentChanged": "This item changed on the server. Refresh and choose it again."
+  ,"directMcpContentTooLarge": "This content is too large to insert."
+  ,"directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again."
+  ,"directMcpContentLoading": "Loading MCP content…"
+  ,"directMcpInsecureCredentialsTitle": "Send credentials without encryption?"
+  ,"directMcpInsecureCredentialsMessage": "This server uses unencrypted HTTP. Your bearer token, OAuth token, and custom headers could be read or changed on the network."
+  ,"directMcpInsecureCredentialsConfirm": "Send without encryption"
+  ,"hermesSessionTooLarge": "Tato konverzace je příliš velká na načtení v tomto zařízení."
+  ,"hermesSessionNotFound": "Tato konverzace už není na serveru Hermes dostupná."
+  ,"hermesSessionLoadFailedDetail": "Tuto konverzaci se nepodařilo načíst: {detail}"
+  ,"@hermesSessionLoadFailedDetail": {
     "placeholders": {
       "detail": {
         "type": "String"
       }
     }
-  },
-  "directBearerDescription": "Odešle přihlašovací údaje v hlavičce Authorization: Bearer. Většina serverů kompatibilních s OpenAI (llama.cpp, vLLM, LM Studio, Ollama) to očekává.",
-  "directApiKeyHeaderAzureOnlyDescription": "Odešle přihlašovací údaje v hlavičce api-key. Používejte pouze pro Azure OpenAI; ostatní servery kompatibilní s OpenAI očekávají token Bearer.",
+  }
+  ,"directBearerDescription": "Odešle přihlašovací údaje v hlavičce Authorization: Bearer. Většina serverů kompatibilních s OpenAI (llama.cpp, vLLM, LM Studio, Ollama) to očekává."
+  ,"directApiKeyHeaderAzureOnlyDescription": "Odešle přihlašovací údaje v hlavičce api-key. Používejte pouze pro Azure OpenAI; ostatní servery kompatibilní s OpenAI očekávají token Bearer.",
   "searchFailed": "Hledání selhalo",
   "searchResultsHeader": "Výsledky",
   "threadNoRepliesYet": "Zatím žádné odpovědi",
@@ -5086,39 +4957,60 @@
   "settingsTitle": "Nastavení",
   "themePaletteEochatDescription": "Značková paleta EO — fialová, žlutá a broskvová.",
   "themePaletteEochatLabel": "EOchat",
-  "appleOnDeviceUnavailable": "Apple On-Device is not available on this device.",
-  "applePccContextSize": "{tokens} token context",
-  "applePccCurrentLanguageUnsupported": "The current device language may not be supported.",
-  "applePccOnDeviceFallback": "On-device fallback",
-  "applePccOnDeviceFallbackSubtitle": "Use Apple's smaller on-device model when PCC cannot be reached. Reasoning requests never fall back.",
-  "applePccQuotaApproaching": "Nearing the daily usage limit",
-  "applePccQuotaReached": "Daily usage limit reached",
-  "applePccQuotaResetsAt": "Resets {time}",
-  "applePccShowQuotaOptions": "Show usage options",
-  "applePccStatusAvailable": "Available",
-  "applePccUnavailable": "Apple Private Cloud Compute is not available on this device.",
-  "backendChooserAppleOnDeviceSubtitle": "Run Apple's private model on this device, even offline.",
+  "appleOnDeviceUnavailable": "Apple On-Device není na tomto zařízení dostupný.",
+  "applePccContextSize": "Kontext {tokens} tokenů",
+  "@applePccContextSize": {"description": "Apple PCC context size label.", "placeholders": {"tokens": {"type": "String"}}},
+  "applePccCurrentLanguageUnsupported": "Aktuální jazyk zařízení nemusí být podporován.",
+  "applePccOnDeviceFallback": "Záloha v zařízení",
+  "applePccOnDeviceFallbackSubtitle": "Použít menší model Apple v zařízení, když je PCC nedostupné. Požadavky s uvažováním tuto zálohu nikdy nepoužijí.",
+  "applePccQuotaApproaching": "Blížíte se dennímu limitu využití",
+  "applePccQuotaReached": "Denní limit využití vyčerpán",
+  "applePccQuotaResetsAt": "Obnovení: {time}",
+  "@applePccQuotaResetsAt": {"description": "Apple PCC quota reset time.", "placeholders": {"time": {"type": "String"}}},
+  "applePccShowQuotaOptions": "Zobrazit možnosti využití",
+  "applePccStatusAvailable": "Dostupné",
+  "applePccUnavailable": "Apple Private Cloud Compute není na tomto zařízení dostupný.",
+  "backendChooserAppleOnDeviceSubtitle": "Spusťte soukromý model Apple přímo v tomto zařízení, i bez připojení.",
   "backendChooserAppleOnDeviceTitle": "Apple On-Device",
-  "backendChooserApplePccSubtitle": "Use Apple's private cloud model without an API key.",
+  "backendChooserApplePccSubtitle": "Používejte soukromý cloudový model Apple bez klíče API.",
   "backendChooserApplePccTitle": "Apple Private Cloud Compute",
   "backendChooserAppleSectionTitle": "Apple Intelligence",
-  "backendChooserModelApisSectionTitle": "Model APIs",
-  "backendChooserSelfHostedSectionTitle": "Self-hosted services",
-  "directContextCompactionDescription": "These models do not report a context window. EOchat uses the selected limit to compact older messages before requests get too large.",
-  "directContextCompactionPickerDescription": "Choose the context window EOchat should use for automatic compaction.",
-  "directContextCompactionTitle": "Context compaction",
-  "directContextLimit": "Context limit: {tokens}",
-  "notificationSystemSettingsOpenFailed": "Couldn't open system notification settings.",
-  "notificationSystemSettingsTitle": "System notification settings",
-  "readOnly": "Read-only",
-  "readOnlySharedChat": "This chat was shared with you. Only its owner can send messages.",
-  "reasoningEffortDeep": "Deep",
-  "reasoningEffortLight": "Light",
-  "reasoningEffortModerate": "Moderate",
-  "sharedBadge": "Shared",
-  "sharedFolderOwner": "Shared by {name}",
-  "transcribingAudio": "Transcribing...",
-  "proxyAuthSignInAgain": "Sign in through proxy again",
-  "citationShowTitles": "Show citation page titles",
-  "citationShowTitlesDescription": "Use page titles instead of website domains in citation badges"
+  "backendChooserModelApisSectionTitle": "API modelů",
+  "backendChooserSelfHostedSectionTitle": "Vlastní hostované služby",
+  "citationShowTitles": "Zobrazovat názvy stránek u citací",
+  "citationShowTitlesDescription": "V odznacích citací používat názvy stránek místo domén webů",
+  "directContextCompactionDescription": "Tyto modely neuvádějí velikost kontextového okna. EOchat použije zvolený limit ke zhuštění starších zpráv dříve, než budou požadavky příliš velké.",
+  "directContextCompactionPickerDescription": "Vyberte kontextové okno, které má EOchat použít pro automatické zhuštění.",
+  "directContextCompactionTitle": "Zhuštění kontextu",
+  "directContextLimit": "Limit kontextu: {tokens}",
+  "@directContextLimit": {"description": "Provider-neutral model context limit label.", "placeholders": {"tokens": {"type": "String"}}},
+  "notificationSystemSettingsDescription": "Změňte oprávnění, zvuk a možnosti bannerů pro EOchat.",
+  "notificationSystemSettingsOpenFailed": "Systémové nastavení oznámení se nepodařilo otevřít.",
+  "notificationSystemSettingsTitle": "Systémové nastavení oznámení",
+  "proxyAuthSignInAgain": "Znovu se přihlásit přes proxy",
+  "readOnly": "Jen pro čtení",
+  "readOnlySharedChat": "Tento chat byl sdílen s vámi. Zprávy může posílat pouze jeho vlastník.",
+  "reasoningEffortDeep": "Hluboké",
+  "reasoningEffortLight": "Lehké",
+  "reasoningEffortModerate": "Střední",
+  "sharedBadge": "Sdíleno",
+  "sharedFolderOwner": "Sdílí {name}",
+  "@sharedFolderOwner": {"description": "Owner label on a folder another user shared with this account.", "placeholders": {"name": {"type": "String", "example": "Alex"}}},
+  "transcribingAudio": "Přepis...",
+  "chatTaskProgress": "Úkoly: dokončeno {completed} z {total}",
+  "@chatTaskProgress": {
+    "description": "Summary of the Open WebUI task checklist above the chat composer.",
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "chatTaskPending": "Čeká",
+  "chatTaskInProgress": "Probíhá",
+  "chatTaskCompleted": "Dokončeno",
+  "chatTaskCancelled": "Zrušeno"
 }

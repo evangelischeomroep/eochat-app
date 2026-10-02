@@ -6,20 +6,28 @@ import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/models/model.dart';
+import 'package:conduit_core/models/model.dart';
+
 import '../../../core/services/ios_native_dropdown_bridge.dart';
 import '../../../core/services/native_sheet_bridge.dart';
-import '../../../core/services/settings_service.dart';
-import '../../../core/utils/debug_logger.dart';
+
+import 'package:conduit_core/services/settings_service.dart';
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../core/utils/tts_voice_utils.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/theme/tweakcn_themes.dart';
 import '../../../shared/widgets/adaptive_selection_sheet.dart';
-import '../../tools/providers/tools_providers.dart';
-import '../../../core/models/tool.dart';
+
+import 'package:conduit_core/features/tools/providers/tools_providers.dart';
+
+import 'package:conduit_core/models/tool.dart';
+
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/utils/ui_utils.dart';
-import '../../../core/providers/app_providers.dart';
+
+import 'package:conduit_core/providers/app_providers.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../chat/providers/text_to_speech_provider.dart';
 import '../../chat/services/voice_input_service.dart';
@@ -30,6 +38,7 @@ import '../widgets/settings_page_scaffold.dart';
 import '../../../shared/widgets/utility_components.dart';
 import '../widgets/socket_health_card.dart';
 import '../widgets/stt_language_picker.dart';
+import '../../../shared/theme/theme_providers.dart';
 
 const _sectionGap = SizedBox(height: Spacing.lg);
 
@@ -625,22 +634,11 @@ class AppCustomizationPage extends ConsumerWidget {
   }
 
   Widget _buildPromptLoadingTile(BuildContext context, String title) {
-    final theme = context.conduitTheme;
-    final color = theme.buttonPrimary;
     return CustomizationTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AppBorderRadius.small),
-          border: Border.all(
-            color: color.withValues(alpha: 0.2),
-            width: BorderWidth.thin,
-          ),
-        ),
-        alignment: Alignment.center,
-        child: const ConduitLoadingIndicator(isCompact: true),
+      leading: const SizedBox(
+        width: IconSize.xl,
+        height: IconSize.xl,
+        child: Center(child: ConduitLoadingIndicator(isCompact: true)),
       ),
       title: title,
       subtitle: '',
@@ -1837,28 +1835,13 @@ class AppCustomizationPage extends ConsumerWidget {
     );
   }
 
+  /// Current value shown trailing a row in secondary ink, the way iOS
+  /// settings show values ("System", "English").
   Widget _buildValueBadge(BuildContext context, String label) {
     final theme = context.conduitTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: Spacing.md,
-        vertical: Spacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: theme.buttonPrimary.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(AppBorderRadius.small),
-        border: Border.all(
-          color: theme.buttonPrimary.withValues(alpha: 0.25),
-          width: BorderWidth.thin,
-        ),
-      ),
-      child: Text(
-        label,
-        style: theme.bodySmall?.copyWith(
-          color: theme.buttonPrimary,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+    return Text(
+      label,
+      style: AppTypography.bodyMediumStyle.copyWith(color: theme.textSecondary),
     );
   }
 
@@ -1867,20 +1850,7 @@ class AppCustomizationPage extends ConsumerWidget {
     IconData icon, {
     required Color color,
   }) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppBorderRadius.small),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: BorderWidth.thin,
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Icon(icon, color: color, size: IconSize.medium),
-    );
+    return SettingsIconBadge(icon: icon, color: color);
   }
 
   Future<void> _showPaletteSelectorSheet(

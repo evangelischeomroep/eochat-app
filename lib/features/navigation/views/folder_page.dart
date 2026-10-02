@@ -9,18 +9,24 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/models/conversation.dart';
-import '../../../core/models/folder.dart';
-import '../../../core/models/model.dart';
-import '../../../core/providers/app_providers.dart';
+import 'package:conduit_core/models/conversation.dart';
+import 'package:conduit_core/models/folder.dart';
+import 'package:conduit_core/models/model.dart';
+
+import 'package:conduit_core/providers/app_providers.dart';
+
 import '../../../core/services/haptic_service.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/native_sheet_hydration_service.dart';
-import '../../../core/services/navigation_service.dart';
-import '../../../core/services/user_friendly_error_handler.dart';
-import '../../../core/services/settings_service.dart';
+import '../../../shared/services/navigation_service.dart';
+import '../../../shared/services/user_friendly_error_handler.dart';
+
+import 'package:conduit_core/services/settings_service.dart';
+
 import '../../../l10n/app_localizations.dart';
-import '../../auth/providers/unified_auth_providers.dart';
+
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+
 import '../../../shared/theme/conduit_input_styles.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/adaptive_glass.dart';
@@ -28,7 +34,9 @@ import '../../../shared/utils/platform_scroll_physics.dart';
 import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../core/services/media_upload_controller.dart';
-import '../../../core/utils/debug_logger.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/adaptive_toolbar_components.dart';
 import '../../../shared/widgets/chrome_gradient_fade.dart';
@@ -50,9 +58,11 @@ import '../../chat/widgets/file_attachment_widget.dart';
 import '../../chat/widgets/modern_chat_input.dart';
 import '../../chat/widgets/server_file_picker_sheet.dart';
 import '../../chat/voice_call/presentation/voice_call_launcher.dart';
-import '../../hermes/models/hermes_config.dart';
-import '../../hermes/providers/hermes_providers.dart';
-import '../../tools/providers/tools_providers.dart';
+
+import 'package:conduit_core/features/hermes/models/hermes_config.dart';
+import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit_core/features/tools/providers/tools_providers.dart';
+
 import '../providers/conversation_selection_provider.dart';
 import '../widgets/conversation_tile.dart';
 import '../widgets/folder_icon.dart';
@@ -191,7 +201,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
       ConduitNativeToolbarAction(
         iosSymbol: isTemporary ? 'eye.slash' : 'eye',
         accessibilityLabel: l10n.temporaryChat,
-        tintColor: isTemporary ? Colors.blue : tintColor,
+        tintColor: isTemporary ? context.conduitTheme.info : tintColor,
         onPressed: _toggleTemporaryChat,
       ),
       // A read-grant shared folder cannot receive new chats.
@@ -215,6 +225,7 @@ class _FolderPageState extends ConsumerState<FolderPage> {
         key: const ValueKey<String>('folder-page-drawer-button'),
         icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
         iosSymbol: 'line.3.horizontal',
+        semanticLabel: AppLocalizations.of(context)!.sidebarButtonLabel,
         onPressed: _toggleDrawer,
         iconColor: tintColor,
       ),
@@ -2241,7 +2252,9 @@ class _SectionHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: context.sidebarTheme.accent.withValues(alpha: 0.7),
+              color: context.sidebarTheme.tint.withValues(
+                alpha: SidebarThemeExtension.tintMaxOpacity,
+              ),
               borderRadius: BorderRadius.circular(AppBorderRadius.xs),
               border: Border.all(
                 color: context.sidebarTheme.border.withValues(alpha: 0.35),
@@ -2251,7 +2264,7 @@ class _SectionHeader extends StatelessWidget {
             child: Text(
               '$count',
               style: AppTypography.sidebarBadgeStyle.copyWith(
-                color: context.sidebarTheme.foreground.withValues(alpha: 0.8),
+                color: context.sidebarTheme.foreground,
                 decoration: TextDecoration.none,
               ),
             ),

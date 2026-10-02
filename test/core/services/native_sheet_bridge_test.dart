@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:checks/checks.dart';
-import 'package:conduit/core/platform/conduit_platform_apis.g.dart';
+import 'package:conduit/platform/conduit_platform_apis.g.dart';
 import 'package:conduit/core/services/native_sheet_bridge.dart';
+import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -742,6 +743,32 @@ void main() {
       check(failedChanges).isEmpty();
       presentation.complete(wrapResponse(result: null));
       await presented;
+    });
+  });
+
+  group('resolveGroupedSheetColors', () {
+    const white = Color(0xFFFFFFFF);
+
+    test('puts white cards on the tinted page when the card is tinted', () {
+      // Conduit light: white page, tinted card.
+      const tinted = Color(0xFFF4F4F4);
+      check(resolveGroupedSheetColors(page: white, card: tinted))
+          .equals((tinted, white));
+    });
+
+    test('keeps palettes that already tint the page', () {
+      // Catppuccin light: tinted page, white card.
+      const tinted = Color(0xFFEFF1F5);
+      check(resolveGroupedSheetColors(page: tinted, card: white))
+          .equals((tinted, white));
+    });
+
+    test('lifts cards onto the popover when page and card match', () {
+      // T3 Chat light: page and card share one tinted color.
+      const tinted = Color(0xFFFAF5FA);
+      check(
+        resolveGroupedSheetColors(page: tinted, card: tinted, popover: white),
+      ).equals((tinted, white));
     });
   });
 }

@@ -1,8 +1,8 @@
+import 'package:conduit_core/providers/app_providers.dart';
+import 'package:conduit_core/providers/backend_mode_providers.dart';
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/core/config/fork_overrides.dart';
-import 'package:conduit/core/providers/app_providers.dart';
-import 'package:conduit/core/providers/backend_mode_providers.dart';
-import 'package:conduit/features/auth/providers/unified_auth_providers.dart';
-import 'package:conduit/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit/features/profile/views/profile_page.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
@@ -56,7 +56,8 @@ void main() {
     await tester.scrollUntilVisible(find.text('Direct Connections'), 300);
     expect(find.byKey(const Key('settings-category-server')), findsNothing);
     expect(find.text('Direct Connections'), findsOneWidget);
-    expect(find.text('OpenAI-compatible APIs and Ollama'), findsOneWidget);
+    // Settings rows are single-line; descriptions no longer render.
+    expect(find.text('OpenAI-compatible APIs and Ollama'), findsNothing);
     expect(find.text('Connect to Open WebUI'), findsOneWidget);
 
     await tester.fling(find.byType(ListView), const Offset(0, -1000), 2000);

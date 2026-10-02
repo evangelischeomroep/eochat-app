@@ -7,12 +7,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:conduit/core/providers/app_providers.dart';
-import 'package:conduit/core/services/navigation_service.dart';
-import 'package:conduit/core/utils/debug_logger.dart';
-import 'package:conduit/features/workspace/models/workspace_knowledge.dart';
+import 'package:conduit_core/providers/app_providers.dart';
+import 'package:conduit/shared/services/navigation_service.dart';
+import 'package:conduit_core/utils/debug_logger.dart';
+import 'package:conduit_core/features/workspace/models/workspace_knowledge.dart';
 import 'package:conduit/features/workspace/models/workspace_prompt_command.dart';
-import 'package:conduit/features/workspace/models/workspace_resources.dart';
+import 'package:conduit_core/features/workspace/models/workspace_resources.dart';
 import 'package:conduit/features/workspace/providers/workspace_capabilities_provider.dart';
 import 'package:conduit/features/workspace/providers/workspace_providers.dart';
 import 'package:conduit/features/workspace/widgets/workspace_section_editors.dart';
@@ -133,9 +133,7 @@ class _WorkspaceGateState extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = context.conduitTheme;
     final usesCupertinoChrome = context.usesCupertinoChrome;
-    final pageBackground = usesCupertinoChrome
-        ? CupertinoColors.systemGroupedBackground.resolveFrom(context)
-        : theme.surfaceBackground;
+    final pageBackground = theme.groupedBackground;
     final topInset = usesCupertinoChrome
         ? MediaQuery.paddingOf(context).top +
               conduitAdaptiveToolbarHeightOf(context)
@@ -261,9 +259,7 @@ class WorkspaceScaffold extends ConsumerWidget {
     // fall back to the single-pane compact layout there.
     final wide = MediaQuery.sizeOf(context).width >= 840;
     final theme = context.conduitTheme;
-    final pageBackground = context.usesCupertinoChrome
-        ? CupertinoColors.systemGroupedBackground.resolveFrom(context)
-        : theme.surfaceBackground;
+    final pageBackground = theme.groupedBackground;
 
     // iOS compact collection uses native Cupertino chrome (a sliver navigation
     // bar with search + a pinned segmented switcher), so it hosts its own

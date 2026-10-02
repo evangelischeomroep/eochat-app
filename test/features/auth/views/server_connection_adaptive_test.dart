@@ -1,6 +1,6 @@
 import 'package:checks/checks.dart';
-import 'package:conduit/core/models/server_config.dart';
-import 'package:conduit/core/services/navigation_service.dart';
+import 'package:conduit_core/models/server_config.dart';
+import 'package:conduit/shared/services/navigation_service.dart';
 import 'package:conduit/features/auth/views/backend_chooser_page.dart';
 import 'package:conduit/shared/theme/theme_extensions.dart';
 import 'package:conduit/shared/widgets/conduit_components.dart';
@@ -55,6 +55,34 @@ void main() {
       check(harness.router.routeInformationProvider.value.uri.path)
           .equals(Routes.backendChooser);
       expect(find.byType(BackendChooserPage), findsOneWidget);
+      await harness.unmount(tester);
+    },
+  );
+
+  testWidgets(
+    'server setup returns to chat when a local backend already works',
+    (tester) async {
+      // Adding Open WebUI from settings next to a working Apple, Direct, or
+      // Hermes backend must not strand the user in first-time onboarding.
+      final harness = AdaptiveAuthHarness(
+        server: _server,
+        accountlessBackendUsable: true,
+      );
+      addTearDown(harness.dispose);
+
+      await tester.pumpWidget(
+        harness.build(initialLocation: Routes.serverConnection),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('server-connection-back-button')),
+      );
+      await tester.pumpAndSettle();
+
+      check(harness.router.routeInformationProvider.value.uri.path)
+          .equals(Routes.chat);
+      expect(find.byKey(const ValueKey<String>('chat')), findsOneWidget);
       await harness.unmount(tester);
     },
   );
@@ -115,7 +143,8 @@ void main() {
       ),
     );
     check(renderedUrlField.cupertinoDecoration).isNotNull();
-    check(renderedUrlField.cupertinoDecoration!.border).isNull();
+    // Fields use a hairline outline.
+    check(renderedUrlField.cupertinoDecoration!.border).isNotNull();
 
     final disclosure = tester.widget<UtilityDisclosureSection>(toggle);
     check(disclosure.contentPadding).equals(EdgeInsets.zero);
@@ -144,7 +173,8 @@ void main() {
     )) {
       check(field.prefixIcon).isNull();
       check(field.cupertinoDecoration).isNotNull();
-      check(field.cupertinoDecoration!.border).isNull();
+      // Fields use a hairline outline.
+      check(field.cupertinoDecoration!.border).isNotNull();
     }
     final addHeaderFinder = find.byKey(
       const ValueKey<String>('add-custom-header-button'),

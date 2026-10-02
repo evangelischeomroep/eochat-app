@@ -4,12 +4,13 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../../core/platform/conduit_platform_apis.g.dart';
-import '../models/direct_completion.dart';
-import '../models/direct_connection_profile.dart';
-import '../models/direct_remote_model.dart';
-import 'direct_adapter_helpers.dart';
-import 'direct_provider_adapter.dart';
+import '../../../platform/conduit_platform_apis.g.dart';
+
+import 'package:conduit_core/features/direct_connections/models/direct_completion.dart';
+import 'package:conduit_core/features/direct_connections/models/direct_connection_profile.dart';
+import 'package:conduit_core/features/direct_connections/models/direct_remote_model.dart';
+import 'package:conduit_core/features/direct_connections/services/direct_adapter_helpers.dart';
+import 'package:conduit_core/features/direct_connections/services/direct_provider_adapter.dart';
 
 const List<String> kApplePccReasoningEfforts = <String>[
   'automatic',
@@ -103,7 +104,8 @@ final class ApplePccAdapter implements DirectProviderAdapter, PccFlutterApi {
         isMultimodal: isPcc,
         capabilities: <String, dynamic>{
           if (isPcc) 'apple_pcc': true else 'apple_on_device': true,
-          'context_length': current.contextSize ?? (isPcc ? 32768 : 4096),
+          'context_length':
+              reportedApplePccContextSize(current) ?? (isPcc ? 32768 : 4096),
           'reasoning': isPcc,
           'vision': isPcc,
           'structured_outputs': true,
@@ -650,6 +652,13 @@ PlatformAppleModel? _platformModel(DirectConnectionProfile profile) {
     return PlatformAppleModel.privateCloudCompute;
   }
   return null;
+}
+
+/// The context window Apple reported, or null when it did not report one.
+/// The simulator reports 0 for the on-device model.
+int? reportedApplePccContextSize(PlatformPccStatus status) {
+  final size = status.contextSize;
+  return size != null && size > 0 ? size : null;
 }
 
 String _displayName(PlatformAppleModel model) => switch (model) {

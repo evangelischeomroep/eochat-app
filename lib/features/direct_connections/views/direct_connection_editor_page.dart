@@ -6,8 +6,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/services/navigation_service.dart';
-import '../../../core/utils/debug_logger.dart';
+import '../../../shared/services/navigation_service.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/conduit_components.dart';
@@ -18,8 +20,10 @@ import '../controllers/direct_connection_editor_draft.dart';
 import '../controllers/direct_connection_editor_form.dart';
 import '../controllers/direct_connection_editor_workflow.dart';
 import '../controllers/riverpod_direct_connection_editor_gateway.dart';
-import '../models/direct_connection_profile.dart';
-import '../models/direct_remote_model.dart';
+
+import 'package:conduit_core/features/direct_connections/models/direct_connection_profile.dart';
+import 'package:conduit_core/features/direct_connections/models/direct_remote_model.dart';
+
 import 'direct_connection_editor_sections.dart';
 
 enum DirectEditorEntry { overview, chooser }
@@ -57,12 +61,19 @@ class _DirectConnectionEditorPageState
   ConnectionAttemptState get _attempt => _editorState.attempt;
   String? get _operationError => _editorState.operationError;
 
+  bool _workflowCreated = false;
+
   @override
-  void initState() {
-    super.initState();
-    final mode = widget.mode;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Created here rather than in initState so the new-connection default name
+    // can be localized.
+    if (_workflowCreated) return;
+    _workflowCreated = true;
     _workflow = DirectConnectionEditorWorkflow(
-      gateway: riverpodDirectConnectionEditorGateway(ref, mode),
+      gateway: riverpodDirectConnectionEditorGateway(ref, widget.mode),
+      defaultConnectionName: AppLocalizations.of(context)!
+          .directDefaultConnectionName,
     );
     _workflow.addListener(_handleEditorChanged);
   }
@@ -286,9 +297,6 @@ class _DirectConnectionEditorPageState
       final l10n = AppLocalizations.of(context)!;
       return UtilityPageScaffold.auth(
         title: title,
-        backgroundColor: PlatformInfo.isIOS
-            ? CupertinoColors.systemGroupedBackground.resolveFrom(context)
-            : null,
         backNavigation: UtilityBackNavigation(
           label: l10n.back,
           buttonKey: const ValueKey<String>('direct-editor-back-button'),
@@ -311,9 +319,6 @@ class _DirectConnectionEditorPageState
 
     return UtilityPageScaffold.settings(
       title: title,
-      backgroundColor: PlatformInfo.isIOS
-          ? CupertinoColors.systemGroupedBackground.resolveFrom(context)
-          : null,
       trailing: trailing,
       contentPadding: PlatformInfo.isIOS
           ? const EdgeInsets.fromLTRB(
@@ -419,9 +424,7 @@ class _DirectConnectionEditorPageState
                 ),
                 title: l10n.testDirectConnection,
                 titleFontWeight: FontWeight.w400,
-                foregroundColor: CupertinoColors.activeBlue.resolveFrom(
-                  context,
-                ),
+                foregroundColor: context.conduitTheme.buttonPrimary,
                 enabled:
                     !_saving &&
                     !_deleting &&

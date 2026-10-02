@@ -11,19 +11,29 @@ import 'package:conduit/l10n/app_localizations.dart';
 
 import '../../../shared/widgets/conduit_loading.dart';
 import '../../../shared/widgets/adaptive_route_shell.dart';
+import '../../../shared/widgets/adaptive_toolbar_components.dart';
 
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../../../shared/widgets/sign_out_options_dialog.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/providers/backend_mode_providers.dart';
-import '../../../core/services/navigation_service.dart';
-import '../../auth/providers/unified_auth_providers.dart';
+
+import 'package:conduit_core/providers/app_providers.dart';
+
+import 'package:conduit_core/providers/backend_mode_providers.dart';
+
+import '../../../shared/services/navigation_service.dart';
+
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+
 import '../../workspace/providers/workspace_capabilities_provider.dart';
-import '../../../core/services/api_service.dart';
-import '../../../core/models/user.dart' as models;
-import '../../../core/utils/user_display_name.dart';
-import '../../../core/utils/user_avatar_utils.dart';
+
+import 'package:conduit_core/services/api_service.dart';
+
+import 'package:conduit_core/models/user.dart' as models;
+import 'package:conduit_core/utils/user_display_name.dart';
+
+import 'package:conduit_core/utils/user_avatar_utils.dart';
+
 import '../../../shared/widgets/user_avatar.dart';
 import '../../../core/config/fork_overrides.dart';
 import '../../../shared/widgets/utility_components.dart';
@@ -65,9 +75,35 @@ class ProfilePage extends ConsumerWidget {
   Widget _buildScaffold(BuildContext context, {required Widget body}) {
     final l10n = AppLocalizations.of(context)!;
 
+    // Use the same floating back control as the settings subpages so the
+    // hub and its destinations share one toolbar style.
+    final backLabel = MaterialLocalizations.of(context).backButtonTooltip;
+    final backButton = Navigator.of(context).canPop()
+        ? AdaptiveTooltip(
+            message: backLabel,
+            child: ConduitAdaptiveAppBarIconButton(
+              icon: context.usesCupertinoChrome
+                  ? CupertinoIcons.chevron_back
+                  : Icons.arrow_back,
+              semanticLabel: backLabel,
+              onPressed: () => Navigator.of(context).maybePop(),
+            ),
+          )
+        : null;
+
     return AdaptiveRouteShell(
-      backgroundColor: context.conduitTheme.surfaceBackground,
-      appBar: AdaptiveAppBar(title: l10n.you),
+      backgroundColor: context.conduitTheme.groupedBackground,
+      appBar: AdaptiveAppBar(
+        title: l10n.you,
+        leading: backButton == null || context.usesCupertinoChrome
+            ? backButton
+            : Center(
+                child: SizedBox.square(
+                  dimension: TouchTarget.minimum,
+                  child: backButton,
+                ),
+              ),
+      ),
       body: body,
     );
   }
@@ -114,10 +150,8 @@ class ProfilePage extends ConsumerWidget {
       ),
       children: [
         if (hasOpenWebUiAccount) ...[
-          InsetGroupedList(
-            children: [_buildProfileHeader(context, userData, api)],
-          ),
-          const SizedBox(height: Spacing.sm),
+          _buildProfileHeader(context, userData, api),
+          const SizedBox(height: Spacing.lg),
         ],
         ...items,
         const SizedBox(height: Spacing.xl),
@@ -238,13 +272,42 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
     }
 
     final email = extractEmail(user) ?? l10n.noEmailLabel;
-    return UtilityRow(
-      onTap: () => context.pushNamed(RouteNames.accountSettings),
-      leading: UserAvatar(size: 56, imageUrl: avatarUrl, fallbackText: initial),
-      title: displayName,
-      subtitle: email,
-      showChevron: true,
-      padding: const EdgeInsets.all(Spacing.md),
+    final theme = context.conduitTheme;
+    // Identity header: centered avatar, name, and account line,
+    // with an explicit pill that opens the account editor.
+    return Column(
+      children: [
+        UserAvatar(size: 80, imageUrl: avatarUrl, fallbackText: initial),
+        const SizedBox(height: Spacing.sm + Spacing.xxs),
+        Text(
+          displayName,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.headlineSmallStyle.copyWith(
+            color: theme.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: Spacing.xxs),
+        Text(
+          email,
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypography.bodyMediumStyle.copyWith(
+            color: theme.textSecondary,
+          ),
+        ),
+        const SizedBox(height: Spacing.md),
+        AdaptiveButton(
+          key: const Key('settings-edit-profile'),
+          onPressed: () => context.pushNamed(RouteNames.accountSettings),
+          label: l10n.edit,
+          style: AdaptiveButtonStyle.bordered,
+          size: AdaptiveButtonSize.small,
+        ),
+      ],
     );
   }
 
@@ -257,6 +320,8 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
     final l10n = AppLocalizations.of(context)!;
     final canManageWorkspace = canManageAnyWorkspaceSection(ref);
 
+    // Single-line settings rows, so each title and its
+    // icon carry the meaning without a descriptive subtitle.
     final appItems = <Widget>[
       _buildAccountOption(
         context,
@@ -265,7 +330,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
           android: Icons.tune,
         ),
         title: l10n.settingsAppearance,
-        subtitle: l10n.settingsAppearanceSubtitle,
         onTap: () => context.pushNamed(RouteNames.appearanceSettings),
       ),
       _buildAccountOption(
@@ -275,7 +339,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
           android: Icons.chat_bubble_outline,
         ),
         title: l10n.chatSettings,
-        subtitle: l10n.settingsChatSubtitle,
         onTap: () => context.pushNamed(RouteNames.chatSettings),
       ),
       _buildAccountOption(
@@ -285,7 +348,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
           android: Icons.graphic_eq,
         ),
         title: l10n.audioSettingsTitle,
-        subtitle: l10n.audioSettingsSubtitle,
         onTap: () => context.pushNamed(RouteNames.audioSettings),
       ),
       if (hasOpenWebUiAccount)
@@ -296,7 +358,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
             android: Icons.notifications_outlined,
           ),
           title: l10n.notificationsTitle,
-          subtitle: l10n.notificationsSubtitle,
           onTap: () => context.pushNamed(RouteNames.notificationSettings),
         ),
       if (hasOpenWebUiAccount || directPrimary)
@@ -307,7 +368,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
             android: Icons.auto_awesome,
           ),
           title: l10n.personalization,
-          subtitle: l10n.personalizationSubtitle,
           onTap: () => context.pushNamed(RouteNames.personalization),
         ),
     ];
@@ -321,7 +381,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
           android: Icons.smart_toy_outlined,
         ),
         title: l10n.hermesAgentSettingsTitle,
-        subtitle: l10n.hermesAgentSettingsSubtitle,
         onTap: () => context.pushNamed(RouteNames.hermesSettings),
       ),
       if (canManageWorkspace)
@@ -333,7 +392,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
             android: Icons.dashboard_customize_outlined,
           ),
           title: l10n.workspaceTitle,
-          subtitle: l10n.workspaceSubtitle,
           onTap: () => context.pushNamed(RouteNames.workspace),
         ),
       if (hasOpenWebUiAccount)
@@ -345,7 +403,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
             android: Icons.hub_outlined,
           ),
           title: l10n.settingsDataAndConnection,
-          subtitle: l10n.connectionHealth,
           onTap: () => context.pushNamed(RouteNames.dataConnectionSettings),
         ),
       _buildAccountOption(
@@ -355,7 +412,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
           android: Icons.hub_outlined,
         ),
         title: l10n.directConnectionsTitle,
-        subtitle: l10n.directConnectionsSubtitle,
         onTap: () => context.pushNamed(RouteNames.directConnections),
       ),
       if (!hasOpenWebUiAccount)
@@ -366,7 +422,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
             android: Icons.add_circle_outline,
           ),
           title: l10n.connectOpenWebUITitle,
-          subtitle: l10n.connectOpenWebUISubtitle,
           onTap: () => context.goNamed(RouteNames.serverConnection),
         ),
     ];
@@ -389,7 +444,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
         android: Icons.logout,
       ),
       title: l10n.signOut,
-      subtitle: l10n.endYourSession,
       onTap: () => _signOut(context, ref),
       showChevron: false,
       destructive: true,
@@ -402,7 +456,7 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
     IconData? icon,
     String? iconAsset,
     required String title,
-    required String subtitle,
+    String? subtitle,
     required VoidCallback onTap,
     bool showChevron = true,
     bool destructive = false,
@@ -426,23 +480,16 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
     );
   }
 
+  // Plain monochrome glyphs instead of tinted
+  // badges; the fixed box keeps every row's title on the same leading edge.
   Widget _buildIconBadge(
     BuildContext context,
     IconData icon, {
     required Color color,
   }) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppBorderRadius.small),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: BorderWidth.thin,
-        ),
-      ),
-      alignment: Alignment.center,
+    return SizedBox(
+      width: IconSize.xl,
+      height: IconSize.xl,
       child: Icon(icon, color: color, size: IconSize.medium),
     );
   }
@@ -452,26 +499,19 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
     String asset, {
     required Color color,
   }) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppBorderRadius.small),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-          width: BorderWidth.thin,
+    return SizedBox(
+      width: IconSize.xl,
+      height: IconSize.xl,
+      child: Center(
+        child: Image.asset(
+          asset,
+          key: const Key('hermes-settings-logo'),
+          width: IconSize.medium + 2,
+          height: IconSize.medium + 2,
+          color: color,
+          colorBlendMode: BlendMode.srcIn,
+          filterQuality: FilterQuality.high,
         ),
-      ),
-      alignment: Alignment.center,
-      child: Image.asset(
-        asset,
-        key: const Key('hermes-settings-logo'),
-        width: IconSize.medium + 2,
-        height: IconSize.medium + 2,
-        color: color,
-        colorBlendMode: BlendMode.srcIn,
-        filterQuality: FilterQuality.high,
       ),
     );
   }
@@ -486,7 +526,6 @@ if (ForkOverrides.showDonationLinks) _buildDonationSection(context),
         android: Icons.info_outline,
       ),
       title: AppLocalizations.of(context)!.aboutApp,
-      subtitle: AppLocalizations.of(context)!.aboutAppSubtitle,
       onTap: () => context.pushNamed(RouteNames.about),
     );
   }

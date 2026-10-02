@@ -70,13 +70,7 @@
   },
   "releaseNotesTitle": "新機能",
   "releaseNotesAnnouncementTitle": "{version} の新機能",
-  "@releaseNotesAnnouncementTitle": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
+  "@releaseNotesAnnouncementTitle": {"placeholders": {"version": {"type": "String"}}},
   "releaseNotesLearnMore": "詳細を見る",
   "releaseNotesReviewButton": "EOchat をレビュー",
   "releaseNotesDoneButton": "完了",
@@ -2209,21 +2203,13 @@
   },
   "sidebarChannelsTab": "チャンネル",
   "sidebarResizeHandle": "サイドバーの幅を変更",
-  "@sidebarResizeHandle": {
-    "description": "Accessibility label for the draggable tablet sidebar divider."
-  },
+  "@sidebarResizeHandle": {"description": "Accessibility label for the draggable tablet sidebar divider."},
   "sidebarResizeResetHint": "ダブルタップしてサイドバーの幅をリセット",
-  "@sidebarResizeResetHint": {
-    "description": "Accessibility hint for resetting the tablet sidebar width."
-  },
+  "@sidebarResizeResetHint": {"description": "Accessibility hint for resetting the tablet sidebar width."},
   "sidebarWidthValue": "{width}ポイント",
   "@sidebarWidthValue": {
     "description": "Accessibility value describing the current tablet sidebar width.",
-    "placeholders": {
-      "width": {
-        "type": "int"
-      }
-    }
+    "placeholders": {"width": {"type": "int"}}
   },
   "@sidebarChannelsTab": {
     "description": "Label for the Channels tab in the sidebar"
@@ -3053,7 +3039,6 @@
       }
     }
   },
-  "notificationSystemSettingsDescription": "EOchat の許可、音、バナーのオプションを変更します。",
   "notificationPermissionTitle": "通知の許可",
   "@notificationPermissionTitle": {
     "description": "Title for the system notification permission prompt."
@@ -3280,9 +3265,7 @@
   },
   "workspaceModelBaseModelNone": "None (custom)",
   "workspaceModelBaseModelRequired": "ベースモデルを選択してください。",
-  "@workspaceModelBaseModelRequired": {
-    "description": "Validation shown when a non-admin model create or protected edit has no base model."
-  },
+  "@workspaceModelBaseModelRequired": {"description": "Validation shown when a non-admin model create or protected edit has no base model."},
   "@workspaceModelBaseModelNone": {
     "description": "Base-model option meaning no base model is used."
   },
@@ -4217,13 +4200,7 @@
   "workspaceToolSpecs": "Generated specifications",
   "workspaceToolDetails": "ツールの詳細",
   "workspaceToolFunctionCount": "{count} 個の関数",
-  "@workspaceToolFunctionCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@workspaceToolFunctionCount": {"placeholders":{"count":{"type":"int"}}},
   "workspaceToolSpecsEmpty": "No specifications were generated for this tool.",
   "workspaceToolIncompatible": "This tool requires Open WebUI v{required}, but the server is v{current}. Update the server to save.",
   "workspaceToolValves": "Valves",
@@ -4276,17 +4253,11 @@
   "hermesApprovalRequired": "Approval required",
   "hermesApprovalFallback": "The agent is requesting permission to continue.",
   "openWebUiPromptOther": "その他",
-  "@openWebUiPromptOther": {
-    "description": "Label for a free-form answer to an Open WebUI ask-user question."
-  },
+  "@openWebUiPromptOther": {"description": "Label for a free-form answer to an Open WebUI ask-user question."},
   "openWebUiPromptAnswerHint": "回答を入力",
-  "@openWebUiPromptAnswerHint": {
-    "description": "Placeholder for a free-form Open WebUI ask-user answer."
-  },
+  "@openWebUiPromptAnswerHint": {"description": "Placeholder for a free-form Open WebUI ask-user answer."},
   "openWebUiPromptSubmit": "送信",
-  "@openWebUiPromptSubmit": {
-    "description": "Action that submits all answers to an Open WebUI ask-user prompt."
-  },
+  "@openWebUiPromptSubmit": {"description": "Action that submits all answers to an Open WebUI ask-user prompt."},
   "hermesApprovalApproved": "Approved ✓",
   "hermesApprovalDenied": "Denied",
   "hermesApprovalApproveAction": "Approve",
@@ -4349,17 +4320,12 @@
   "openWebUiDirectConnectionsUnavailable": "Open WebUIの接続は利用できません。",
   "directConnectionNoLongerExists": "この接続はすでに削除されています。",
   "openWebUiDirectConnectionDeleteMessage": "Open WebUIアカウントと、ログイン中のほかのクライアントから{name}を削除します。",
-  "@openWebUiDirectConnectionDeleteMessage": {
-    "description": "Confirmation message shown before deleting an Open WebUI-synced direct connection.",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@openWebUiDirectConnectionDeleteMessage": {"description":"Confirmation message shown before deleting an Open WebUI-synced direct connection.","placeholders":{"name":{"type":"String"}}},
   "addDirectConnection": "Add connection",
   "editDirectConnection": "Edit connection",
   "directConnectionName": "Connection name",
+  "directDefaultConnectionName": "マイプロバイダー",
+  "sidebarButtonLabel": "サイドバー",
   "directConnectionNameRequired": "Enter a connection name.",
   "directConnectionUrlInvalid": "Use a valid http:// or https:// URL.",
   "directConnectionCredentialsReentryRequired": "Re-enter credentials when changing servers.",
@@ -4400,9 +4366,7 @@
   "directCustomHeaders": "Custom headers",
   "directManualModelIds": "Manual model IDs",
   "directManualModelIdsDescription": "任意。サーバーがモデルを一覧表示できない場合は、1 行に 1 つの ID を入力します。",
-  "@directManualModelIdsDescription": {
-    "placeholders": {}
-  },
+  "@directManualModelIdsDescription": {"placeholders":{}},
   "directModelIdPrefix": "Model ID prefix",
   "directModelIdPrefixDescription": "Optional. Adds a visible namespace such as studio.model-name without changing the model ID sent to the provider.",
   "directModelTags": "Model tags",
@@ -4493,13 +4457,7 @@
   "hermesMemoryKeyShortDescription": "エージェントの長期記憶をあなたに関連付けます。空欄の場合は Conduit がキーを作成します。",
   "hermesConnectAction": "Hermes に接続",
   "hermesToolCount": "ツール {count} 個",
-  "@hermesToolCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@hermesToolCount": {"placeholders":{"count":{"type":"int"}}},
   "hermesNoToolsets": "サーバーからツールセットが報告されていません。",
   "hermesToolsetsNewSessions": "変更は新しい Hermes セッションに適用されます。既存のチャットは現在のツールを保持します。",
   "hermesServerStatusTitle": "サーバーの状態",
@@ -4552,13 +4510,7 @@
   "hermesTurnControlsUnsupported": "安全なターン制御を有効にするには Hermes をアップグレードしてください。",
   "sidebarHermesTab": "Hermes",
   "markdownShowMoreLines": "あと{count}行を表示",
-  "@markdownShowMoreLines": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@markdownShowMoreLines": {"placeholders":{"count":{"type":"int"}}},
   "markdownShowLess": "表示を減らす",
   "voiceBargeIn": "割り込み",
   "voiceBargeInDescription": "アシスタントの発話中も聞き取りを続け、割り込めるようにします。",
@@ -4619,127 +4571,46 @@
   "hermesSessionDeleteFailed": "会話を削除できませんでした。",
   "hermesSessionLoadFailed": "この会話を読み込めませんでした。接続を確認して、もう一度お試しください。",
   "hermesMemoryKeyFieldLabel": "メモリキー",
-  "directMcpServersTitle": "MCP servers",
-  "directMcpEmptyTitle": "No MCP servers yet",
-  "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.",
-  "directMcpEditorTitle": "Edit MCP server",
-  "directMcpAddTitle": "Add MCP server",
-  "directMcpName": "Server name",
-  "directMcpEndpoint": "Streamable HTTP endpoint",
-  "directMcpBearerToken": "Bearer token (optional)",
-  "directMcpCustomHeaders": "Custom headers (optional)",
-  "directMcpCustomHeadersHint": "One per line: Name: Value",
-  "directMcpTestConnection": "Test connection",
-  "directMcpTesting": "Testing connection…",
-  "directMcpTestSucceeded": "Connected — {count} tools found.",
-  "directMcpTestFailed": "Could not list tools from this MCP server.",
-  "directMcpSaveFailed": "Could not save this MCP server.",
-  "directMcpLoadFailed": "Could not load MCP servers from secure storage.",
-  "directMcpMissing": "This MCP server no longer exists.",
-  "directMcpCredentialTransferTitle": "Use credentials with new server?",
-  "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.",
-  "directMcpCredentialTransferConfirm": "Use credentials",
-  "directMcpDeleteTitle": "Delete MCP server?",
-  "directMcpDeleteMessage": "This removes {name} and its credentials from this device.",
-  "directMcpDeleteFailed": "Could not delete this MCP server.",
-  "directMcpAuthMode": "Authentication",
-  "directMcpAuthNone": "None",
-  "directMcpAuthBearer": "Bearer token",
-  "directMcpAuthOAuth": "OAuth",
-  "directMcpOAuthConnect": "Connect in browser",
-  "directMcpOAuthReconnect": "Reconnect in browser",
-  "directMcpOAuthDisconnect": "Disconnect OAuth",
-  "directMcpOAuthPending": "Waiting for authorization in the browser…",
-  "directMcpOAuthConnected": "OAuth connected.",
-  "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}",
-  "directMcpOAuthNoScopes": "No scopes reported",
-  "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.",
-  "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.",
-  "directMcpApprovalTitle": "Tool approval",
-  "directMcpApprovalAllowOnce": "Allow once",
-  "directMcpApprovalAllowSession": "Allow for session",
-  "directMcpApprovalAllowAlways": "Always allow",
-  "directMcpApprovalAlwaysTitle": "Always allow this tool?",
-  "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.",
-  "@directMcpApprovalAlwaysMessage": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "toolName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.",
-  "directMcpApprovalDeny": "Deny",
-  "directMcpApprovalAllowed": "Allowed once",
-  "directMcpApprovalAllowedSession": "Allowed for session",
-  "directMcpApprovalAllowedAlways": "Always allowed",
-  "directMcpApprovalDenied": "Denied",
-  "directMcpApprovalExpired": "Approval expired",
-  "directMcpRememberedApprovalsTitle": "Always allowed tools",
-  "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.",
-  "directMcpRememberedApprovalRevoke": "Revoke",
-  "directMcpRememberedApprovalsRevokeAll": "Revoke all",
-  "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval.",
-  "directMcpContentAction": "MCP content",
-  "directMcpContentTitle": "MCP content",
-  "directMcpContentServer": "MCP server",
-  "directMcpContentSearch": "Search prompts and resources",
-  "directMcpContentPrompts": "Prompts",
-  "directMcpContentResources": "Resources",
-  "directMcpContentEmpty": "This server has no prompts or resources.",
-  "directMcpContentNoMatches": "No matching prompts or resources.",
-  "directMcpContentLoadFailed": "Could not load content from this MCP server.",
-  "directMcpContentRefresh": "Refresh MCP content",
-  "directMcpContentPreviewTitle": "Preview",
-  "directMcpContentInsert": "Insert",
-  "directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}",
-  "@directMcpContentPromptHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "promptName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}",
-  "@directMcpContentResourceHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "resourceUri": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentRoleUser": "User",
-  "directMcpContentRoleAssistant": "Assistant",
-  "directMcpContentRequestFailed": "Could not load this MCP content. Try again.",
-  "directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource.",
-  "directMcpContentChanged": "This item changed on the server. Refresh and choose it again.",
-  "directMcpContentTooLarge": "This content is too large to insert.",
-  "directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again.",
-  "directMcpContentLoading": "Loading MCP content…",
-  "directMcpInsecureCredentialsTitle": "Send credentials without encryption?",
-  "directMcpInsecureCredentialsMessage": "This server uses unencrypted HTTP. Your bearer token, OAuth token, and custom headers could be read or changed on the network.",
-  "directMcpInsecureCredentialsConfirm": "Send without encryption",
-  "hermesSessionTooLarge": "この会話は大きすぎるため、このデバイスでは読み込めません。",
-  "hermesSessionNotFound": "この会話は Hermes サーバー上で利用できなくなりました。",
-  "hermesSessionLoadFailedDetail": "この会話を読み込めませんでした: {detail}",
-  "@hermesSessionLoadFailedDetail": {
+  "directMcpServersTitle": "MCP servers", "directMcpEmptyTitle": "No MCP servers yet", "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.", "directMcpEditorTitle": "Edit MCP server", "directMcpAddTitle": "Add MCP server", "directMcpName": "Server name", "directMcpEndpoint": "Streamable HTTP endpoint", "directMcpBearerToken": "Bearer token (optional)", "directMcpCustomHeaders": "Custom headers (optional)", "directMcpCustomHeadersHint": "One per line: Name: Value", "directMcpTestConnection": "Test connection", "directMcpTesting": "Testing connection…", "directMcpTestSucceeded": "Connected — {count} tools found.", "directMcpTestFailed": "Could not list tools from this MCP server.", "directMcpSaveFailed": "Could not save this MCP server.", "directMcpLoadFailed": "Could not load MCP servers from secure storage.", "directMcpMissing": "This MCP server no longer exists.", "directMcpCredentialTransferTitle": "Use credentials with new server?", "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.", "directMcpCredentialTransferConfirm": "Use credentials", "directMcpDeleteTitle": "Delete MCP server?", "directMcpDeleteMessage": "This removes {name} and its credentials from this device.", "directMcpDeleteFailed": "Could not delete this MCP server.", "directMcpAuthMode": "Authentication", "directMcpAuthNone": "None", "directMcpAuthBearer": "Bearer token", "directMcpAuthOAuth": "OAuth", "directMcpOAuthConnect": "Connect in browser", "directMcpOAuthReconnect": "Reconnect in browser", "directMcpOAuthDisconnect": "Disconnect OAuth", "directMcpOAuthPending": "Waiting for authorization in the browser…", "directMcpOAuthConnected": "OAuth connected.", "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}", "directMcpOAuthNoScopes": "No scopes reported", "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.", "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.", "directMcpApprovalTitle": "Tool approval", "directMcpApprovalAllowOnce": "Allow once", "directMcpApprovalAllowSession": "Allow for session", "directMcpApprovalAllowAlways": "Always allow", "directMcpApprovalAlwaysTitle": "Always allow this tool?", "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.", "@directMcpApprovalAlwaysMessage": {"placeholders":{"serverName":{"type":"String"},"toolName":{"type":"String"}}}, "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.", "directMcpApprovalDeny": "Deny", "directMcpApprovalAllowed": "Allowed once", "directMcpApprovalAllowedSession": "Allowed for session", "directMcpApprovalAllowedAlways": "Always allowed", "directMcpApprovalDenied": "Denied", "directMcpApprovalExpired": "Approval expired", "directMcpRememberedApprovalsTitle": "Always allowed tools", "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.", "directMcpRememberedApprovalRevoke": "Revoke", "directMcpRememberedApprovalsRevokeAll": "Revoke all", "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval."
+  ,"directMcpContentAction": "MCP content"
+  ,"directMcpContentTitle": "MCP content"
+  ,"directMcpContentServer": "MCP server"
+  ,"directMcpContentSearch": "Search prompts and resources"
+  ,"directMcpContentPrompts": "Prompts"
+  ,"directMcpContentResources": "Resources"
+  ,"directMcpContentEmpty": "This server has no prompts or resources."
+  ,"directMcpContentNoMatches": "No matching prompts or resources."
+  ,"directMcpContentLoadFailed": "Could not load content from this MCP server."
+  ,"directMcpContentRefresh": "Refresh MCP content"
+  ,"directMcpContentPreviewTitle": "Preview"
+  ,"directMcpContentInsert": "Insert"
+  ,"directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}"
+  ,"@directMcpContentPromptHeading": {"placeholders":{"serverName":{"type":"String"},"promptName":{"type":"String"}}}
+  ,"directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}"
+  ,"@directMcpContentResourceHeading": {"placeholders":{"serverName":{"type":"String"},"resourceUri":{"type":"String"}}}
+  ,"directMcpContentRoleUser": "User"
+  ,"directMcpContentRoleAssistant": "Assistant"
+  ,"directMcpContentRequestFailed": "Could not load this MCP content. Try again."
+  ,"directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource."
+  ,"directMcpContentChanged": "This item changed on the server. Refresh and choose it again."
+  ,"directMcpContentTooLarge": "This content is too large to insert."
+  ,"directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again."
+  ,"directMcpContentLoading": "Loading MCP content…"
+  ,"directMcpInsecureCredentialsTitle": "Send credentials without encryption?"
+  ,"directMcpInsecureCredentialsMessage": "This server uses unencrypted HTTP. Your bearer token, OAuth token, and custom headers could be read or changed on the network."
+  ,"directMcpInsecureCredentialsConfirm": "Send without encryption"
+  ,"hermesSessionTooLarge": "この会話は大きすぎるため、このデバイスでは読み込めません。"
+  ,"hermesSessionNotFound": "この会話は Hermes サーバー上で利用できなくなりました。"
+  ,"hermesSessionLoadFailedDetail": "この会話を読み込めませんでした: {detail}"
+  ,"@hermesSessionLoadFailedDetail": {
     "placeholders": {
       "detail": {
         "type": "String"
       }
     }
-  },
-  "directBearerDescription": "認証情報を Authorization: Bearer ヘッダーで送信します。ほとんどの OpenAI 互換サーバー（llama.cpp、vLLM、LM Studio、Ollama）はこの方式を想定しています。",
-  "directApiKeyHeaderAzureOnlyDescription": "認証情報を api-key ヘッダーで送信します。Azure OpenAI 専用です。他の OpenAI 互換サーバーは Bearer トークンを想定しています。",
+  }
+  ,"directBearerDescription": "認証情報を Authorization: Bearer ヘッダーで送信します。ほとんどの OpenAI 互換サーバー（llama.cpp、vLLM、LM Studio、Ollama）はこの方式を想定しています。"
+  ,"directApiKeyHeaderAzureOnlyDescription": "認証情報を api-key ヘッダーで送信します。Azure OpenAI 専用です。他の OpenAI 互換サーバーは Bearer トークンを想定しています。",
   "themePaletteEochatLabel": "EOchat",
   "@themePaletteEochatLabel": {
     "description": "Palette name for the default EOchat theme."
@@ -4777,39 +4648,60 @@
     }
   },
   "markdownPreviewAfterStreaming": "ストリーミングの完了後にプレビューを利用できます。",
-  "appleOnDeviceUnavailable": "Apple On-Device is not available on this device.",
-  "applePccContextSize": "{tokens} token context",
-  "applePccCurrentLanguageUnsupported": "The current device language may not be supported.",
-  "applePccOnDeviceFallback": "On-device fallback",
-  "applePccOnDeviceFallbackSubtitle": "Use Apple's smaller on-device model when PCC cannot be reached. Reasoning requests never fall back.",
-  "applePccQuotaApproaching": "Nearing the daily usage limit",
-  "applePccQuotaReached": "Daily usage limit reached",
-  "applePccQuotaResetsAt": "Resets {time}",
-  "applePccShowQuotaOptions": "Show usage options",
-  "applePccStatusAvailable": "Available",
-  "applePccUnavailable": "Apple Private Cloud Compute is not available on this device.",
-  "backendChooserAppleOnDeviceSubtitle": "Run Apple's private model on this device, even offline.",
+  "appleOnDeviceUnavailable": "このデバイスでは Apple On-Device を利用できません。",
+  "applePccContextSize": "コンテキスト {tokens} トークン",
+  "@applePccContextSize": {"description": "Apple PCC context size label.", "placeholders": {"tokens": {"type": "String"}}},
+  "applePccCurrentLanguageUnsupported": "現在のデバイスの言語はサポートされていない可能性があります。",
+  "applePccOnDeviceFallback": "オンデバイスのフォールバック",
+  "applePccOnDeviceFallbackSubtitle": "PCC に接続できないときに、より小さいオンデバイスの Apple モデルを使用します。推論リクエストがフォールバックすることはありません。",
+  "applePccQuotaApproaching": "1 日の使用上限に近づいています",
+  "applePccQuotaReached": "1 日の使用上限に達しました",
+  "applePccQuotaResetsAt": "リセット: {time}",
+  "@applePccQuotaResetsAt": {"description": "Apple PCC quota reset time.", "placeholders": {"time": {"type": "String"}}},
+  "applePccShowQuotaOptions": "使用状況のオプションを表示",
+  "applePccStatusAvailable": "利用可能",
+  "applePccUnavailable": "このデバイスでは Apple Private Cloud Compute を利用できません。",
+  "backendChooserAppleOnDeviceSubtitle": "Apple のプライベートモデルをこのデバイスで実行します。オフラインでも使えます。",
   "backendChooserAppleOnDeviceTitle": "Apple On-Device",
-  "backendChooserApplePccSubtitle": "Use Apple's private cloud model without an API key.",
+  "backendChooserApplePccSubtitle": "API キーなしで Apple のプライベートクラウドモデルを使用します。",
   "backendChooserApplePccTitle": "Apple Private Cloud Compute",
   "backendChooserAppleSectionTitle": "Apple Intelligence",
-  "backendChooserModelApisSectionTitle": "Model APIs",
-  "backendChooserSelfHostedSectionTitle": "Self-hosted services",
-  "directContextCompactionDescription": "These models do not report a context window. EOchat uses the selected limit to compact older messages before requests get too large.",
-  "directContextCompactionPickerDescription": "Choose the context window EOchat should use for automatic compaction.",
-  "directContextCompactionTitle": "Context compaction",
-  "directContextLimit": "Context limit: {tokens}",
-  "notificationSystemSettingsOpenFailed": "Couldn't open system notification settings.",
-  "notificationSystemSettingsTitle": "System notification settings",
-  "readOnly": "Read-only",
-  "readOnlySharedChat": "This chat was shared with you. Only its owner can send messages.",
-  "reasoningEffortDeep": "Deep",
-  "reasoningEffortLight": "Light",
-  "reasoningEffortModerate": "Moderate",
-  "sharedBadge": "Shared",
-  "sharedFolderOwner": "Shared by {name}",
-  "transcribingAudio": "Transcribing...",
-  "proxyAuthSignInAgain": "Sign in through proxy again",
-  "citationShowTitles": "Show citation page titles",
-  "citationShowTitlesDescription": "Use page titles instead of website domains in citation badges"
+  "backendChooserModelApisSectionTitle": "モデル API",
+  "backendChooserSelfHostedSectionTitle": "セルフホストのサービス",
+  "citationShowTitles": "引用にページタイトルを表示",
+  "citationShowTitlesDescription": "引用バッジにサイトのドメインではなくページタイトルを使用します",
+  "directContextCompactionDescription": "これらのモデルはコンテキストウィンドウを報告しません。EOchat はリクエストが大きくなりすぎる前に、選択した上限を使って古いメッセージを圧縮します。",
+  "directContextCompactionPickerDescription": "EOchat が自動圧縮に使用するコンテキストウィンドウを選択してください。",
+  "directContextCompactionTitle": "コンテキストの圧縮",
+  "directContextLimit": "コンテキスト上限: {tokens}",
+  "@directContextLimit": {"description": "Provider-neutral model context limit label.", "placeholders": {"tokens": {"type": "String"}}},
+  "notificationSystemSettingsDescription": "EOchat の許可、サウンド、バナーの設定を変更します。",
+  "notificationSystemSettingsOpenFailed": "システムの通知設定を開けませんでした。",
+  "notificationSystemSettingsTitle": "システムの通知設定",
+  "proxyAuthSignInAgain": "プロキシ経由で再度サインイン",
+  "readOnly": "読み取り専用",
+  "readOnlySharedChat": "このチャットはあなたに共有されました。メッセージを送信できるのは所有者のみです。",
+  "reasoningEffortDeep": "深い",
+  "reasoningEffortLight": "軽い",
+  "reasoningEffortModerate": "中程度",
+  "sharedBadge": "共有済み",
+  "sharedFolderOwner": "{name} が共有",
+  "@sharedFolderOwner": {"description": "Owner label on a folder another user shared with this account.", "placeholders": {"name": {"type": "String", "example": "Alex"}}},
+  "transcribingAudio": "文字起こし中...",
+  "chatTaskProgress": "タスク: {total} 件中 {completed} 件完了",
+  "@chatTaskProgress": {
+    "description": "Summary of the Open WebUI task checklist above the chat composer.",
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "chatTaskPending": "未着手",
+  "chatTaskInProgress": "進行中",
+  "chatTaskCompleted": "完了",
+  "chatTaskCancelled": "キャンセル済み"
 }

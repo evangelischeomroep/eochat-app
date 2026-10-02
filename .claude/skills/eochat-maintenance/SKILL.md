@@ -93,6 +93,23 @@ sync:
   suite fails the same baseline set, not more.
 - The unreleased upstream commits after the latest tag wait for the next tag.
 
+Lessons from the v4.1.8 sync (upstream became a pub workspace):
+
+- Huge "ours" conflict blocks against a near-empty "theirs" side mean code
+  that upstream moved (into `packages/*` or into `part` files), not new
+  logic. Take upstream, then port only the fork's own lines to the new
+  location (`git diff <prev-tag> <fork-head> -- <old path>` shows them).
+- A `UD` (deleted by upstream) file usually moved; its fork edits must be
+  ported by hand, git's rename detection gave up on it.
+- After resolving, sweep for imports that no longer resolve (fork-only files
+  like `fork_startup_watchdog.dart` still point at old `lib/core/...` paths),
+  and delete orphaned ignored `*.g.dart` / `*.freezed.dart` left behind in
+  the old locations, or the local analyzer reports phantom errors.
+- `build_runner` has to run in every workspace member (`ci_post_clone.sh`,
+  `analyze.yml`, `l10n.yml` loop over `. packages/*`).
+- Merge ARB files as JSON (base/ours/theirs from `git show :1:/:2:/:3:`),
+  then patch the result into upstream's text so the diff stays small.
+
 ## CI and shipping
 
 Workflows: `analyze.yml` (`--fatal-infos`), `l10n.yml` (path-filtered, skips

@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'lib/l10n/*.arb'
+      - 'lib/l10n/**.arb'
 
 jobs:
   l10n:
@@ -20,7 +20,15 @@ jobs:
           channel: 'stable'
       - run: flutter --version
       - run: flutter pub get
-      - run: flutter pub run build_runner build --delete-conflicting-outputs
+      - name: Generate code
+        # Pub workspace (v4.1.8+): run build_runner in every member that uses it.
+        shell: bash
+        run: |
+          for dir in . packages/*; do
+            if [ -f "$dir/pubspec.yaml" ] && grep -q '^  build_runner:' "$dir/pubspec.yaml"; then
+              (cd "$dir" && dart run build_runner build --delete-conflicting-outputs)
+            fi
+          done
       - name: Generate localizations
         run: flutter gen-l10n --arb-dir=lib/l10n --output-dir=lib/l10n --template-arb-file=app_en.arb --output-localization-file=app_localizations.dart
       - name: Analyze (non-fatal infos/warnings)

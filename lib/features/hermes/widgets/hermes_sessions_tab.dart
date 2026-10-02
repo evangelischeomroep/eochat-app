@@ -13,9 +13,11 @@ import '../../navigation/models/sidebar_navigation_model.dart';
 import '../../navigation/widgets/chats_drawer.dart'
     show sidebarSectionDisclosureIcon;
 import '../../navigation/widgets/drawer_section_notifiers.dart';
-import '../models/hermes_bot.dart';
-import '../models/hermes_session.dart';
-import '../providers/hermes_providers.dart';
+
+import 'package:conduit_core/features/hermes/models/hermes_bot.dart';
+import 'package:conduit_core/features/hermes/models/hermes_session.dart';
+import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+
 import 'hermes_bot_tile.dart';
 import 'hermes_jobs_sheet.dart';
 import 'hermes_session_tile.dart';
@@ -257,17 +259,13 @@ class _ScheduledAgentsTile extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: theme.buttonPrimary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppBorderRadius.button),
-                ),
+              SizedBox(
+                width: IconSize.xl,
+                height: IconSize.xl,
                 child: Icon(
                   Icons.event_repeat_rounded,
-                  size: IconSize.listItem,
-                  color: theme.buttonPrimary,
+                  size: IconSize.medium,
+                  color: theme.textPrimary,
                 ),
               ),
               const SizedBox(width: Spacing.md),
@@ -302,14 +300,14 @@ class _ScheduledAgentsTile extends ConsumerWidget {
                     vertical: Spacing.xxs,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.buttonPrimary.withValues(alpha: 0.1),
+                    color: theme.surfaceContainer,
                     borderRadius: BorderRadius.circular(AppBorderRadius.pill),
                   ),
                   child: Text(
                     '$count',
                     style: AppTypography.labelMediumStyle.copyWith(
-                      color: theme.buttonPrimary,
-                      fontWeight: FontWeight.w700,
+                      color: theme.textSecondary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),

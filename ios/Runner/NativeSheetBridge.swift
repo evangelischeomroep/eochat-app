@@ -1138,6 +1138,9 @@ final class NativeSheetBridge: NativeSheetHostApi {
     private var pendingTextEditorResult: PendingActionResult?
     private var pendingResultSheetResult: PendingActionResult?
     private var resultSheetValues: [String: Any] = [:]
+    /// True while the result sheet is itself a confirmation (ThemedDialogs.confirm),
+    /// so its destructive action must not ask a second time.
+    private var resultSheetIsConfirmation = false
     private weak var activeTextEditorController: NativeTextEditorViewController?
     private weak var activeModelSelectorController: NativeModelSelectorTableViewController?
     private var activeModelSelectorPresentationId: String?
@@ -1471,6 +1474,7 @@ final class NativeSheetBridge: NativeSheetHostApi {
         self.configuration = nil
         detailPayloads = configuration.details
         resultSheetValues = configuration.initialValues
+        resultSheetIsConfirmation = configuration.root.id == "confirmation-dialog"
         pendingResultSheetResult = result
 
         let navigation = NativeSheetNavigationController(
@@ -1596,7 +1600,7 @@ final class NativeSheetBridge: NativeSheetHostApi {
             return
         }
 
-        if item.destructive {
+        if item.destructive, !resultSheetIsConfirmation {
             presentDestructiveConfirm(for: item)
             return
         }
@@ -3126,6 +3130,7 @@ private final class NativeSignOutOptionsViewController: UITableViewController {
             ? view.tintColor
             : NativeSheetTheme.shared.secondaryForeground
         cell.contentConfiguration = content
+        applyTextAccessibilityLabel(to: cell, from: content)
         cell.selectionStyle = .default
         cell.accessibilityIdentifier = "sign-out-keep-server-details"
         cell.accessibilityTraits = keepServerDetails
@@ -3383,7 +3388,12 @@ private final class NativeSheetSegmentTableViewCell: UITableViewCell {
     }
 
     func configure(item: NativeSheetItem, onValueChanged: @escaping (String) -> Void) {
+        // Re-read the theme on every bind: reused cells otherwise keep the
+        // palette that was active when they were first created.
+        NativeSheetSettingsStyle.applyCellStyle(self)
         applyNativeSheetSegmentedControlTheme(segmentedControl)
+        titleLabel.textColor = NativeSheetTheme.shared.foreground
+        subtitleLabel.textColor = NativeSheetTheme.shared.secondaryForeground
         titleLabel.text = item.title
         if let subtitle = item.subtitle, !subtitle.isEmpty {
             subtitleLabel.text = subtitle
@@ -4829,6 +4839,7 @@ private final class NativeModelSelectorTableViewController: UITableViewControlle
         }
         content.imageProperties.tintColor = NativeSheetTheme.shared.icon
         cell.contentConfiguration = content
+        applyTextAccessibilityLabel(to: cell, from: content)
         return cell
     }
 
@@ -6820,8 +6831,21 @@ private func configureNavigationCell(
         content.secondaryTextProperties.lineBreakMode = .byWordWrapping
     }
     cell.contentConfiguration = content
+    applyTextAccessibilityLabel(to: cell, from: content)
     cell.accessoryType = showsDisclosure ? .disclosureIndicator : .none
     NativeSheetSettingsStyle.applyCellStyle(cell)
+}
+
+/// VoiceOver otherwise leads with the SF Symbol's generated description
+/// ("Paint palette", "trash") instead of the row's title.
+private func applyTextAccessibilityLabel(
+    to cell: UITableViewCell,
+    from content: UIListContentConfiguration
+) {
+    cell.accessibilityLabel = [content.text, content.secondaryText]
+        .compactMap { $0 }
+        .filter { !$0.isEmpty }
+        .joined(separator: ", ")
 }
 
 private final class NativeAvatarView: UIView {

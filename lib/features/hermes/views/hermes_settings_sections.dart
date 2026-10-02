@@ -4,17 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../core/services/navigation_service.dart';
-import '../../../core/utils/debug_logger.dart';
+import '../../../shared/services/navigation_service.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/utility_components.dart';
 import '../controllers/hermes_connection_controller.dart';
-import '../models/hermes_capabilities.dart';
-import '../models/hermes_config.dart';
-import '../providers/hermes_providers.dart';
-import '../services/hermes_desktop_api_service.dart';
+
+import 'package:conduit_core/features/hermes/models/hermes_capabilities.dart';
+import 'package:conduit_core/features/hermes/models/hermes_config.dart';
+import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit_core/features/hermes/services/hermes_desktop_api_service.dart';
 
 class HermesCapabilitiesSection extends ConsumerWidget {
   const HermesCapabilitiesSection({super.key});
@@ -465,14 +468,10 @@ class _SettingsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: theme.buttonPrimary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppBorderRadius.sm),
-      ),
-      child: Icon(icon, size: 18, color: theme.buttonPrimary),
+    return SizedBox(
+      width: IconSize.xl,
+      height: IconSize.xl,
+      child: Icon(icon, size: IconSize.medium, color: theme.buttonPrimary),
     );
   }
 }

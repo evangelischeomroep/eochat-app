@@ -10,15 +10,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
 
-import '../../../core/models/channel.dart';
-import '../../../core/models/channel_message.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/services/api_service.dart';
+import 'package:conduit_core/models/channel.dart';
+import 'package:conduit_core/models/channel_message.dart';
+import 'package:conduit_core/providers/app_providers.dart';
+import 'package:conduit_core/services/api_service.dart';
+
+import '../utils/channel_presentation.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../core/services/native_sheet_bridge.dart';
-import '../../../core/services/navigation_service.dart';
+import '../../../shared/services/navigation_service.dart';
 import '../../../core/utils/model_icon_utils.dart';
-import '../../../core/utils/user_avatar_utils.dart';
+
+import 'package:conduit_core/utils/user_avatar_utils.dart';
+
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/adaptive_glass.dart';
 import '../../../shared/widgets/adaptive_route_shell.dart';
@@ -1119,25 +1123,31 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
     return _buildScaffold(context, theme);
   }
 
+  // Equal side insets keep the icon and name centered in the title pill.
+  static const double _channelTitleInset = 12;
+
   Widget _buildChannelTitlePill(
     BuildContext context,
     Channel? channel, {
     required double maxWidth,
   }) {
-    final label = channel?.name ?? '';
+    final label = channel == null
+        ? ''
+        : channelDisplayName(
+            channel,
+            fallback: AppLocalizations.of(context)!.channelUnknownMember,
+          );
     final textStyle = conduitAdaptiveToolbarLeadingTitleTextStyle(context);
     final controlExtent = conduitScaledControlExtent(context);
     final iconExtent = conduitScaledIconExtent(context, IconSize.appBar);
-    final leadingIcon = channel?.isPrivate == true
-        ? Icons.lock_outlined
-        : Icons.tag;
+    final leadingIcon = channel == null ? Icons.tag : channelIcon(channel);
     final targetWidth = resolveConduitAdaptiveTextPillWidth(
       context: context,
       label: label,
       textStyle: textStyle,
       maxWidth: maxWidth,
       minWidth: 96,
-      horizontalPadding: 10 + Spacing.xs,
+      horizontalPadding: _channelTitleInset * 2,
       leadingWidth: iconExtent + Spacing.xs,
     );
 
@@ -1147,7 +1157,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
       child: ConstrainedBox(
         constraints: BoxConstraints(minHeight: controlExtent),
         child: Padding(
-          padding: const EdgeInsets.only(left: 10, right: Spacing.xs),
+          padding: const EdgeInsets.symmetric(horizontal: _channelTitleInset),
           child: Center(
             widthFactor: 1,
             child: Row(
@@ -1282,6 +1292,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
       leading: ConduitAdaptiveAppBarIconButton(
         icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
         iosSymbol: 'line.3.horizontal',
+        semanticLabel: AppLocalizations.of(context)!.sidebarButtonLabel,
         onPressed: _toggleDrawer,
         iconColor: tintColor,
       ),

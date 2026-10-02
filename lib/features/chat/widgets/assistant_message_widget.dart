@@ -9,8 +9,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/markdown/streaming_markdown_widget.dart';
 import '../../../shared/widgets/markdown/renderer/markdown_style.dart';
-import '../../../core/models/chat_message.dart';
-import '../../../shared/widgets/markdown/markdown_preprocessor.dart';
+
+import 'package:conduit_core/models/chat_message.dart';
+import 'package:conduit_markdown/conduit_markdown.dart';
+
 import '../providers/text_to_speech_provider.dart';
 import '../providers/queued_completion_provider.dart';
 import '../providers/streaming_haptic_memory.dart';
@@ -31,16 +33,22 @@ import '../providers/chat_providers.dart'
         chatComposerTextInsertionTargetId,
         isChatStreamingProvider,
         sendMessageWithContainer,
-        streamingContentProvider;
+        streamingContentProvider,
+        chatMessagesProvider;
 import '../../../shared/utils/external_link_launcher.dart';
-import '../../../core/utils/debug_logger.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../core/services/haptic_service.dart';
-import '../../../core/services/settings_service.dart';
-import '../../../core/utils/embed_utils.dart';
+
+import 'package:conduit_core/services/settings_service.dart';
+
 import 'sources/openwebui_sources.dart';
 import '../providers/assistant_response_builder_provider.dart';
 import '../views/chat_turn_render_state.dart';
-import '../../../core/services/worker_manager.dart';
+
+import 'package:conduit_core/services/worker_manager.dart';
+
 import 'streaming_status_widget.dart';
 import '../utils/file_utils.dart';
 import 'code_execution_display.dart';
@@ -364,10 +372,23 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
 
   String _resolvedMessageContent([String? overrideContent, int? versionIndex]) {
     final selectedVersionIndex = versionIndex ?? _activeVersionIndex;
+    // The canonical message and the visible-stream provider publish on
+    // different schedules. A row rebuild can otherwise overwrite a newer
+    // tool projection with the older canonical text in the same frame.
+    // Read their shared owner so either publication order uses the current
+    // buffer, including when a virtualized row remounts between flushes.
+    final streamingContent =
+        selectedVersionIndex < 0 &&
+            widget.isStreaming &&
+            ref.exists(chatMessagesProvider)
+        ? ref
+              .read(chatMessagesProvider.notifier)
+              .contentForStreamingMessage(widget.message.id)
+        : null;
     final raw0 = selectedVersionIndex >= 0
         ? (widget.message.versions[selectedVersionIndex].content as String?) ??
               ''
-        : (overrideContent ?? widget.message.content ?? '');
+        : (streamingContent ?? overrideContent ?? widget.message.content ?? '');
 
     // Strip any leftover placeholders from content before parsing
     const ti = '[TYPING_INDICATOR]';
@@ -832,34 +853,28 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     }
     final hasIcon = iconUrl != null && iconUrl.isNotEmpty;
 
+    // A quiet speaker label, like a group-chat sender name: it names a model
+    // change without competing with the answer below it.
     final Widget leading = hasIcon
-        ? ModelAvatar(size: 20, imageUrl: iconUrl, label: modelName)
-        : Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: theme.buttonPrimary,
-              borderRadius: BorderRadius.circular(AppBorderRadius.small),
-            ),
-            child: Icon(
-              Icons.auto_awesome,
-              color: theme.buttonPrimaryText,
-              size: 12,
-            ),
+        ? ModelAvatar(size: 16, imageUrl: iconUrl, label: modelName)
+        : Icon(
+            Icons.auto_awesome,
+            color: theme.textTertiary,
+            size: IconSize.sm - 2,
           );
 
     _cachedAvatar = Padding(
-      padding: const EdgeInsets.only(bottom: Spacing.md),
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
       child: Row(
         children: [
           leading,
-          const SizedBox(width: Spacing.xs),
+          const SizedBox(width: Spacing.xs + Spacing.xxs),
           Flexible(
             child: MiddleEllipsisText(
               modelName,
               style: AppTypography.bodySmallStyle.copyWith(
-                color: theme.textSecondary,
-                fontWeight: FontWeight.w500,
+                color: theme.textTertiary,
+                fontWeight: FontWeight.w400,
                 letterSpacing: AppTypography.letterSpacingNormal,
               ),
             ),
@@ -1855,41 +1870,29 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       return null;
     }
 
-    final leftAlignedWidgets = <Widget>[
+    final overflowButton = overflowActions.isNotEmpty
+        ? _buildOverflowActionButton(overflowActions)
+        : null;
+    // The icon buttons sit edge to edge with the overflow
+    // trailing them inline, and informational chips follow the buttons.
+    final actionButtons = <Widget>[
       for (final action in visibleActions)
         _buildActionButton(
           icon: action.icon,
           label: action.label,
           onTap: action.onTap,
         ),
-      ...infoWidgets,
+      ?overflowButton,
     ];
-    final overflowButton = overflowActions.isNotEmpty
-        ? _buildOverflowActionButton(overflowActions)
-        : null;
 
-    if (overflowButton == null) {
-      return Wrap(
-        spacing: Spacing.sm,
-        runSpacing: Spacing.sm,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: leftAlignedWidgets,
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Wrap(
+      spacing: Spacing.sm,
+      runSpacing: Spacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Expanded(
-          child: Wrap(
-            spacing: Spacing.sm,
-            runSpacing: Spacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: leftAlignedWidgets,
-          ),
-        ),
-        const SizedBox(width: Spacing.sm),
-        overflowButton,
+        if (actionButtons.isNotEmpty)
+          Row(mainAxisSize: MainAxisSize.min, children: actionButtons),
+        ...infoWidgets,
       ],
     );
   }
@@ -1981,7 +1984,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     // Fork: outline speaker so the footer glyphs share one weight.
     final IconData listenIcon = Platform.isIOS
         ? CupertinoIcons.speaker_2
-        : Icons.volume_up;
+        : Icons.volume_up_outlined;
     final IconData stopIcon = Platform.isIOS
         ? CupertinoIcons.stop_fill
         : Icons.stop;
@@ -1990,11 +1993,11 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       _AssistantFooterAction(
         id: 'copy',
         icon: Platform.isIOS
-            ? CupertinoIcons.doc_on_clipboard
-            : Icons.content_copy,
+            ? CupertinoIcons.doc_on_doc
+            : Icons.content_copy_outlined,
         label: l10n.copy,
         onTap: _responseCompleted ? widget.onCopy : null,
-        sfSymbol: 'doc.on.clipboard',
+        sfSymbol: 'doc.on.doc',
       ),
       if (shouldShowTtsButton)
         _AssistantFooterAction(

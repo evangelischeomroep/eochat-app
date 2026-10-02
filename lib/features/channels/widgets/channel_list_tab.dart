@@ -5,17 +5,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
 
-import '../../../core/models/channel.dart';
-import '../../../core/providers/app_providers.dart';
-import '../../../core/utils/debug_logger.dart';
+import 'package:conduit_core/models/channel.dart';
+import 'package:conduit_core/providers/app_providers.dart';
+import 'package:conduit_core/utils/debug_logger.dart';
+
+import '../utils/channel_presentation.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/conversation_context_menu.dart';
 import '../../../shared/utils/locale_display_formatters.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
 import '../../../shared/widgets/conduit_components.dart';
-import '../../../core/services/navigation_service.dart';
-import '../../auth/providers/unified_auth_providers.dart';
+import '../../../shared/services/navigation_service.dart';
+
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+
 import '../../navigation/providers/sidebar_search_providers.dart';
 import '../../navigation/providers/sidebar_tab_scroll_registry.dart';
 import '../../navigation/models/sidebar_navigation_model.dart';
@@ -249,7 +253,13 @@ class _ChannelListTabState extends ConsumerState<ChannelListTab>
             final filtered = queryLower.isEmpty
                 ? channels
                 : channels
-                      .where((c) => c.name.toLowerCase().contains(queryLower))
+                      .where(
+                        (c) => channelMatchesQuery(
+                          c,
+                          queryLower,
+                          fallback: l10n.channelUnknownMember,
+                        ),
+                      )
                       .toList();
 
             if (filtered.isEmpty) {
@@ -344,22 +354,7 @@ class _ChannelTile extends ConsumerWidget {
   final VoidCallback onTap;
   final List<ConduitContextMenuAction> actions;
 
-  IconData _channelIcon() {
-    if (channel.isDm) return Icons.person_outline;
-    if (channel.isGroup) return Icons.group_outlined;
-    return channel.isPrivate ? Icons.lock_outlined : Icons.tag;
-  }
-
-  String _channelDisplayName() {
-    if (channel.isDm && channel.users != null && channel.users!.isNotEmpty) {
-      final names = channel.users!
-          .map((u) => u['name'] as String? ?? '')
-          .where((n) => n.isNotEmpty)
-          .toList();
-      return names.join(', ');
-    }
-    return channel.name;
-  }
+  IconData _channelIcon() => channelIcon(channel);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -367,7 +362,10 @@ class _ChannelTile extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final unread = channel.unreadCount;
 
-    final displayName = _channelDisplayName();
+    final displayName = channelDisplayName(
+      channel,
+      fallback: l10n.channelUnknownMember,
+    );
     final description = channel.description.isEmpty
         ? null
         : channel.description;

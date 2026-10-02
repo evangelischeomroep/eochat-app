@@ -1,5 +1,5 @@
 import 'package:checks/checks.dart';
-import 'package:conduit/core/models/model.dart';
+import 'package:conduit_core/models/model.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/theme/app_theme.dart';
@@ -76,20 +76,10 @@ void main() {
     expect(find.text('reasoning'), findsNothing);
   });
 
-  testWidgets('the selected row highlight paints against the card surface', (
+  testWidgets('selection is a trailing checkmark, not a row fill', (
     tester,
   ) async {
     final theme = await _pumpTile(tester, isSelected: true);
-    final highlighted = Color.alphaBlend(
-      theme.buttonPrimary.withValues(alpha: 0.1),
-      theme.cardBackground,
-    );
-    final surfaceHighlighted = Color.alphaBlend(
-      theme.buttonPrimary.withValues(alpha: 0.1),
-      theme.surfaceBackground,
-    );
-
-    check(highlighted).not((it) => it.equals(surfaceHighlighted));
 
     final tile = find.byType(ModelListTile);
     final containers = tester.widgetList<Container>(
@@ -98,7 +88,19 @@ void main() {
     final rowBackgrounds = containers
         .map((container) => container.decoration)
         .whereType<BoxDecoration>()
-        .map((decoration) => decoration.color);
-    check(rowBackgrounds).contains(highlighted);
+        .map((decoration) => decoration.color)
+        .whereType<Color>();
+    check(rowBackgrounds).not(
+      (it) => it.contains(
+        Color.alphaBlend(
+          theme.buttonPrimary.withValues(alpha: 0.1),
+          theme.cardBackground,
+        ),
+      ),
+    );
+    expect(
+      find.descendant(of: tile, matching: find.byIcon(Icons.check)),
+      findsOneWidget,
+    );
   });
 }

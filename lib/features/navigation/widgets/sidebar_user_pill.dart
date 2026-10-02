@@ -12,26 +12,39 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/models/user.dart';
+import 'package:conduit_core/models/user.dart';
+
 import '../../../core/network/image_header_utils.dart';
-import '../../../core/providers/app_providers.dart';
+
+import 'package:conduit_core/providers/app_providers.dart';
+
+import 'package:conduit_core/providers/backend_mode_providers.dart';
+
+import 'package:conduit_core/services/api_service.dart';
+
 import '../../../core/config/fork_overrides.dart';
-import '../../../core/providers/backend_mode_providers.dart';
-import '../../../core/services/api_service.dart';
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/native_sheet_hydration_service.dart';
-import '../../../core/services/navigation_service.dart';
-import '../../../core/services/settings_service.dart';
-import '../../../core/utils/debug_logger.dart';
+import '../../../shared/services/navigation_service.dart';
+
+import 'package:conduit_core/services/settings_service.dart';
+import 'package:conduit_core/utils/debug_logger.dart';
+
 import '../../../core/utils/native_sheet_utils.dart';
-import '../../../core/utils/user_avatar_utils.dart';
-import '../../../core/utils/user_display_name.dart';
-import '../../hermes/providers/hermes_providers.dart';
+
+import 'package:conduit_core/utils/user_avatar_utils.dart';
+
+import 'package:conduit_core/utils/user_display_name.dart';
+
+import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/adaptive_glass.dart';
 import '../../../shared/widgets/conduit_components.dart';
 import '../../../shared/widgets/user_avatar.dart';
-import '../../auth/providers/unified_auth_providers.dart';
+
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+
 import '../../workspace/providers/workspace_capabilities_provider.dart';
 import '../providers/sidebar_providers.dart';
 import 'sidebar_tab_registry.dart';
@@ -156,7 +169,7 @@ Future<Uint8List?> rasterizeSidebarNativeAvatar(
 @visibleForTesting
 NativeSheetItemConfig buildDirectConnectionsNativeSheetItem({
   required String title,
-  required String subtitle,
+  String? subtitle,
 }) => NativeSheetItemConfig(
   id: NativeSheetRoutes.directConnections,
   title: title,
@@ -271,6 +284,7 @@ Widget buildSidebarProfileButton({
   required VoidCallback onPressed,
   required AdaptiveButtonStyle fallbackStyle,
   Color? fallbackColor,
+  Color? nativeSymbolColor,
   Uint8List? nativeAvatarBytes,
   required Widget child,
 }) {
@@ -286,7 +300,7 @@ Widget buildSidebarProfileButton({
           ? CNSymbol(
               'person.crop.circle.fill',
               size: IconSize.large,
-              color: fallbackColor,
+              color: nativeSymbolColor ?? fallbackColor,
             )
           : null,
       imageAsset: avatarBytes == null
@@ -401,47 +415,54 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
               .asData
               ?.value;
 
+    Future<void> openProfile() async {
+      await Navigator.of(context).maybePop();
+      if (!context.mounted) return;
+
+      if (nativeProfilePresenter != null) {
+        // Pre-load the Hermes avatar bytes (the config builder is sync, and
+        // avatarBytes must be supplied up front).
+        final hermesAvatarBytes = hermesOnly
+            ? await _loadHermesAvatarBytes()
+            : null;
+        if (!context.mounted) return;
+        final config = _buildNativeProfileSheetConfig(
+          context: context,
+          ref: ref,
+          user: user,
+          api: api,
+          displayName: displayName,
+          initials: initial,
+          canManageWorkspace: canManageWorkspace,
+          hermesAvatarBytes: hermesAvatarBytes,
+        );
+        final presented = await nativeProfilePresenter(config);
+        if (presented) return;
+      }
+
+      if (context.mounted) {
+        context.pushNamed(
+          sidebarProfileFallbackRouteName(
+            directPrimary: directPrimary,
+            hasOpenWebUiUser: user != null,
+          ),
+        );
+      }
+    }
+
+    // Exclude the native glass button's own node so VoiceOver announces one
+    // labelled control instead of an unlabelled avatar image.
     return Semantics(
       label: l10n.manage,
       button: true,
+      excludeSemantics: true,
+      onTap: openProfile,
       child: buildSidebarProfileButton(
         supportsNativeGlass: supportsNativeGlass,
-        onPressed: () async {
-          await Navigator.of(context).maybePop();
-          if (!context.mounted) return;
-
-          if (nativeProfilePresenter != null) {
-            // Pre-load the Hermes avatar bytes (the config builder is sync, and
-            // avatarBytes must be supplied up front).
-            final hermesAvatarBytes = hermesOnly
-                ? await _loadHermesAvatarBytes()
-                : null;
-            if (!context.mounted) return;
-            final config = _buildNativeProfileSheetConfig(
-              context: context,
-              ref: ref,
-              user: user,
-              api: api,
-              displayName: displayName,
-              initials: initial,
-              canManageWorkspace: canManageWorkspace,
-              hermesAvatarBytes: hermesAvatarBytes,
-            );
-            final presented = await nativeProfilePresenter(config);
-            if (presented) return;
-          }
-
-          if (context.mounted) {
-            context.pushNamed(
-              sidebarProfileFallbackRouteName(
-                directPrimary: directPrimary,
-                hasOpenWebUiUser: user != null,
-              ),
-            );
-          }
-        },
+        onPressed: openProfile,
         fallbackStyle: style,
         fallbackColor: useOpaqueFallback ? iconColor : null,
+        nativeSymbolColor: iconColor,
         nativeAvatarBytes: nativeAvatarBytes,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(AppBorderRadius.avatar),
@@ -495,38 +516,35 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
             subtitle: email,
             sfSymbol: 'person.crop.circle',
           );
+    // Single-line settings rows, so each title and its
+    // symbol carry the meaning without a descriptive subtitle.
     final appItems = <NativeSheetItemConfig>[
       NativeSheetItemConfig(
         id: NativeSheetRoutes.appearance,
         title: appearanceTitle,
-        subtitle: l10n.settingsAppearanceSubtitle,
         // Fork: lighter glyphs than upstream's palette / double bubble.
         sfSymbol: 'slider.horizontal.3',
       ),
       NativeSheetItemConfig(
         id: NativeSheetRoutes.chats,
         title: chatsTitle,
-        subtitle: l10n.settingsChatSubtitle,
         sfSymbol: 'bubble.left',
       ),
       NativeSheetItemConfig(
         id: NativeSheetRoutes.voice,
         title: l10n.voice,
-        subtitle: l10n.audioSettingsSubtitle,
         sfSymbol: 'waveform',
       ),
       if (user != null)
         NativeSheetItemConfig(
           id: NativeSheetRoutes.notificationSettings,
           title: l10n.notificationsTitle,
-          subtitle: l10n.notificationsSubtitle,
           sfSymbol: 'bell',
         ),
       if (user != null)
         NativeSheetItemConfig(
           id: NativeSheetRoutes.aiMemory,
           title: aiMemoryTitle,
-          subtitle: l10n.personalizationSubtitle,
           sfSymbol: 'wand.and.stars',
         ),
     ];
@@ -534,22 +552,17 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
       NativeSheetItemConfig(
         id: NativeSheetRoutes.hermes,
         title: l10n.hermesAgentSettingsTitle,
-        subtitle: l10n.hermesAgentSettingsSubtitle,
         // Fork: line glyph like every other row instead of the Hermes logo.
         sfSymbol: 'cube',
         dismissOnSelect: true,
         actionId: NativeSheetRoutes.hermes,
         actionValue: true,
       ),
-      buildDirectConnectionsNativeSheetItem(
-        title: l10n.directConnectionsTitle,
-        subtitle: l10n.directConnectionsSubtitle,
-      ),
+      buildDirectConnectionsNativeSheetItem(title: l10n.directConnectionsTitle),
       if (canManageWorkspace)
         NativeSheetItemConfig(
           id: NativeSheetRoutes.workspace,
           title: l10n.workspaceTitle,
-          subtitle: l10n.workspaceSubtitle,
           sfSymbol: 'square.grid.2x2',
           dismissOnSelect: true,
           actionId: NativeSheetRoutes.workspace,
@@ -559,14 +572,12 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
         NativeSheetItemConfig(
           id: NativeSheetRoutes.dataConnection,
           title: dataConnectionTitle,
-          subtitle: l10n.connectionHealth,
           sfSymbol: 'network',
         ),
       if (user == null)
         NativeSheetItemConfig(
           id: 'add-owui-server',
           title: l10n.connectOpenWebUITitle,
-          subtitle: l10n.connectOpenWebUISubtitle,
           sfSymbol: 'plus.circle',
           dismissOnSelect: true,
           actionId: 'add-owui-server',
@@ -576,7 +587,6 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
     final aboutItem = NativeSheetItemConfig(
       id: NativeSheetRoutes.helpAbout,
       title: l10n.aboutApp,
-      subtitle: l10n.aboutAppSubtitle,
       sfSymbol: 'info.circle',
     );
     final signOutItem = user == null

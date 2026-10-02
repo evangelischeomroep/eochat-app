@@ -1,13 +1,17 @@
 import 'package:flutter/widgets.dart';
 
-import '../models/direct_connection_profile.dart';
+import 'package:conduit_core/features/direct_connections/models/direct_connection_profile.dart';
+
 import 'direct_connection_editor_draft.dart';
 import 'direct_custom_headers_controller.dart';
 
 /// Owns editable direct-connection fields, draft validation, and presentation
 /// preferences. Persistence and operation state belong to the workflow.
 final class DirectConnectionEditorForm extends ChangeNotifier {
-  DirectConnectionEditorForm({required this.mode}) {
+  DirectConnectionEditorForm({
+    required this.mode,
+    this.defaultName = 'My provider',
+  }) {
     headers = DirectCustomHeadersController(onChanged: _handleHeaderChanged);
     name.addListener(_generalTextChanged);
     baseUrl.addListener(_baseUrlTextChanged);
@@ -19,6 +23,10 @@ final class DirectConnectionEditorForm extends ChangeNotifier {
   }
 
   final DirectConnectionEditorMode mode;
+
+  /// Localized name prefilled for a new OpenAI-compatible connection.
+  final String defaultName;
+
   int _draftRevision = 0;
 
   late final DirectCustomHeadersController headers;
@@ -102,7 +110,7 @@ final class DirectConnectionEditorForm extends ChangeNotifier {
       _savedProfile = profile;
       _savedAuthentication = authentication;
       if (profile == null) {
-        name.text = 'My provider';
+        name.text = defaultName;
         baseUrl.text = 'https://api.openai.com/v1';
         return;
       }
@@ -163,13 +171,13 @@ final class DirectConnectionEditorForm extends ChangeNotifier {
         _ => 'https://api.openai.com/v1',
       };
       if (mode.isNew &&
-          (name.text == 'My provider' ||
+          (name.text == defaultName ||
               name.text == ollamaDefaultName ||
               name.text == openRouterDefaultName)) {
         name.text = switch (value) {
           kOllamaAdapterKey => ollamaDefaultName,
           kOpenRouterProviderPreset => openRouterDefaultName,
-          _ => 'My provider',
+          _ => defaultName,
         };
       }
     });

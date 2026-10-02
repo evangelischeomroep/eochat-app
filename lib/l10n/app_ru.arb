@@ -844,7 +844,7 @@
   "previous7Days": "Последние 7 дней",
   "previous30Days": "Последние 30 дней",
   "older": "Старше",
-  "wordCount": "{count} слов",
+  "wordCount": "{count, plural, one{{count} слово} few{{count} слова} many{{count} слов} other{{count} слова}}",
   "@wordCount": {
     "placeholders": {
       "count": {
@@ -853,7 +853,7 @@
       }
     }
   },
-  "charCount": "{count} символов",
+  "charCount": "{count, plural, one{{count} символ} few{{count} символа} many{{count} символов} other{{count} символа}}",
   "@charCount": {
     "placeholders": {
       "count": {
@@ -1634,7 +1634,6 @@
       }
     }
   },
-  "notificationSystemSettingsDescription": "Измените параметры разрешений, звука и баннеров для EOchat.",
   "notificationPermissionTitle": "Разрешение на уведомления",
   "@notificationPermissionTitle": {
     "description": "Title for the system notification permission prompt."
@@ -1940,9 +1939,7 @@
   },
   "workspaceModelBaseModelNone": "None (custom)",
   "workspaceModelBaseModelRequired": "Выберите базовую модель.",
-  "@workspaceModelBaseModelRequired": {
-    "description": "Validation shown when a non-admin model create or protected edit has no base model."
-  },
+  "@workspaceModelBaseModelRequired": {"description": "Validation shown when a non-admin model create or protected edit has no base model."},
   "@workspaceModelBaseModelNone": {
     "description": "Base-model option meaning no base model is used."
   },
@@ -2936,17 +2933,11 @@
   "hermesApprovalRequired": "Требуется подтверждение",
   "hermesApprovalFallback": "Агент запрашивает разрешение на продолжение.",
   "openWebUiPromptOther": "Другое",
-  "@openWebUiPromptOther": {
-    "description": "Label for a free-form answer to an Open WebUI ask-user question."
-  },
+  "@openWebUiPromptOther": {"description": "Label for a free-form answer to an Open WebUI ask-user question."},
   "openWebUiPromptAnswerHint": "Введите ответ",
-  "@openWebUiPromptAnswerHint": {
-    "description": "Placeholder for a free-form Open WebUI ask-user answer."
-  },
+  "@openWebUiPromptAnswerHint": {"description": "Placeholder for a free-form Open WebUI ask-user answer."},
   "openWebUiPromptSubmit": "Отправить",
-  "@openWebUiPromptSubmit": {
-    "description": "Action that submits all answers to an Open WebUI ask-user prompt."
-  },
+  "@openWebUiPromptSubmit": {"description": "Action that submits all answers to an Open WebUI ask-user prompt."},
   "hermesApprovalApproved": "Одобрено ✓",
   "hermesApprovalDenied": "Отклонено",
   "hermesApprovalApproveAction": "Одобрить",
@@ -3020,6 +3011,8 @@
   "addDirectConnection": "Добавить подключение",
   "editDirectConnection": "Редактировать подключение",
   "directConnectionName": "Название подключения",
+  "directDefaultConnectionName": "Мой провайдер",
+  "sidebarButtonLabel": "Боковая панель",
   "directConnectionNameRequired": "Введите название подключения.",
   "directConnectionUrlInvalid": "Используйте корректный URL (http:// или https://).",
   "directConnectionCredentialsReentryRequired": "Введите учетные данные заново при смене сервера.",
@@ -3279,112 +3272,31 @@
   "hermesSessionDeleteFailed": "Не удалось удалить разговор.",
   "hermesSessionLoadFailed": "Не удалось загрузить этот разговор. Проверьте подключение и повторите попытку.",
   "hermesMemoryKeyFieldLabel": "Ключ памяти",
-  "directMcpServersTitle": "MCP servers",
-  "directMcpEmptyTitle": "No MCP servers yet",
-  "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.",
-  "directMcpEditorTitle": "Edit MCP server",
-  "directMcpAddTitle": "Add MCP server",
-  "directMcpName": "Server name",
-  "directMcpEndpoint": "Streamable HTTP endpoint",
-  "directMcpBearerToken": "Bearer token (optional)",
-  "directMcpCustomHeaders": "Custom headers (optional)",
-  "directMcpCustomHeadersHint": "One per line: Name: Value",
-  "directMcpTestConnection": "Test connection",
-  "directMcpTesting": "Testing connection…",
-  "directMcpTestSucceeded": "Connected — {count} tools found.",
-  "directMcpTestFailed": "Could not list tools from this MCP server.",
-  "directMcpSaveFailed": "Could not save this MCP server.",
-  "directMcpLoadFailed": "Could not load MCP servers from secure storage.",
-  "directMcpMissing": "This MCP server no longer exists.",
-  "directMcpCredentialTransferTitle": "Use credentials with new server?",
-  "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.",
-  "directMcpCredentialTransferConfirm": "Use credentials",
-  "directMcpDeleteTitle": "Delete MCP server?",
-  "directMcpDeleteMessage": "This removes {name} and its credentials from this device.",
-  "directMcpDeleteFailed": "Could not delete this MCP server.",
-  "directMcpAuthMode": "Authentication",
-  "directMcpAuthNone": "None",
-  "directMcpAuthBearer": "Bearer token",
-  "directMcpAuthOAuth": "OAuth",
-  "directMcpOAuthConnect": "Connect in browser",
-  "directMcpOAuthReconnect": "Reconnect in browser",
-  "directMcpOAuthDisconnect": "Disconnect OAuth",
-  "directMcpOAuthPending": "Waiting for authorization in the browser…",
-  "directMcpOAuthConnected": "OAuth connected.",
-  "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}",
-  "directMcpOAuthNoScopes": "No scopes reported",
-  "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.",
-  "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.",
-  "directMcpApprovalTitle": "Tool approval",
-  "directMcpApprovalAllowOnce": "Allow once",
-  "directMcpApprovalAllowSession": "Allow for session",
-  "directMcpApprovalAllowAlways": "Always allow",
-  "directMcpApprovalAlwaysTitle": "Always allow this tool?",
-  "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.",
-  "@directMcpApprovalAlwaysMessage": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "toolName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.",
-  "directMcpApprovalDeny": "Deny",
-  "directMcpApprovalAllowed": "Allowed once",
-  "directMcpApprovalAllowedSession": "Allowed for session",
-  "directMcpApprovalAllowedAlways": "Always allowed",
-  "directMcpApprovalDenied": "Denied",
-  "directMcpApprovalExpired": "Approval expired",
-  "directMcpRememberedApprovalsTitle": "Always allowed tools",
-  "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.",
-  "directMcpRememberedApprovalRevoke": "Revoke",
-  "directMcpRememberedApprovalsRevokeAll": "Revoke all",
-  "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval.",
-  "directMcpContentAction": "MCP content",
-  "directMcpContentTitle": "MCP content",
-  "directMcpContentServer": "MCP server",
-  "directMcpContentSearch": "Search prompts and resources",
-  "directMcpContentPrompts": "Prompts",
-  "directMcpContentResources": "Resources",
-  "directMcpContentEmpty": "This server has no prompts or resources.",
-  "directMcpContentNoMatches": "No matching prompts or resources.",
-  "directMcpContentLoadFailed": "Could not load content from this MCP server.",
-  "directMcpContentRefresh": "Refresh MCP content",
-  "directMcpContentPreviewTitle": "Preview",
-  "directMcpContentInsert": "Insert",
-  "directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}",
-  "@directMcpContentPromptHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "promptName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}",
-  "@directMcpContentResourceHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "resourceUri": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentRoleUser": "User",
-  "directMcpContentRoleAssistant": "Assistant",
-  "directMcpContentRequestFailed": "Could not load this MCP content. Try again.",
-  "directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource.",
-  "directMcpContentChanged": "This item changed on the server. Refresh and choose it again.",
-  "directMcpContentTooLarge": "This content is too large to insert.",
-  "directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again.",
-  "directMcpContentLoading": "Loading MCP content…",
+  "directMcpServersTitle": "MCP servers", "directMcpEmptyTitle": "No MCP servers yet", "directMcpReachabilityHelp": "Add a Streamable HTTP endpoint that this phone can reach.", "directMcpEditorTitle": "Edit MCP server", "directMcpAddTitle": "Add MCP server", "directMcpName": "Server name", "directMcpEndpoint": "Streamable HTTP endpoint", "directMcpBearerToken": "Bearer token (optional)", "directMcpCustomHeaders": "Custom headers (optional)", "directMcpCustomHeadersHint": "One per line: Name: Value", "directMcpTestConnection": "Test connection", "directMcpTesting": "Testing connection…", "directMcpTestSucceeded": "Connected — {count} tools found.", "directMcpTestFailed": "Could not list tools from this MCP server.", "directMcpSaveFailed": "Could not save this MCP server.", "directMcpLoadFailed": "Could not load MCP servers from secure storage.", "directMcpMissing": "This MCP server no longer exists.", "directMcpCredentialTransferTitle": "Use credentials with new server?", "directMcpCredentialTransferMessage": "This sends the bearer token and custom headers to the new server. Continue only if you trust it. Cancel saves the server without credentials.", "directMcpCredentialTransferConfirm": "Use credentials", "directMcpDeleteTitle": "Delete MCP server?", "directMcpDeleteMessage": "This removes {name} and its credentials from this device.", "directMcpDeleteFailed": "Could not delete this MCP server.", "directMcpAuthMode": "Authentication", "directMcpAuthNone": "None", "directMcpAuthBearer": "Bearer token", "directMcpAuthOAuth": "OAuth", "directMcpOAuthConnect": "Connect in browser", "directMcpOAuthReconnect": "Reconnect in browser", "directMcpOAuthDisconnect": "Disconnect OAuth", "directMcpOAuthPending": "Waiting for authorization in the browser…", "directMcpOAuthConnected": "OAuth connected.", "directMcpOAuthConnectionDetails": "Connected to {issuerHost} · {scopes}", "directMcpOAuthNoScopes": "No scopes reported", "directMcpOAuthConnectFailed": "Could not connect this MCP server with OAuth.", "directMcpOAuthDisconnectFailed": "Could not disconnect OAuth from this MCP server.", "directMcpApprovalTitle": "Tool approval", "directMcpApprovalAllowOnce": "Allow once", "directMcpApprovalAllowSession": "Allow for session", "directMcpApprovalAllowAlways": "Always allow", "directMcpApprovalAlwaysTitle": "Always allow this tool?", "directMcpApprovalAlwaysMessage": "{serverName} will be allowed to run {toolName} without asking again. The approval is revoked automatically if the tool schema changes.", "@directMcpApprovalAlwaysMessage": {"placeholders":{"serverName":{"type":"String"},"toolName":{"type":"String"}}}, "directMcpApprovalSaveFailed": "Could not remember this approval. You can retry or choose another option.", "directMcpApprovalDeny": "Deny", "directMcpApprovalAllowed": "Allowed once", "directMcpApprovalAllowedSession": "Allowed for session", "directMcpApprovalAllowedAlways": "Always allowed", "directMcpApprovalDenied": "Denied", "directMcpApprovalExpired": "Approval expired", "directMcpRememberedApprovalsTitle": "Always allowed tools", "directMcpRememberedApprovalsSubtitle": "These exact tools can run without asking while their server and input schema remain unchanged.", "directMcpRememberedApprovalRevoke": "Revoke", "directMcpRememberedApprovalsRevokeAll": "Revoke all", "directMcpRememberedApprovalRevokeFailed": "Could not revoke the remembered approval."
+  ,"directMcpContentAction": "MCP content"
+  ,"directMcpContentTitle": "MCP content"
+  ,"directMcpContentServer": "MCP server"
+  ,"directMcpContentSearch": "Search prompts and resources"
+  ,"directMcpContentPrompts": "Prompts"
+  ,"directMcpContentResources": "Resources"
+  ,"directMcpContentEmpty": "This server has no prompts or resources."
+  ,"directMcpContentNoMatches": "No matching prompts or resources."
+  ,"directMcpContentLoadFailed": "Could not load content from this MCP server."
+  ,"directMcpContentRefresh": "Refresh MCP content"
+  ,"directMcpContentPreviewTitle": "Preview"
+  ,"directMcpContentInsert": "Insert"
+  ,"directMcpContentPromptHeading": "MCP prompt from {serverName}: {promptName}"
+  ,"@directMcpContentPromptHeading": {"placeholders":{"serverName":{"type":"String"},"promptName":{"type":"String"}}}
+  ,"directMcpContentResourceHeading": "MCP resource from {serverName}: {resourceUri}"
+  ,"@directMcpContentResourceHeading": {"placeholders":{"serverName":{"type":"String"},"resourceUri":{"type":"String"}}}
+  ,"directMcpContentRoleUser": "User"
+  ,"directMcpContentRoleAssistant": "Assistant"
+  ,"directMcpContentRequestFailed": "Could not load this MCP content. Try again."
+  ,"directMcpContentUnsupported": "This item is binary or unsupported. Choose a text prompt or text resource."
+  ,"directMcpContentChanged": "This item changed on the server. Refresh and choose it again."
+  ,"directMcpContentTooLarge": "This content is too large to insert."
+  ,"directMcpContentComposerTooLarge": "The draft and this content exceed the 256 KiB message limit. Shorten the draft or content and try again."
+  ,"directMcpContentLoading": "Loading MCP content…",
   "reasoningEffortLight": "Низкий",
   "reasoningEffortModerate": "Средний",
   "reasoningEffortDeep": "Высокий",
@@ -3410,55 +3322,6 @@
   "directContextCompactionTitle": "Сжатие контекста",
   "directContextCompactionDescription": "Эти модели не сообщают размер контекста. Conduit использует выбранный лимит для сжатия старых сообщений.",
   "directContextCompactionPickerDescription": "Выберите размер контекста, который Conduit должен использовать для автоматического сжатия.",
-  "hermesExecutionTitle": "Выполнение",
-  "hermesExecutionManual": "Ручное одобрение",
-  "hermesExecutionManualSubtitle": "Каждое действие требует подтверждения перед запуском.",
-  "hermesExecutionAuto": "Автоматическое выполнение",
-  "hermesExecutionAutoSubtitle": "Агент может выполнять разрешенные действия без запроса подтверждения.",
-  "hermesExecutionAskPerAction": "Запрашивать для каждого действия",
-  "hermesExecutionAskPerActionSubtitle": "Выбирайте подтверждение индивидуально для каждой категории инструментов.",
-  "hermesCapabilityTerminal": "Терминал",
-  "hermesCapabilityFilesystem": "Файловая система",
-  "hermesCapabilityWebSearch": "Веб-поиск",
-  "hermesCapabilityBrowser": "Браузер",
-  "hermesCapabilityMemory": "Память",
-  "hermesSchedulesTitle": "Расписания",
-  "hermesScheduleEnable": "Включить расписание",
-  "hermesScheduleDisable": "Отключить расписание",
-  "hermesScheduleRunNow": "Запустить сейчас",
-  "hermesScheduleDelete": "Удалить расписание",
-  "hermesJobsTitle": "Фоновые задачи",
-  "hermesJobsEmptyTitle": "Нет запланированных задач",
-  "hermesJobsEmptyDescription": "Здесь будут отображаться задачи и расписания агента Hermes.",
-  "hermesApprovalRequestTitle": "Требуется подтверждение действия",
-  "hermesApprovalAllowAlways": "Разрешать всегда",
-  "hermesApprovalDeny": "Отклонить",
-  "hermesStatusOnline": "В сети",
-  "hermesStatusOffline": "Не в сети",
-  "hermesStatusBusy": "Занят",
-  "hermesStatusConnecting": "Подключение…",
-  "hermesStatusError": "Ошибка",
-  "directConnectionsEmptyTitle": "Нет прямых подключений",
-  "directConnectionsEmptyDescription": "Добавьте подключение к API OpenAI, Anthropic, OpenRouter или Ollama.",
-  "directConnectionAdd": "Добавить подключение",
-  "directConnectionEdit": "Редактировать подключение",
-  "directConnectionDelete": "Удалить подключение",
-  "directConnectionDeleteConfirm": "Удалить это подключение?",
-  "directConnectionProvider": "Провайдер",
-  "directConnectionApiKey": "Ключ API",
-  "directConnectionBaseUrl": "Базовый URL",
-  "directConnectionModels": "Модели",
-  "directConnectionSuccess": "Подключение успешно установлено",
-  "directConnectionFailed": "Ошибка подключения к провайдеру",
-  "workspacePromptsTitle": "Промпты",
-  "workspacePromptsSubtitle": "Шаблоны системных и пользовательских промптов",
-  "workspacePromptTitleField": "Название",
-  "workspacePromptCommandField": "Команда (/название)",
-  "workspacePromptContentField": "Содержимое промпта",
-  "workspaceToolsTitle": "Инструменты",
-  "workspaceToolsSubtitle": "Пользовательские расширения и интеграции инструментов",
-  "workspaceKnowledgeTitle": "База знаний",
-  "workspaceKnowledgeSubtitle": "Коллекции документов для семантического поиска",
   "directMcpInsecureCredentialsTitle": "Send credentials without encryption?",
   "directMcpInsecureCredentialsMessage": "This server uses unencrypted HTTP. Your bearer token, OAuth token, and custom headers could be read or changed on the network.",
   "directMcpInsecureCredentialsConfirm": "Send without encryption",
@@ -3511,14 +3374,32 @@
     }
   },
   "markdownPreviewAfterStreaming": "Предварительный просмотр будет доступен после завершения потоковой передачи.",
-  "notificationSystemSettingsOpenFailed": "Couldn't open system notification settings.",
-  "notificationSystemSettingsTitle": "System notification settings",
-  "readOnly": "Read-only",
-  "readOnlySharedChat": "This chat was shared with you. Only its owner can send messages.",
-  "sharedBadge": "Shared",
-  "sharedFolderOwner": "Shared by {name}",
-  "transcribingAudio": "Transcribing...",
-  "proxyAuthSignInAgain": "Sign in through proxy again",
-  "citationShowTitles": "Show citation page titles",
-  "citationShowTitlesDescription": "Use page titles instead of website domains in citation badges"
+  "citationShowTitles": "Показывать заголовки страниц в источниках",
+  "citationShowTitlesDescription": "Использовать заголовки страниц вместо доменов сайтов в значках источников",
+  "notificationSystemSettingsDescription": "Измените разрешения, звук и параметры баннеров для EOchat.",
+  "notificationSystemSettingsOpenFailed": "Не удалось открыть системные настройки уведомлений.",
+  "notificationSystemSettingsTitle": "Системные настройки уведомлений",
+  "proxyAuthSignInAgain": "Войти через прокси ещё раз",
+  "readOnly": "Только чтение",
+  "readOnlySharedChat": "Этим чатом поделились с вами. Отправлять сообщения может только владелец.",
+  "sharedBadge": "Общий",
+  "sharedFolderOwner": "Поделился {name}",
+  "@sharedFolderOwner": {"description": "Owner label on a folder another user shared with this account.", "placeholders": {"name": {"type": "String", "example": "Alex"}}},
+  "transcribingAudio": "Расшифровка...",
+  "chatTaskProgress": "Задачи: выполнено {completed} из {total}",
+  "@chatTaskProgress": {
+    "description": "Summary of the Open WebUI task checklist above the chat composer.",
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "chatTaskPending": "Ожидает",
+  "chatTaskInProgress": "Выполняется",
+  "chatTaskCompleted": "Выполнено",
+  "chatTaskCancelled": "Отменено"
 }

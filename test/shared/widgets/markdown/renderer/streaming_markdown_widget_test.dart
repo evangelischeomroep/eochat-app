@@ -5,9 +5,9 @@ import 'dart:ui' as ui;
 import 'package:checks/checks.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
-import 'package:conduit/core/services/worker_manager.dart';
-import 'package:conduit/core/models/chat_message.dart';
-import 'package:conduit/core/services/settings_service.dart';
+import 'package:conduit_core/services/worker_manager.dart';
+import 'package:conduit_core/models/chat_message.dart';
+import 'package:conduit_core/services/settings_service.dart';
 import 'package:conduit/features/chat/providers/chat_providers.dart';
 import 'package:conduit/features/chat/providers/text_to_speech_provider.dart';
 import 'package:conduit/features/chat/widgets/assistant_message_widget.dart';
@@ -2167,6 +2167,64 @@ After
     },
   );
 
+  testWidgets('tool headers show protocol preparation and approval status', (
+    tester,
+  ) async {
+    for (final entry in const [
+      ('in_progress', false, 'Preparing search…'),
+      ('completed', false, 'Executing search…'),
+      ('pending', false, 'Tool Approval Needed: search'),
+      ('failed', true, 'View Result from search'),
+      ('rejected', false, 'Denied search'),
+      ('in_progress', null, 'Preparing search…'),
+      ('completed', null, 'Executing search…'),
+      ('pending', null, 'Tool Approval Needed: search'),
+      ('failed', null, 'View Result from search'),
+      ('incomplete', null, 'View Result from search'),
+      ('rejected', null, 'Denied search'),
+      ('', false, 'Executing search…'),
+    ]) {
+      final content =
+          '<details type="tool_calls" '
+          '${entry.$2 == null ? '' : 'done="${entry.$2}" '}'
+          'name="search" ${entry.$1.isEmpty ? '' : 'status="${entry.$1}"'}>'
+          '<summary>Executing...</summary></details>';
+      await tester.pumpWidget(
+        buildHarness(content, isStreaming: entry.$2 != true),
+      );
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(find.text(entry.$3), findsOneWidget);
+    }
+  });
+
+  testWidgets('unsuccessful tool detail sheets do not show a success icon', (
+    tester,
+  ) async {
+    for (final status in ['failed', 'completed', 'incomplete']) {
+      final result = status == 'completed' ? 'Error: offline' : '';
+      await tester.pumpWidget(
+        buildHarness(
+          '<details type="tool_calls" done="true" status="$status" '
+          'name="search" arguments="{}" result="$result">'
+          '<summary>Tool Executed</summary></details>',
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('View Result from search'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          status == 'incomplete' ? 'Incomplete search' : 'Failed search',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.cancel_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.check_circle_outline_rounded), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    }
+  });
+
   testWidgets('renders a tool-call block attached to raw streamed text', (
     tester,
   ) async {
@@ -3930,59 +3988,54 @@ Tail keeps growing
     },
   );
 
-  testWidgets(
-    'over-cap settled mount compiles off-frame behind a skeleton',
-    (tester) async {
-      // A settled body past the synchronous-mount cap must not prepare or
-      // parse on the mount frame (the conversation-open freeze); it shows the
-      // approximate skeleton while the compile runs and fills in after.
-      final longSettled = StringBuffer();
-      var index = 0;
-      while (longSettled.length < 30000) {
-        longSettled.writeln('Deferred giant line $index with padding words.');
-        index += 1;
-      }
-      final content = longSettled.toString();
-      final compiler = _GatedSettledPrepareMarkdownCompileService();
-      addTearDown(() {
-        compiler.releaseFirst();
-        compiler.dispose();
-      });
+  testWidgets('over-cap settled mount compiles off-frame behind a skeleton', (
+    tester,
+  ) async {
+    // A settled body past the synchronous-mount cap must not prepare or
+    // parse on the mount frame (the conversation-open freeze); it shows the
+    // approximate skeleton while the compile runs and fills in after.
+    final longSettled = StringBuffer();
+    var index = 0;
+    while (longSettled.length < 30000) {
+      longSettled.writeln('Deferred giant line $index with padding words.');
+      index += 1;
+    }
+    final content = longSettled.toString();
+    final compiler = _GatedSettledPrepareMarkdownCompileService();
+    addTearDown(() {
+      compiler.releaseFirst();
+      compiler.dispose();
+    });
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            markdownCompileServiceProvider.overrideWithValue(compiler),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.light(TweakcnThemes.t3Chat),
-            home: Scaffold(
-              body: SingleChildScrollView(
-                child: StreamingMarkdownWidget(
-                  content: content,
-                  isStreaming: false,
-                  // Opt into the production mount path; the default
-                  // widget-test detection forces the synchronous path.
-                  debugTreatAsWidgetTest: false,
-                ),
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [markdownCompileServiceProvider.overrideWithValue(compiler)],
+        child: MaterialApp(
+          theme: AppTheme.light(TweakcnThemes.t3Chat),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: StreamingMarkdownWidget(
+                content: content,
+                isStreaming: false,
+                // Opt into the production mount path; the default
+                // widget-test detection forces the synchronous path.
+                debugTreatAsWidgetTest: false,
               ),
             ),
           ),
         ),
-      );
+      ),
+    );
 
-      check(tester.any(find.byType(MarkdownLoadingSkeleton))).isTrue();
-      check(
-        tester.any(find.textContaining('Deferred giant line 0')),
-      ).isFalse();
+    check(tester.any(find.byType(MarkdownLoadingSkeleton))).isTrue();
+    check(tester.any(find.textContaining('Deferred giant line 0'))).isFalse();
 
-      compiler.releaseFirst();
-      await tester.pumpAndSettle();
+    compiler.releaseFirst();
+    await tester.pumpAndSettle();
 
-      check(compiler.preparedInputs).deepEquals([content]);
-      check(tester.any(find.textContaining('Deferred giant line 0'))).isTrue();
-    },
-  );
+    check(compiler.preparedInputs).deepEquals([content]);
+    check(tester.any(find.textContaining('Deferred giant line 0'))).isTrue();
+  });
 
   testWidgets(
     'below-cap settled mount renders synchronously on the first frame',

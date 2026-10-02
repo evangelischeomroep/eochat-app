@@ -40,11 +40,21 @@ Search prefixes that usually locate fork code quickly:
 
 ## 3) Allowed inline edits to upstream files
 
+Since v4.1.8 upstream is a pub workspace: most non-UI code lives in
+`packages/conduit_core` (auth, database, sync, services, providers, Hermes,
+direct connections), `packages/conduit_markdown` and `packages/conduit_theme`.
+Those packages must stay Flutter-free and cannot import app code, so
+`ForkOverrides` hooks belong in `lib/` only; inside the packages the fork
+carries branding strings and nothing else.
+
 Keep this list short — it names files with a structural or behavioral fork hook
 (something a merge needs to specifically watch for), not every file that has ever
 carried a branding-string swap. Current known inline-touch files:
 
-- `lib/core/router/app_router.dart`
+- `lib/core/router/app_router.dart` — fork imports (`fork_overrides`,
+  `fork_startup_watchdog`, `chat_providers`, and `connectivity_service` which
+  now comes from `package:conduit_core/services/`) plus the fork's router
+  refresh subscriptions.
 - `lib/core/providers/app_startup_providers.dart`
 - `lib/features/auth/views/server_connection_page.dart`
 - `lib/features/auth/views/authentication_page.dart`
@@ -52,9 +62,14 @@ carried a branding-string swap. Current known inline-touch files:
 - `lib/features/navigation/widgets/sidebar_user_pill.dart`
 - `lib/shared/services/brand_service.dart`
 - `lib/shared/theme/color_tokens.dart`
-- `lib/shared/theme/tweakcn_themes.dart`
+- `lib/shared/theme/tweakcn_themes.dart` — since v4.1.8 a thin `Color` adapter
+  over `packages/conduit_theme`. Fork hooks: imports `eochat_palette.dart`,
+  registers `eochat` first in `all`, aliases the legacy stored id `conduit` →
+  `eochat` (also the `byId` fallback), and `mix()` really lerps (upstream's is
+  a leftover no-op).
 - `lib/core/auth/native_cookie_manager.dart`
-- `lib/features/hermes/services/hermes_api_service.dart` — EOchat branding threaded
+- `packages/conduit_core/lib/features/hermes/services/hermes_api_service.dart`
+  (was `lib/features/hermes/...` before v4.1.8) — EOchat branding threaded
   through Hermes error/status messages; watch for upstream renaming the exception
   types thrown at those same call sites (happened in the v4.1.5 sync).
 - `lib/features/navigation/views/folder_page.dart` — the temporary-chat icon tint
@@ -166,13 +181,27 @@ carried a branding-string swap. Current known inline-touch files:
   gone; `model_list_tile.dart` dropped its `rowSurface` argument and
   `test/shared/widgets/model_list_tile_test.dart` asserts the mask instead
   of gradient colours.
-- `lib/features/chat/widgets/composer_overflow_menu.dart` — `ToggleTile`
-  trails a check icon instead of an `AdaptiveSwitch`; attachment action
-  buttons are 64x44 filled `surfaceContainerHighest` pills without outline.
+- `lib/features/chat/widgets/composer_overflow_menu.dart` — retired in the
+  v4.1.8 sync: upstream now ships a trailing checkmark instead of a switch
+  and filled attachment tiles, which is what the fork edit did. File is pure
+  upstream again.
 - `lib/features/chat/views/chat_page.dart` — scroll-to-bottom native glass
   button is wrapped in a solid card disc; assistant rows hide the per-message
   model header when the row's model equals the active model
   (`ForkOverrides.hideRedundantModelHeader`).
+- Branding-only string swaps inside the packages, carried by git through the
+  v4.1.8 moves: `packages/conduit_core/lib/providers/app_providers_conversations.dart`
+  (demo-mode conversation), `.../auth/auth_state_manager.dart`,
+  `.../features/direct_connections/services/*`, `.../features/hermes/services/*`,
+  and in the app `lib/features/chat/providers/chat_direct_turns.dart` /
+  `chat_headless_completion.dart` (split out of `chat_providers.dart`).
+- Build glue: `ios/ci_scripts/ci_post_clone.sh`, `.github/workflows/analyze.yml`
+  and `l10n.yml` run `build_runner` in every workspace member that uses it (the
+  root alone no longer generates `conduit_core`'s code). Upstream's
+  `.github/workflows/ci.yml` is deliberately not carried (it ran `flutter test`
+  on every main push, red on the fork's known test baseline), and the old root
+  `build.yaml` was dropped because the drift files it excluded moved into
+  `conduit_core`.
 - `lib/shared/widgets/chrome_gradient_fade.dart` — scrim held stop 0.7 and
   `kConduitChromeFadeHeight` 24 (upstream 0.92 / 30).
 - `lib/features/chat/widgets/enhanced_image_attachment.dart` — the full-screen

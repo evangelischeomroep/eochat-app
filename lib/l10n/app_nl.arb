@@ -31,13 +31,7 @@
   "buyMeACoffeeSubtitle": "Doe een eenmalige donatie om bedankt te zeggen.",
   "releaseNotesTitle": "Nieuw",
   "releaseNotesAnnouncementTitle": "Nieuw in {version}",
-  "@releaseNotesAnnouncementTitle": {
-    "placeholders": {
-      "version": {
-        "type": "String"
-      }
-    }
-  },
+  "@releaseNotesAnnouncementTitle": {"placeholders": {"version": {"type": "String"}}},
   "releaseNotesLearnMore": "Meer informatie",
   "releaseNotesReviewButton": "Beoordeel EOchat",
   "releaseNotesDoneButton": "Gereed",
@@ -844,7 +838,7 @@
   "previous7Days": "Afgelopen 7 dagen",
   "previous30Days": "Afgelopen 30 dagen",
   "older": "Ouder",
-  "wordCount": "{count} woorden",
+  "wordCount": "{count, plural, one{{count} woord} other{{count} woorden}}",
   "@wordCount": {
     "placeholders": {
       "count": {
@@ -853,7 +847,7 @@
       }
     }
   },
-  "charCount": "{count} tekens",
+  "charCount": "{count, plural, one{{count} teken} other{{count} tekens}}",
   "@charCount": {
     "placeholders": {
       "count": {
@@ -984,21 +978,13 @@
   "sidebarNotesTab": "Notities",
   "sidebarChannelsTab": "Kanalen",
   "sidebarResizeHandle": "Breedte van zijbalk wijzigen",
-  "@sidebarResizeHandle": {
-    "description": "Accessibility label for the draggable tablet sidebar divider."
-  },
+  "@sidebarResizeHandle": {"description": "Accessibility label for the draggable tablet sidebar divider."},
   "sidebarResizeResetHint": "Tik dubbel om de breedte van de zijbalk te herstellen",
-  "@sidebarResizeResetHint": {
-    "description": "Accessibility hint for resetting the tablet sidebar width."
-  },
+  "@sidebarResizeResetHint": {"description": "Accessibility hint for resetting the tablet sidebar width."},
   "sidebarWidthValue": "{width} punten",
   "@sidebarWidthValue": {
     "description": "Accessibility value describing the current tablet sidebar width.",
-    "placeholders": {
-      "width": {
-        "type": "int"
-      }
-    }
+    "placeholders": {"width": {"type": "int"}}
   },
   "closeSidebar": "Zijbalk sluiten",
   "terminalSelectServer": "Selecteer een terminalserver",
@@ -1634,7 +1620,6 @@
       }
     }
   },
-  "notificationSystemSettingsDescription": "Wijzig toestemming, geluid en banneropties voor EOchat.",
   "notificationPermissionTitle": "Meldingstoestemming",
   "@notificationPermissionTitle": {
     "description": "Title for the system notification permission prompt."
@@ -1940,9 +1925,7 @@
   },
   "workspaceModelBaseModelNone": "None (custom)",
   "workspaceModelBaseModelRequired": "Kies een basismodel.",
-  "@workspaceModelBaseModelRequired": {
-    "description": "Validation shown when a non-admin model create or protected edit has no base model."
-  },
+  "@workspaceModelBaseModelRequired": {"description": "Validation shown when a non-admin model create or protected edit has no base model."},
   "@workspaceModelBaseModelNone": {
     "description": "Base-model option meaning no base model is used."
   },
@@ -2877,13 +2860,7 @@
   "workspaceToolSpecs": "Generated specifications",
   "workspaceToolDetails": "Tooldetails",
   "workspaceToolFunctionCount": "{count, plural, =1{1 functie} other{{count} functies}}",
-  "@workspaceToolFunctionCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@workspaceToolFunctionCount": {"placeholders":{"count":{"type":"int"}}},
   "workspaceToolSpecsEmpty": "No specifications were generated for this tool.",
   "workspaceToolIncompatible": "This tool requires Open WebUI v{required}, but the server is v{current}. Update the server to save.",
   "workspaceToolValves": "Valves",
@@ -2936,17 +2913,11 @@
   "hermesApprovalRequired": "Goedkeuring vereist",
   "hermesApprovalFallback": "De agent vraagt toestemming om verder te gaan.",
   "openWebUiPromptOther": "Anders",
-  "@openWebUiPromptOther": {
-    "description": "Label for a free-form answer to an Open WebUI ask-user question."
-  },
+  "@openWebUiPromptOther": {"description": "Label for a free-form answer to an Open WebUI ask-user question."},
   "openWebUiPromptAnswerHint": "Typ je antwoord",
-  "@openWebUiPromptAnswerHint": {
-    "description": "Placeholder for a free-form Open WebUI ask-user answer."
-  },
+  "@openWebUiPromptAnswerHint": {"description": "Placeholder for a free-form Open WebUI ask-user answer."},
   "openWebUiPromptSubmit": "Indienen",
-  "@openWebUiPromptSubmit": {
-    "description": "Action that submits all answers to an Open WebUI ask-user prompt."
-  },
+  "@openWebUiPromptSubmit": {"description": "Action that submits all answers to an Open WebUI ask-user prompt."},
   "hermesApprovalApproved": "Goedgekeurd ✓",
   "hermesApprovalDenied": "Geweigerd",
   "hermesApprovalApproveAction": "Goedkeuren",
@@ -3009,17 +2980,12 @@
   "openWebUiDirectConnectionsUnavailable": "Open WebUI-verbindingen zijn niet beschikbaar.",
   "directConnectionNoLongerExists": "Deze verbinding bestaat niet meer.",
   "openWebUiDirectConnectionDeleteMessage": "Hiermee verwijder je {name} uit je Open WebUI-account en uit andere clients waarop je bent aangemeld.",
-  "@openWebUiDirectConnectionDeleteMessage": {
-    "description": "Confirmation message shown before deleting an Open WebUI-synced direct connection.",
-    "placeholders": {
-      "name": {
-        "type": "String"
-      }
-    }
-  },
+  "@openWebUiDirectConnectionDeleteMessage": {"description":"Confirmation message shown before deleting an Open WebUI-synced direct connection.","placeholders":{"name":{"type":"String"}}},
   "addDirectConnection": "Verbinding toevoegen",
   "editDirectConnection": "Verbinding bewerken",
   "directConnectionName": "Naam van verbinding",
+  "directDefaultConnectionName": "Mijn provider",
+  "sidebarButtonLabel": "Zijbalk",
   "directConnectionNameRequired": "Voer een naam voor de verbinding in.",
   "directConnectionUrlInvalid": "Gebruik een geldige http://- of https://-URL.",
   "directConnectionCredentialsReentryRequired": "Voer de inloggegevens opnieuw in wanneer je van server wisselt.",
@@ -3060,9 +3026,7 @@
   "directCustomHeaders": "Aangepaste headers",
   "directManualModelIds": "Handmatige model-ID's",
   "directManualModelIdsDescription": "Optioneel. Voer één ID per regel in als de server de modellen niet kan weergeven.",
-  "@directManualModelIdsDescription": {
-    "placeholders": {}
-  },
+  "@directManualModelIdsDescription": {"placeholders":{}},
   "directModelIdPrefix": "Voorvoegsel model-ID",
   "directModelIdPrefixDescription": "Optioneel. Voegt een zichtbare naamruimte toe, zoals studio.modelnaam, zonder de model-ID te wijzigen die naar de aanbieder gaat.",
   "directModelTags": "Modeltags",
@@ -3153,13 +3117,7 @@
   "hermesMemoryKeyShortDescription": "Houdt het langetermijngeheugen van de agent aan jou gekoppeld. Laat leeg zodat EOchat een sleutel maakt.",
   "hermesConnectAction": "Hermes verbinden",
   "hermesToolCount": "{count, plural, =1{1 hulpmiddel} other{{count} hulpmiddelen}}",
-  "@hermesToolCount": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@hermesToolCount": {"placeholders":{"count":{"type":"int"}}},
   "hermesNoToolsets": "De server heeft geen toolsets gemeld.",
   "hermesToolsetsNewSessions": "Wijzigingen gelden voor nieuwe Hermes-sessies. Bestaande chats behouden hun huidige tools.",
   "hermesServerStatusTitle": "Serverstatus",
@@ -3212,13 +3170,7 @@
   "hermesTurnControlsUnsupported": "Werk Hermes bij om veilige beurtbediening in te schakelen.",
   "sidebarHermesTab": "Hermes",
   "markdownShowMoreLines": "{count, plural, =1{Toon nog 1 regel} other{Toon nog {count} regels}}",
-  "@markdownShowMoreLines": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
+  "@markdownShowMoreLines": {"placeholders":{"count":{"type":"int"}}},
   "markdownShowLess": "Toon minder",
   "voiceBargeIn": "Onderbreken",
   "voiceBargeInDescription": "Blijft luisteren terwijl de assistent praat, zodat je hem kunt onderbreken.",
@@ -3279,127 +3231,46 @@
   "hermesSessionDeleteFailed": "Het gesprek kon niet worden verwijderd.",
   "hermesSessionLoadFailed": "Dit gesprek kon niet worden geladen. Controleer de verbinding en probeer het opnieuw.",
   "hermesMemoryKeyFieldLabel": "Geheugensleutel",
-  "directMcpServersTitle": "MCP-servers",
-  "directMcpEmptyTitle": "Nog geen MCP-servers",
-  "directMcpReachabilityHelp": "Voeg een Streamable HTTP-endpoint toe dat deze telefoon kan bereiken.",
-  "directMcpEditorTitle": "MCP-server bewerken",
-  "directMcpAddTitle": "MCP-server toevoegen",
-  "directMcpName": "Servernaam",
-  "directMcpEndpoint": "Streamable HTTP-endpoint",
-  "directMcpBearerToken": "Bearer-token (optioneel)",
-  "directMcpCustomHeaders": "Aangepaste headers (optioneel)",
-  "directMcpCustomHeadersHint": "Eén per regel: Naam: Waarde",
-  "directMcpTestConnection": "Verbinding testen",
-  "directMcpTesting": "Verbinding testen…",
-  "directMcpTestSucceeded": "Verbonden — {count} tools gevonden.",
-  "directMcpTestFailed": "Kan geen tools ophalen van deze MCP-server.",
-  "directMcpSaveFailed": "Kan deze MCP-server niet opslaan.",
-  "directMcpLoadFailed": "Kan MCP-servers niet laden uit de beveiligde opslag.",
-  "directMcpMissing": "Deze MCP-server bestaat niet meer.",
-  "directMcpCredentialTransferTitle": "Inloggegevens gebruiken voor nieuwe server?",
-  "directMcpCredentialTransferMessage": "Hiermee worden het bearer-token en de aangepaste headers naar de nieuwe server gestuurd. Ga alleen verder als je die vertrouwt. Annuleren slaat de server op zonder inloggegevens.",
-  "directMcpCredentialTransferConfirm": "Inloggegevens gebruiken",
-  "directMcpDeleteTitle": "MCP-server verwijderen?",
-  "directMcpDeleteMessage": "Hiermee worden {name} en de bijbehorende inloggegevens van dit apparaat verwijderd.",
-  "directMcpDeleteFailed": "Kan deze MCP-server niet verwijderen.",
-  "directMcpAuthMode": "Authenticatie",
-  "directMcpAuthNone": "Geen",
-  "directMcpAuthBearer": "Bearer-token",
-  "directMcpAuthOAuth": "OAuth",
-  "directMcpOAuthConnect": "Verbinden in browser",
-  "directMcpOAuthReconnect": "Opnieuw verbinden in browser",
-  "directMcpOAuthDisconnect": "OAuth-verbinding verbreken",
-  "directMcpOAuthPending": "Wachten op autorisatie in de browser…",
-  "directMcpOAuthConnected": "OAuth verbonden.",
-  "directMcpOAuthConnectionDetails": "Verbonden met {issuerHost} · {scopes}",
-  "directMcpOAuthNoScopes": "Geen scopes gemeld",
-  "directMcpOAuthConnectFailed": "Kan deze MCP-server niet verbinden via OAuth.",
-  "directMcpOAuthDisconnectFailed": "Kan de OAuth-verbinding met deze MCP-server niet verbreken.",
-  "directMcpApprovalTitle": "Toolgoedkeuring",
-  "directMcpApprovalAllowOnce": "Eén keer toestaan",
-  "directMcpApprovalAllowSession": "Toestaan voor deze sessie",
-  "directMcpApprovalAllowAlways": "Altijd toestaan",
-  "directMcpApprovalAlwaysTitle": "Deze tool altijd toestaan?",
-  "directMcpApprovalAlwaysMessage": "{serverName} mag {toolName} uitvoeren zonder opnieuw te vragen. De goedkeuring wordt automatisch ingetrokken als het toolschema verandert.",
-  "@directMcpApprovalAlwaysMessage": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "toolName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpApprovalSaveFailed": "Kan deze goedkeuring niet onthouden. Probeer opnieuw of kies een andere optie.",
-  "directMcpApprovalDeny": "Weigeren",
-  "directMcpApprovalAllowed": "Eén keer toegestaan",
-  "directMcpApprovalAllowedSession": "Toegestaan voor deze sessie",
-  "directMcpApprovalAllowedAlways": "Altijd toegestaan",
-  "directMcpApprovalDenied": "Geweigerd",
-  "directMcpApprovalExpired": "Goedkeuring verlopen",
-  "directMcpRememberedApprovalsTitle": "Altijd toegestane tools",
-  "directMcpRememberedApprovalsSubtitle": "Deze tools mogen zonder vragen draaien zolang hun server en invoerschema ongewijzigd blijven.",
-  "directMcpRememberedApprovalRevoke": "Intrekken",
-  "directMcpRememberedApprovalsRevokeAll": "Alles intrekken",
-  "directMcpRememberedApprovalRevokeFailed": "Kan de onthouden goedkeuring niet intrekken.",
-  "directMcpContentAction": "MCP-inhoud",
-  "directMcpContentTitle": "MCP-inhoud",
-  "directMcpContentServer": "MCP-server",
-  "directMcpContentSearch": "Zoek prompts en bronnen",
-  "directMcpContentPrompts": "Prompts",
-  "directMcpContentResources": "Bronnen",
-  "directMcpContentEmpty": "Deze server heeft geen prompts of bronnen.",
-  "directMcpContentNoMatches": "Geen overeenkomende prompts of bronnen.",
-  "directMcpContentLoadFailed": "Kan geen inhoud laden van deze MCP-server.",
-  "directMcpContentRefresh": "MCP-inhoud vernieuwen",
-  "directMcpContentPreviewTitle": "Voorbeeld",
-  "directMcpContentInsert": "Invoegen",
-  "directMcpContentPromptHeading": "MCP-prompt van {serverName}: {promptName}",
-  "@directMcpContentPromptHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "promptName": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentResourceHeading": "MCP-bron van {serverName}: {resourceUri}",
-  "@directMcpContentResourceHeading": {
-    "placeholders": {
-      "serverName": {
-        "type": "String"
-      },
-      "resourceUri": {
-        "type": "String"
-      }
-    }
-  },
-  "directMcpContentRoleUser": "Gebruiker",
-  "directMcpContentRoleAssistant": "Assistent",
-  "directMcpContentRequestFailed": "Kan deze MCP-inhoud niet laden. Probeer opnieuw.",
-  "directMcpContentUnsupported": "Dit item is binair of wordt niet ondersteund. Kies een tekstprompt of tekstbron.",
-  "directMcpContentChanged": "Dit item is gewijzigd op de server. Vernieuw en kies het opnieuw.",
-  "directMcpContentTooLarge": "Deze inhoud is te groot om in te voegen.",
-  "directMcpContentComposerTooLarge": "Het concept en deze inhoud overschrijden samen de berichtlimiet van 256 KiB. Maak het concept of de inhoud korter en probeer opnieuw.",
-  "directMcpContentLoading": "MCP-inhoud laden…",
-  "directMcpInsecureCredentialsTitle": "Inloggegevens onversleuteld versturen?",
-  "directMcpInsecureCredentialsMessage": "Deze server gebruikt onversleuteld HTTP. Je bearer-token, OAuth-token en aangepaste headers kunnen op het netwerk worden gelezen of gewijzigd.",
-  "directMcpInsecureCredentialsConfirm": "Onversleuteld versturen",
-  "hermesSessionTooLarge": "Dit gesprek is te groot om op dit apparaat te laden.",
-  "hermesSessionNotFound": "Dit gesprek is niet meer beschikbaar op de Hermes-server.",
-  "hermesSessionLoadFailedDetail": "Kan dit gesprek niet laden: {detail}",
-  "@hermesSessionLoadFailedDetail": {
+  "directMcpServersTitle": "MCP-servers", "directMcpEmptyTitle": "Nog geen MCP-servers", "directMcpReachabilityHelp": "Voeg een Streamable HTTP-endpoint toe dat deze telefoon kan bereiken.", "directMcpEditorTitle": "MCP-server bewerken", "directMcpAddTitle": "MCP-server toevoegen", "directMcpName": "Servernaam", "directMcpEndpoint": "Streamable HTTP-endpoint", "directMcpBearerToken": "Bearer-token (optioneel)", "directMcpCustomHeaders": "Aangepaste headers (optioneel)", "directMcpCustomHeadersHint": "Eén per regel: Naam: Waarde", "directMcpTestConnection": "Verbinding testen", "directMcpTesting": "Verbinding testen…", "directMcpTestSucceeded": "Verbonden — {count} tools gevonden.", "directMcpTestFailed": "Kan geen tools ophalen van deze MCP-server.", "directMcpSaveFailed": "Kan deze MCP-server niet opslaan.", "directMcpLoadFailed": "Kan MCP-servers niet laden uit de beveiligde opslag.", "directMcpMissing": "Deze MCP-server bestaat niet meer.", "directMcpCredentialTransferTitle": "Inloggegevens gebruiken voor nieuwe server?", "directMcpCredentialTransferMessage": "Hiermee worden het bearer-token en de aangepaste headers naar de nieuwe server gestuurd. Ga alleen verder als je die vertrouwt. Annuleren slaat de server op zonder inloggegevens.", "directMcpCredentialTransferConfirm": "Inloggegevens gebruiken", "directMcpDeleteTitle": "MCP-server verwijderen?", "directMcpDeleteMessage": "Hiermee worden {name} en de bijbehorende inloggegevens van dit apparaat verwijderd.", "directMcpDeleteFailed": "Kan deze MCP-server niet verwijderen.", "directMcpAuthMode": "Authenticatie", "directMcpAuthNone": "Geen", "directMcpAuthBearer": "Bearer-token", "directMcpAuthOAuth": "OAuth", "directMcpOAuthConnect": "Verbinden in browser", "directMcpOAuthReconnect": "Opnieuw verbinden in browser", "directMcpOAuthDisconnect": "OAuth-verbinding verbreken", "directMcpOAuthPending": "Wachten op autorisatie in de browser…", "directMcpOAuthConnected": "OAuth verbonden.", "directMcpOAuthConnectionDetails": "Verbonden met {issuerHost} · {scopes}", "directMcpOAuthNoScopes": "Geen scopes gemeld", "directMcpOAuthConnectFailed": "Kan deze MCP-server niet verbinden via OAuth.", "directMcpOAuthDisconnectFailed": "Kan de OAuth-verbinding met deze MCP-server niet verbreken.", "directMcpApprovalTitle": "Toolgoedkeuring", "directMcpApprovalAllowOnce": "Eén keer toestaan", "directMcpApprovalAllowSession": "Toestaan voor deze sessie", "directMcpApprovalAllowAlways": "Altijd toestaan", "directMcpApprovalAlwaysTitle": "Deze tool altijd toestaan?", "directMcpApprovalAlwaysMessage": "{serverName} mag {toolName} uitvoeren zonder opnieuw te vragen. De goedkeuring wordt automatisch ingetrokken als het toolschema verandert.", "@directMcpApprovalAlwaysMessage": {"placeholders":{"serverName":{"type":"String"},"toolName":{"type":"String"}}}, "directMcpApprovalSaveFailed": "Kan deze goedkeuring niet onthouden. Probeer opnieuw of kies een andere optie.", "directMcpApprovalDeny": "Weigeren", "directMcpApprovalAllowed": "Eén keer toegestaan", "directMcpApprovalAllowedSession": "Toegestaan voor deze sessie", "directMcpApprovalAllowedAlways": "Altijd toegestaan", "directMcpApprovalDenied": "Geweigerd", "directMcpApprovalExpired": "Goedkeuring verlopen", "directMcpRememberedApprovalsTitle": "Altijd toegestane tools", "directMcpRememberedApprovalsSubtitle": "Deze tools mogen zonder vragen draaien zolang hun server en invoerschema ongewijzigd blijven.", "directMcpRememberedApprovalRevoke": "Intrekken", "directMcpRememberedApprovalsRevokeAll": "Alles intrekken", "directMcpRememberedApprovalRevokeFailed": "Kan de onthouden goedkeuring niet intrekken."
+  ,"directMcpContentAction": "MCP-inhoud"
+  ,"directMcpContentTitle": "MCP-inhoud"
+  ,"directMcpContentServer": "MCP-server"
+  ,"directMcpContentSearch": "Zoek prompts en bronnen"
+  ,"directMcpContentPrompts": "Prompts"
+  ,"directMcpContentResources": "Bronnen"
+  ,"directMcpContentEmpty": "Deze server heeft geen prompts of bronnen."
+  ,"directMcpContentNoMatches": "Geen overeenkomende prompts of bronnen."
+  ,"directMcpContentLoadFailed": "Kan geen inhoud laden van deze MCP-server."
+  ,"directMcpContentRefresh": "MCP-inhoud vernieuwen"
+  ,"directMcpContentPreviewTitle": "Voorbeeld"
+  ,"directMcpContentInsert": "Invoegen"
+  ,"directMcpContentPromptHeading": "MCP-prompt van {serverName}: {promptName}"
+  ,"@directMcpContentPromptHeading": {"placeholders":{"serverName":{"type":"String"},"promptName":{"type":"String"}}}
+  ,"directMcpContentResourceHeading": "MCP-bron van {serverName}: {resourceUri}"
+  ,"@directMcpContentResourceHeading": {"placeholders":{"serverName":{"type":"String"},"resourceUri":{"type":"String"}}}
+  ,"directMcpContentRoleUser": "Gebruiker"
+  ,"directMcpContentRoleAssistant": "Assistent"
+  ,"directMcpContentRequestFailed": "Kan deze MCP-inhoud niet laden. Probeer opnieuw."
+  ,"directMcpContentUnsupported": "Dit item is binair of wordt niet ondersteund. Kies een tekstprompt of tekstbron."
+  ,"directMcpContentChanged": "Dit item is gewijzigd op de server. Vernieuw en kies het opnieuw."
+  ,"directMcpContentTooLarge": "Deze inhoud is te groot om in te voegen."
+  ,"directMcpContentComposerTooLarge": "Het concept en deze inhoud overschrijden samen de berichtlimiet van 256 KiB. Maak het concept of de inhoud korter en probeer opnieuw."
+  ,"directMcpContentLoading": "MCP-inhoud laden…"
+  ,"directMcpInsecureCredentialsTitle": "Inloggegevens onversleuteld versturen?"
+  ,"directMcpInsecureCredentialsMessage": "Deze server gebruikt onversleuteld HTTP. Je bearer-token, OAuth-token en aangepaste headers kunnen op het netwerk worden gelezen of gewijzigd."
+  ,"directMcpInsecureCredentialsConfirm": "Onversleuteld versturen"
+  ,"hermesSessionTooLarge": "Dit gesprek is te groot om op dit apparaat te laden."
+  ,"hermesSessionNotFound": "Dit gesprek is niet meer beschikbaar op de Hermes-server."
+  ,"hermesSessionLoadFailedDetail": "Kan dit gesprek niet laden: {detail}"
+  ,"@hermesSessionLoadFailedDetail": {
     "placeholders": {
       "detail": {
         "type": "String"
       }
     }
-  },
-  "directBearerDescription": "Verstuurt de inloggegevens in de header Authorization: Bearer. De meeste OpenAI-compatibele servers (llama.cpp, vLLM, LM Studio, Ollama) verwachten dit.",
-  "directApiKeyHeaderAzureOnlyDescription": "Verstuurt de inloggegevens in de header api-key. Gebruik dit alleen voor Azure OpenAI; andere OpenAI-compatibele servers verwachten een Bearer-token.",
+  }
+  ,"directBearerDescription": "Verstuurt de inloggegevens in de header Authorization: Bearer. De meeste OpenAI-compatibele servers (llama.cpp, vLLM, LM Studio, Ollama) verwachten dit."
+  ,"directApiKeyHeaderAzureOnlyDescription": "Verstuurt de inloggegevens in de header api-key. Gebruik dit alleen voor Azure OpenAI; andere OpenAI-compatibele servers verwachten een Bearer-token.",
   "themePaletteEochatLabel": "EOchat",
   "@themePaletteEochatLabel": {
     "description": "Palette name for the default EOchat theme."
@@ -3437,30 +3308,37 @@
       }
     }
   },
-  "appleOnDeviceUnavailable": "Apple op het apparaat is niet beschikbaar op dit apparaat.",
-  "applePccContextSize": "{tokens} tokens context",
+  "appleOnDeviceUnavailable": "Apple On-Device is niet beschikbaar op dit apparaat.",
+  "applePccContextSize": "Context van {tokens} tokens",
+  "@applePccContextSize": {"description": "Apple PCC context size label.", "placeholders": {"tokens": {"type": "String"}}},
   "applePccCurrentLanguageUnsupported": "De huidige apparaattaal wordt mogelijk niet ondersteund.",
-  "applePccOnDeviceFallback": "Terugvallen op het apparaat",
-  "applePccOnDeviceFallbackSubtitle": "Gebruik het kleinere model van Apple op het apparaat als PCC niet bereikbaar is. Redeneerverzoeken vallen nooit terug.",
-  "applePccQuotaApproaching": "Dagelijkse gebruikslimiet bijna bereikt",
-  "applePccQuotaReached": "Dagelijkse gebruikslimiet bereikt",
-  "applePccQuotaResetsAt": "Wordt gereset {time}",
+  "applePccOnDeviceFallback": "Terugval op apparaat",
+  "applePccOnDeviceFallbackSubtitle": "Gebruik het kleinere Apple-model op het apparaat wanneer PCC niet bereikbaar is. Verzoeken met redeneren vallen nooit terug.",
+  "applePccQuotaApproaching": "Bijna aan de daglimiet",
+  "applePccQuotaReached": "Daglimiet bereikt",
+  "applePccQuotaResetsAt": "Reset {time}",
+  "@applePccQuotaResetsAt": {"description": "Apple PCC quota reset time.", "placeholders": {"time": {"type": "String"}}},
   "applePccShowQuotaOptions": "Gebruiksopties tonen",
   "applePccStatusAvailable": "Beschikbaar",
   "applePccUnavailable": "Apple Private Cloud Compute is niet beschikbaar op dit apparaat.",
-  "backendChooserAppleOnDeviceSubtitle": "Gebruik het privémodel van Apple op dit apparaat, ook offline.",
-  "backendChooserAppleOnDeviceTitle": "Apple op het apparaat",
-  "backendChooserApplePccSubtitle": "Gebruik het privécloudmodel van Apple zonder API-sleutel.",
+  "backendChooserAppleOnDeviceSubtitle": "Voer het privémodel van Apple uit op dit apparaat, ook offline.",
+  "backendChooserAppleOnDeviceTitle": "Apple On-Device",
+  "backendChooserApplePccSubtitle": "Gebruik het private cloudmodel van Apple zonder API-sleutel.",
   "backendChooserApplePccTitle": "Apple Private Cloud Compute",
   "backendChooserAppleSectionTitle": "Apple Intelligence",
   "backendChooserModelApisSectionTitle": "Model-API's",
   "backendChooserSelfHostedSectionTitle": "Zelfgehoste diensten",
-  "directContextCompactionDescription": "Deze modellen geven geen contextvenster door. EOchat gebruikt de gekozen limiet om oudere berichten te comprimeren voordat verzoeken te groot worden.",
-  "directContextCompactionPickerDescription": "Kies het contextvenster dat EOchat moet gebruiken voor automatische compactie.",
-  "directContextCompactionTitle": "Contextcompactie",
+  "citationShowTitles": "Paginatitels in bronvermeldingen tonen",
+  "citationShowTitlesDescription": "Paginatitels gebruiken in plaats van websitedomeinen in bronlabels",
+  "directContextCompactionDescription": "Deze modellen geven geen contextvenster op. EOchat gebruikt de gekozen limiet om oudere berichten te comprimeren voordat verzoeken te groot worden.",
+  "directContextCompactionPickerDescription": "Kies het contextvenster dat EOchat moet gebruiken voor automatisch comprimeren.",
+  "directContextCompactionTitle": "Context comprimeren",
   "directContextLimit": "Contextlimiet: {tokens}",
-  "notificationSystemSettingsOpenFailed": "Kan de systeeminstellingen voor meldingen niet openen.",
+  "@directContextLimit": {"description": "Provider-neutral model context limit label.", "placeholders": {"tokens": {"type": "String"}}},
+  "notificationSystemSettingsDescription": "Wijzig toestemming, geluid en bannerinstellingen voor EOchat.",
+  "notificationSystemSettingsOpenFailed": "Kan systeeminstellingen voor meldingen niet openen.",
   "notificationSystemSettingsTitle": "Systeeminstellingen voor meldingen",
+  "proxyAuthSignInAgain": "Opnieuw aanmelden via proxy",
   "readOnly": "Alleen-lezen",
   "readOnlySharedChat": "Deze chat is met je gedeeld. Alleen de eigenaar kan berichten sturen.",
   "reasoningEffortDeep": "Diep",
@@ -3468,8 +3346,22 @@
   "reasoningEffortModerate": "Gemiddeld",
   "sharedBadge": "Gedeeld",
   "sharedFolderOwner": "Gedeeld door {name}",
+  "@sharedFolderOwner": {"description": "Owner label on a folder another user shared with this account.", "placeholders": {"name": {"type": "String", "example": "Alex"}}},
   "transcribingAudio": "Transcriberen...",
-  "proxyAuthSignInAgain": "Opnieuw aanmelden via proxy",
-  "citationShowTitles": "Paginatitels in bronvermeldingen",
-  "citationShowTitlesDescription": "Gebruik paginatitels in plaats van websitedomeinen in bronvermeldingen"
+  "chatTaskProgress": "Taken: {completed} van {total} voltooid",
+  "@chatTaskProgress": {
+    "description": "Summary of the Open WebUI task checklist above the chat composer.",
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "chatTaskPending": "In afwachting",
+  "chatTaskInProgress": "Bezig",
+  "chatTaskCompleted": "Voltooid",
+  "chatTaskCancelled": "Geannuleerd"
 }

@@ -22,44 +22,61 @@ import '../../../shared/widgets/sidebar_layout_contract.dart';
 
 import 'dart:async';
 
-import '../../../core/providers/app_providers.dart';
-import '../../../core/services/interaction_activity.dart';
+import 'package:conduit_core/providers/app_providers.dart';
+
+import 'package:conduit_core/services/interaction_activity.dart';
+
 import '../../../core/services/native_sheet_bridge.dart';
 import '../../../core/services/native_sheet_hydration_service.dart';
-import '../../../core/services/performance_profiler.dart';
-import '../../../core/services/api_service.dart';
-import '../../../core/services/connectivity_service.dart';
-import '../../../core/services/settings_service.dart';
-import '../../../core/database/database_provider.dart';
-import '../../../core/database/app_database.dart';
-import '../../../core/database/chat_database_repository.dart';
-import '../../../core/database/models/chat_transcript_window.dart';
-import '../../auth/providers/unified_auth_providers.dart';
-import '../../direct_connections/providers/direct_connection_providers.dart';
-import '../../direct_connections/services/direct_chat_bridge.dart';
-import '../../direct_connections/services/direct_model_registry.dart';
+
+import 'package:conduit_core/services/performance_profiler.dart';
+
+import 'package:conduit_core/services/api_service.dart';
+import 'package:conduit_core/services/connectivity_service.dart';
+
+import 'package:conduit_core/services/settings_service.dart';
+
+import 'package:conduit_core/database/database_provider.dart';
+
+import 'package:conduit_core/database/app_database.dart';
+import 'package:conduit_core/database/chat_database_repository.dart';
+import 'package:conduit_core/database/models/chat_transcript_window.dart';
+
+import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+import 'package:conduit_core/features/direct_connections/providers/direct_connection_providers.dart';
+import 'package:conduit_core/features/direct_connections/services/direct_chat_bridge.dart';
+import 'package:conduit_core/features/direct_connections/services/direct_model_registry.dart';
+
 import '../../direct_connections/widgets/direct_mcp_message_interactions.dart';
 import '../providers/chat_providers.dart';
 import '../providers/openwebui_chat_prompt_provider.dart';
-import '../../hermes/models/hermes_model.dart';
-import '../../hermes/models/hermes_bot.dart';
-import '../../hermes/models/hermes_config.dart';
-import '../../hermes/providers/hermes_providers.dart';
-import '../../hermes/services/hermes_decision_projection.dart';
-import '../../hermes/services/hermes_desktop_api_service.dart';
-import '../../hermes/services/hermes_local_document_trust_store.dart';
-import '../../hermes/services/hermes_message_mapper.dart';
-import '../../hermes/services/hermes_pending_decision_store.dart';
-import '../../hermes/services/hermes_session_provenance.dart';
+
+import 'package:conduit_core/features/hermes/models/hermes_model.dart';
+import 'package:conduit_core/features/hermes/models/hermes_bot.dart';
+import 'package:conduit_core/features/hermes/models/hermes_config.dart';
+import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit_core/features/hermes/services/hermes_decision_projection.dart';
+import 'package:conduit_core/features/hermes/services/hermes_desktop_api_service.dart';
+import 'package:conduit_core/features/hermes/services/hermes_local_document_trust_store.dart';
+import 'package:conduit_core/features/hermes/services/hermes_message_mapper.dart';
+import 'package:conduit_core/features/hermes/services/hermes_pending_decision_store.dart';
+import 'package:conduit_core/features/hermes/services/hermes_session_provenance.dart';
+
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
-import '../../../core/utils/debug_logger.dart';
-import '../../../core/utils/message_tree_utils.dart' as message_tree;
-import '../../../core/utils/user_display_name.dart';
+
+import 'package:conduit_core/utils/debug_logger.dart';
+
+import 'package:conduit_core/utils/message_tree_utils.dart' as message_tree;
+
+import 'package:conduit_core/utils/user_display_name.dart';
+
 import '../../../core/utils/model_icon_utils.dart';
 import '../../../shared/widgets/markdown/markdown_compile_service.dart';
-import '../../../shared/widgets/markdown/markdown_preprocessor.dart';
-import '../../../core/utils/android_assistant_handler.dart';
+
+import 'package:conduit_markdown/conduit_markdown.dart';
+
+import '../../../platform/android_assistant_handler.dart';
 import '../widgets/model_selector_sheet.dart';
 import '../widgets/modern_chat_input.dart';
 import '../widgets/user_message_bubble.dart';
@@ -75,13 +92,17 @@ import '../voice_mode/chat_voice_mode_controller.dart';
 import '../voice_mode/chat_voice_mode_overlay.dart';
 import '../voice_call/presentation/voice_call_launcher.dart';
 import '../../../core/services/media_upload_controller.dart';
-import '../../tools/providers/tools_providers.dart';
+
+import 'package:conduit_core/features/tools/providers/tools_providers.dart';
+
 import '../../release_notes/widgets/release_notes_banner.dart';
-import '../../../core/models/chat_message.dart';
-import '../../../core/models/conversation.dart';
-import '../../../core/models/folder.dart';
-import '../../../core/models/model.dart';
-import '../../../core/models/openwebui_chat_prompt.dart';
+
+import 'package:conduit_core/models/chat_message.dart';
+import 'package:conduit_core/models/conversation.dart';
+import 'package:conduit_core/models/folder.dart';
+import 'package:conduit_core/models/model.dart';
+import 'package:conduit_core/models/openwebui_chat_prompt.dart';
+
 import '../providers/context_attachments_provider.dart';
 import '../../../shared/utils/adaptive_glass.dart';
 import '../../../shared/widgets/themed_dialogs.dart';
@@ -97,7 +118,9 @@ import 'chat_timeline_render_model.dart';
 import 'chat_turn_render_state.dart';
 import '../widgets/streaming_turn_footer.dart';
 import '../widgets/openwebui_prompt_overlay.dart';
+import '../widgets/openwebui_task_list.dart';
 import '../widgets/chat_timeline_viewport.dart';
+import '../../../platform/frame_profiler.dart';
 
 @visibleForTesting
 bool? chatResizeToAvoidBottomInset({
@@ -2311,7 +2334,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (_activeScrollProfileTaskKey != null) {
       return;
     }
-    PerformanceProfiler.instance.startFrameCadence();
+    FrameProfiler.instance.startFrameCadence();
     _activeScrollProfileTaskKey = PerformanceProfiler.instance.startTask(
       'chat_scroll',
       scope: 'chat',
@@ -2329,7 +2352,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       return;
     }
     _activeScrollProfileTaskKey = null;
-    PerformanceProfiler.instance.stopFrameCadence(reason: reason);
+    FrameProfiler.instance.stopFrameCadence(reason: reason);
     PerformanceProfiler.instance.finishTask(
       taskKey,
       data: {
@@ -3859,7 +3882,6 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             (attachments) => attachments.isNotEmpty,
           ),
         );
-
     return RepaintBoundary(
       child: MeasureSize(
         onChange: (size) {
@@ -3878,6 +3900,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               const SizedBox(height: Spacing.xl),
+              OpenWebUiTaskList(
+                keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
+              ),
               const FileAttachmentWidget(),
               const ContextAttachmentWidget(),
               if (hasAttachments) const SizedBox(height: Spacing.sm),
@@ -4444,6 +4469,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         key: const ValueKey('chat-sidebar-toggle'),
         icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
         iosSymbol: 'line.3.horizontal',
+        semanticLabel: AppLocalizations.of(context)!.sidebarButtonLabel,
         onPressed: () => _toggleResponsiveDrawer(context),
         iconColor: tintColor,
       ),
@@ -4909,7 +4935,8 @@ typedef ChatGroupingPlacement = ({
 /// A single Hermes turn lands as several assistant messages. Repeating the
 /// avatar + model name and the copy/listen/regenerate bar for each one reads as
 /// several answers rather than one, so the first member carries the header and
-/// the last carries the bar.
+/// the last carries the bar. Across turns the header is shown only when the
+/// responding model differs from the last announced one.
 ///
 /// [rows] is the transcript in display order. A row is `isSkipped` when it
 /// renders no response of its own — archived variants (zero-size placeholders)
@@ -4927,6 +4954,10 @@ List<ChatGroupingPlacement> debugResolveAssistantGroupingForTesting(
   // Display model of the response currently being grouped; null once a user
   // turn closes it. Drives header suppression only.
   String? openGroupModelName;
+  // Model most recently announced by a header. Unlike [openGroupModelName] it
+  // survives user turns, so consecutive answers from the same model stay
+  // unlabeled and a header appears only when the responding model changes.
+  String? lastAnnouncedModelName;
   // Members of the action group being accumulated. It tracks the header group
   // except that a versioned row is always alone in its own.
   var openActionGroup = <int>[];
@@ -4960,7 +4991,18 @@ List<ChatGroupingPlacement> debugResolveAssistantGroupingForTesting(
       openGroupModelName: openGroupModelName,
       displayModelName: row.displayModelName,
     );
-    showModelHeader[index] = !continuesGroup;
+    showModelHeader[index] =
+        !continuesGroup &&
+        !debugAssistantRowContinuesGroupForTesting(
+          openGroupModelName: lastAnnouncedModelName,
+          displayModelName: row.displayModelName,
+        );
+    if (showModelHeader[index]) {
+      lastAnnouncedModelName = row.displayModelName;
+    }
+    // A versioned row can display a historical version from another model,
+    // which this pass cannot see, so the next answer must announce itself.
+    if (row.hasVersions) lastAnnouncedModelName = null;
     openGroupModelName = row.displayModelName;
 
     if (!continuesGroup || row.hasVersions) {

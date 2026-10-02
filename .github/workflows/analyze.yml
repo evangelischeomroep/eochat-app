@@ -31,7 +31,16 @@ jobs:
         run: flutter pub get
 
       - name: Generate code
-        run: dart run build_runner build --delete-conflicting-outputs
+        # Pub workspace (v4.1.8+): run build_runner in every member that uses it.
+        shell: bash
+        run: |
+          for dir in . packages/*; do
+            if [ -f "$dir/pubspec.yaml" ] && grep -q '^  build_runner:' "$dir/pubspec.yaml"; then
+              echo "::group::build_runner in $dir"
+              (cd "$dir" && dart run build_runner build --delete-conflicting-outputs)
+              echo "::endgroup::"
+            fi
+          done
 
       - name: dart analyze
         run: flutter analyze --no-pub --fatal-infos

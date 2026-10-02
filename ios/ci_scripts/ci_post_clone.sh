@@ -42,8 +42,16 @@ for attempt in 1 2 3; do
 done
 [ "$pub_get_ok" -eq 1 ] || exit 1
 
-echo "=== dart run build_runner build ==="
-dart run build_runner build --delete-conflicting-outputs
+echo "=== dart run build_runner build (app + workspace packages) ==="
+# v4.1.8 made the repo a pub workspace: generated code for packages/conduit_core
+# (drift, freezed, json_serializable, riverpod) is produced in that package, so
+# build_runner has to run in every member that depends on it, not just the root.
+for dir in . packages/*; do
+  if [ -f "$dir/pubspec.yaml" ] && grep -q '^  build_runner:' "$dir/pubspec.yaml"; then
+    echo "--- build_runner in $dir"
+    (cd "$dir" && dart run build_runner build --delete-conflicting-outputs)
+  fi
+done
 
 echo "=== Patch xcodeproj for Xcode 26 object version 70 ==="
 # CocoaPods bundles xcodeproj with a hardcoded load path, so gem install is

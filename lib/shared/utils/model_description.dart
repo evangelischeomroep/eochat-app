@@ -1,4 +1,4 @@
-import '../../core/models/model.dart';
+import 'package:conduit_core/models/model.dart';
 
 /// Fork: the model description Open WebUI admins write under
 /// `info.meta.description`, reduced to one line for list subtitles.
