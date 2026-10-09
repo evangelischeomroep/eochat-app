@@ -117,10 +117,51 @@ jobs:
                                   entry_content = zf.read(name).decode("utf-8", errors="replace")
                               except Exception:
                                   continue
-                              for line in entry_content.splitlines():
-                                  lower = line.lower()
-                                  if any(k in lower for k in ["error:", "failed", "phasescript", "exit code", "command /bin/sh", "note:"]):
-                                      print(f"    >>> {line.strip()[:300]}")
+                              lines = entry_content.splitlines()
+
+                              # 1) Print wide context (60 lines before, 10 after)
+                              # around the actual "nonzero exit code" / "exited with"
+                              # failure marker(s) -- the real shell error (cp/rsync/
+                              # codesign output, "No such file", etc.) immediately
+                              # precedes it and was getting drowned out by compiler
+                              # "note:" noise before.
+                              fail_markers = ("nonzero exit code", "exited with", "** archive failed **", "the following build commands failed")
+                              printed_ranges = []
+                              for i, line in enumerate(lines):
+                                  low = line.lower()
+                                  if any(m in low for m in fail_markers):
+                                      start = max(0, i - 60)
+                                      end = min(len(lines), i + 10)
+                                      printed_ranges.append((start, end))
+                              # merge overlapping ranges
+                              printed_ranges.sort()
+                              merged = []
+                              for s, e in printed_ranges:
+                                  if merged and s <= merged[-1][1]:
+                                      merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+                                  else:
+                                      merged.append((s, e))
+                              for s, e in merged:
+                                  print(f"    ----- context lines {s}-{e} around failure marker -----")
+                                  for line in lines[s:e]:
+                                      print(f"    CTX| {line.rstrip()[:500]}")
+
+                              # 2) Also print any line mentioning the specific pod/
+                              # script phase we suspect (onnxruntime / xcframework /
+                              # vad), with a little context, in case the failure
+                              # marker above didn't catch it.
+                              suspect_markers = ("onnxruntime", "xcframework", "copy xcframeworks", "/vad", "codesign")
+                              for i, line in enumerate(lines):
+                                  low = line.lower()
+                                  if any(m in low for m in suspect_markers):
+                                      s = max(0, i - 2)
+                                      e = min(len(lines), i + 3)
+                                      print(f"    ~~~~~ suspect-keyword context {s}-{e} ~~~~~")
+                                      for cline in lines[s:e]:
+                                          print(f"    SUSP| {cline.rstrip()[:500]}")
+
+                              if not merged:
+                                  print("    (no 'nonzero exit code'/'exited with' marker found in this file)")
                       except Exception as e:
                           print(f"    Not a zip: {e} -- printing raw (truncated, first 4000 bytes)")
                           print(raw[:4000].decode("utf-8", errors="replace"))
