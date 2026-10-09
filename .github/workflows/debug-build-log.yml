@@ -94,28 +94,34 @@ jobs:
                       ia = issue["attributes"]
                       print(f"  Issue: {ia}")
 
-                  # Get artifacts for this action
+                  # Get artifacts for this action -- try ALL of them, not just
+                  # ones with "log" in the name (the real build log can be under
+                  # other names/asset types).
                   arts = get(f"/ciBuildActions/{action_id}/artifacts")
+                  print(f"  Artifact count: {len(arts.get('data', []))}")
                   for art in arts.get("data", []):
                       aa = art["attributes"]
-                      print(f"  Artifact: {aa.get('fileName')} ({aa.get('fileSize')} bytes)")
-                      if "log" in aa.get("fileName","").lower() or "log" in str(aa.get("assetType","")).lower():
-                          dl_url = aa.get("downloadUrl")
-                          if dl_url:
-                              print(f"  Downloading log from {dl_url[:60]}...")
-                              import zipfile, io
-                              raw = download_bytes(dl_url)
+                      print(f"  Artifact: {aa.get('fileName')} type={aa.get('assetType')} ({aa.get('fileSize')} bytes)")
+                      dl_url = aa.get("downloadUrl")
+                      if not dl_url:
+                          print("    (no downloadUrl)")
+                          continue
+                      print(f"  Downloading from {dl_url[:80]}...")
+                      import zipfile, io
+                      raw = download_bytes(dl_url)
+                      try:
+                          zf = zipfile.ZipFile(io.BytesIO(raw))
+                          for name in zf.namelist():
+                              print(f"    Zip entry: {name} ({zf.getinfo(name).file_size} bytes)")
                               try:
-                                  zf = zipfile.ZipFile(io.BytesIO(raw))
-                                  for name in zf.namelist():
-                                      print(f"    Zip entry: {name}")
-                                      content = zf.read(name).decode("utf-8", errors="replace")
-                                      # Print lines with error keywords
-                                      for line in content.splitlines():
-                                          lower = line.lower()
-                                          if any(k in lower for k in ["error:", "failed", "phasescript", "exit code", "command /bin/sh"]):
-                                              print(f"    >>> {line.strip()[:200]}")
-                              except Exception as e:
-                                  print(f"    Not a zip: {e} — printing raw (truncated)")
-                                  print(raw[:2000].decode("utf-8", errors="replace"))
+                                  entry_content = zf.read(name).decode("utf-8", errors="replace")
+                              except Exception:
+                                  continue
+                              for line in entry_content.splitlines():
+                                  lower = line.lower()
+                                  if any(k in lower for k in ["error:", "failed", "phasescript", "exit code", "command /bin/sh", "note:"]):
+                                      print(f"    >>> {line.strip()[:300]}")
+                      except Exception as e:
+                          print(f"    Not a zip: {e} -- printing raw (truncated, first 4000 bytes)")
+                          print(raw[:4000].decode("utf-8", errors="replace"))
           PYEOF
