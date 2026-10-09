@@ -16,7 +16,7 @@ import 'package:conduit_core/utils/debug_logger.dart';
 
 import '../config/fork_overrides.dart';
 import '../config/fork_startup_watchdog.dart';
-import 'package:conduit_core/features/chat/providers/chat_message_structure.dart';
+import 'package:conduit_core/features/chat/providers/chat_providers.dart';
 import '../../features/auth/views/authentication_page.dart';
 import '../../features/auth/views/backend_chooser_page.dart';
 import '../../features/auth/views/connect_signin_page.dart';
