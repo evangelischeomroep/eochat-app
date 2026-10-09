@@ -1,7 +1,8 @@
 import 'package:checks/checks.dart';
 import 'package:conduit_core/models/chat_message.dart';
 import 'package:conduit_core/services/settings_service.dart';
-import 'package:conduit/features/chat/providers/queued_completion_provider.dart';
+import 'package:conduit_core/features/chat/providers/queued_completion_provider.dart';
+import 'package:conduit/features/chat/widgets/conduit_streaming_orbit.dart';
 import 'package:conduit/features/chat/widgets/streaming_turn_footer.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';

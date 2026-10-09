@@ -167,8 +167,14 @@ class AdaptiveButton extends StatelessWidget {
   final bool useSmoothRectangleBorder;
   final bool useNative;
 
-  bool get _canUseNative =>
-      useNative && PlatformUiCapabilities.usesNativeIOS26 && child == null;
+  // Material's AlertDialog sizes its body with IntrinsicWidth, and the native
+  // button lays out through a LayoutBuilder, which cannot report intrinsic
+  // sizes. Inside one, the dialog fails layout and leaves only its barrier.
+  bool _canUseNative(BuildContext context) =>
+      useNative &&
+      PlatformUiCapabilities.usesNativeIOS26 &&
+      child == null &&
+      context.findAncestorWidgetOfExactType<AlertDialog>() == null;
 
   double get _defaultHeight => switch (size) {
     AdaptiveButtonSize.small => 28,
@@ -188,7 +194,7 @@ class AdaptiveButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_canUseNative) {
+    if (_canUseNative(context)) {
       final resolvedPadding = padding?.resolve(Directionality.of(context));
       final resolvedRadius = borderRadius?.resolve(Directionality.of(context));
       final config = CNButtonConfig(

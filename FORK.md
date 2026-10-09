@@ -51,10 +51,26 @@ Keep this list short — it names files with a structural or behavioral fork hoo
 (something a merge needs to specifically watch for), not every file that has ever
 carried a branding-string swap. Current known inline-touch files:
 
-- `lib/core/router/app_router.dart` — fork imports (`fork_overrides`,
-  `fork_startup_watchdog`, `chat_providers`, and `connectivity_service` which
-  now comes from `package:conduit_core/services/`) plus the fork's router
-  refresh subscriptions.
+- `lib/core/router/app_router.dart` — since v4.1.9 upstream's redirect logic
+  lives in `packages/conduit_core/lib/navigation/route_redirect.dart`
+  (`resolveRouteRedirect`), called from a thin `redirect()` here. Fork hooks:
+  the subscription list adds `startupAuthStuckProvider`,
+  `connectivityStatusProvider`, `isChatStreamingProvider` and
+  `serverIncompatibleProvider` alongside upstream's generic
+  `routeRedirectDependencies` loop; `redirect()` passes
+  `authStuckOverride`/`hasPreconfiguredServer` (two optional params added to
+  `resolveRouteRedirect` itself — see the next entry) sourced from
+  `startupAuthStuckProvider` / `ForkOverrides.hasPreconfiguredServer`.
+  `isChatStreamingProvider` now comes from
+  `package:conduit_core/features/chat/providers/chat_message_structure.dart`.
+- `packages/conduit_core/lib/navigation/route_redirect.dart` — new in v4.1.9
+  (upstream moved the router's redirect policy here, Flutter-free, tested
+  without go_router). Fork hook: `resolveRouteRedirect` takes two optional
+  bool params, `authStuckOverride` and `hasPreconfiguredServer` (both default
+  false, reproducing pure upstream), so the Flutter-free package stays free
+  of `ForkOverrides`/Flutter imports while still letting `app_router.dart`
+  inject the fork's stuck-loading and preconfigured-server behavior at the
+  two exact branch points upstream's base logic used to have them.
 - `lib/core/providers/app_startup_providers.dart`
 - `lib/features/auth/views/server_connection_page.dart`
 - `lib/features/auth/views/authentication_page.dart`
@@ -203,13 +219,26 @@ carried a branding-string swap. Current known inline-touch files:
   `build.yaml` was dropped because the drift files it excluded moved into
   `conduit_core`.
 - `lib/shared/widgets/chrome_gradient_fade.dart` — scrim held stop 0.7 and
-  `kConduitChromeFadeHeight` 24 (upstream 0.92 / 30).
-- `lib/features/chat/widgets/enhanced_image_attachment.dart` — the full-screen
-  viewer's share button passes `sharePositionOrigin` (the button's rect, via a
-  `Builder`), resolves server-relative image URLs against `api.baseUrl`, and
-  shows a snackbar on failure. Upstream omitted the origin and swallowed the
-  error, so share/download on generated images silently did nothing.
-  Inline previews keep the image's own aspect ratio
+  `kConduitChromeFadeHeight` 24 (upstream 0.92 / 30), and the stop is derived
+  from the actual `contentHeight / height` ratio rather than upstream's fixed
+  `[0.0, 0.3, 0.65, 1.0]`, so the near-opaque band holds regardless of safe-area
+  inset height. Since v4.1.9 upstream added a `solidBehindChrome` param (used
+  by `utility_page_scaffold.dart` so a title stays legible over scrolling
+  rows); the fork's `solidBehindChrome` branch reuses the same ratio-derived
+  stop and the fork's `opaque`/`clear` values instead of upstream's fixed 0.96
+  plateau, to stay consistent with the rest of this file's approach.
+- `lib/features/chat/widgets/enhanced_image_attachment.dart` — since v4.1.9
+  upstream replaced the old Flutter full-screen dialog viewer with a native
+  gallery-paging viewer (`ImageViewerItem`, `NativeImageViewerBridge.swift`),
+  falling back to a new Flutter widget, `lib/features/chat/widgets/
+  full_screen_image_viewer.dart` (`part of` this file), for SVGs, failures,
+  slow pages and non-iOS. The fork's old `_shareImage`/`_shareOriginFor`
+  (sharePositionOrigin + server-relative URL resolution, see below) were
+  retired — superseded by the native viewer's own share handling — **except**
+  the fallback viewer's own `_share()` had the same missing-`sharePositionOrigin`
+  bug upstream's old dialog had, so the fork re-applies the fix there instead
+  (`sharePositionOrigin: _globalRectOf(context)`, reusing upstream's own
+  rect helper). Inline previews keep the image's own aspect ratio
   (`ForkOverrides.chatImagesKeepAspectRatio`, `preserveAspectRatio` param):
   the ratio is read from the decoded preview, cached per attachment id, and
   the preview is fitted inside the caller's max box and capped at
@@ -415,3 +444,15 @@ or with Cursor/other editors that may have it open.
 - `ForkOverrides.preconfigureServer` / `preconfiguredServerUrl` have no call sites
   anywhere in `lib/` — either dead code from an earlier approach, or meant to be wired
   up somewhere and never was. Worth a decision either way.
+- v4.1.9 added a release-notes "enjoying the app?" review/tip prompt
+  (`releaseNotesSupportPromptHeading`/`Message`, shown unconditionally in
+  `release_notes_sheet.dart`, not gated by `ForkOverrides.showDonationLinks`
+  like the sidebar/profile donation links are). Rebranded the text to EOchat
+  in this sync, but left it ungated — worth a decision on whether it should
+  follow the same `showDonationLinks` precedent as the rest of the donation UI.
+- Two more pre-existing, non-gated "Conduit" strings found during the v4.1.9
+  sweep, both outside any fork-touched file so left as-is per the "only
+  rebrand what a sync touches" rule: `lib/main.dart`'s
+  `showLicensePage(applicationName: 'Conduit')`, and two user-facing RPC
+  error strings in `packages/conduit_core/lib/services/socket_service.dart`
+  ("Conduit does not support client-side JavaScript/Python execution").

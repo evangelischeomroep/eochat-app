@@ -18,6 +18,7 @@ class ConduitChromeGradientFade extends StatelessWidget {
     required this.contentHeight,
     this.fadeHeight = kConduitChromeFadeHeight,
     this.backgroundColor,
+    this.solidBehindChrome = false,
   });
 
   const ConduitChromeGradientFade.top({
@@ -25,6 +26,7 @@ class ConduitChromeGradientFade extends StatelessWidget {
     required this.contentHeight,
     this.fadeHeight = kConduitChromeFadeHeight,
     this.backgroundColor,
+    this.solidBehindChrome = false,
   }) : edge = ConduitChromeFadeEdge.top;
 
   const ConduitChromeGradientFade.bottom({
@@ -32,12 +34,19 @@ class ConduitChromeGradientFade extends StatelessWidget {
     required this.contentHeight,
     this.fadeHeight = kConduitChromeFadeHeight,
     this.backgroundColor,
-  }) : edge = ConduitChromeFadeEdge.bottom;
+  }) : edge = ConduitChromeFadeEdge.bottom,
+       solidBehindChrome = false;
 
   final ConduitChromeFadeEdge edge;
   final double contentHeight;
   final double fadeHeight;
   final Color? backgroundColor;
+
+  /// Keeps the fade near-opaque across [contentHeight] and only softens it
+  /// in the [fadeHeight] strip beyond, like iOS's "hard" scroll-edge style.
+  /// For bars with a title over scrolling rows, where the default ramp lets
+  /// text read through behind the title.
+  final bool solidBehindChrome;
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +84,13 @@ class ConduitChromeGradientFade extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: colors,
+              // Fork: solidBehindChrome stays fully opaque across the
+              // content band (same ratio-derived stop as the default ramp)
+              // instead of easing to the softer `held` alpha, so a title
+              // over scrolling rows stays legible.
+              colors: solidBehindChrome
+                  ? (isTop ? [opaque, opaque, clear] : [clear, opaque, opaque])
+                  : colors,
               stops: stops,
             ),
           ),
