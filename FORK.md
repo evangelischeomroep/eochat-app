@@ -263,13 +263,21 @@ carried a branding-string swap. Current known inline-touch files:
   `preserveAspectRatio: false` to keep uniform tiles.
 
 - Opknapper, EO's AI training game, as a sidebar tab (fork-only code in
-  `lib/features/opknapper/`, gated by `ForkOverrides.showOpknapper`, address
-  in `ForkOverrides.opknapperUrl`). Its hooks into upstream files:
+  `lib/features/opknapper/`, address in `ForkOverrides.opknapperUrl`).
+  Until `ForkOverrides.opknapperReleased` is true it exists only in beta
+  mode: seven taps on the app version (Over) turn it on or off per device
+  (`opknapper_availability.dart`). Its hooks into upstream files:
   - `packages/conduit_core/lib/features/navigation/models/sidebar_navigation_model.dart`
     — `opknapper` appended to `SidebarTabId` (persisted by name, so the
     position at the end matters only for upstream merges).
   - `lib/features/navigation/widgets/sidebar_tab_registry.dart` — the tab's
     descriptor, second in `sidebarTabRegistry`, and its builders.
+  - `lib/features/navigation/providers/sidebar_providers.dart` — the
+    snapshot drops the Opknapper tab unless `opknapperAvailableProvider`
+    (released or beta mode); the registry's predicate can't watch providers.
+  - `lib/features/profile/views/about_page.dart` — the version row counts
+    taps for beta mode (no hint), and a *Bètamodus* switch shows while it's
+    on, so a tester can always find the way out.
   - `lib/core/router/app_router.dart` — `/opknapper` inside the drawer
     `ShellRoute`, beside chat, notes and channels.
   - `lib/core/providers/app_startup_providers.dart` — starts

@@ -4,6 +4,7 @@ import 'package:conduit_core/providers/app_providers.dart';
 
 import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
 
+import '../../opknapper/opknapper_availability.dart';
 import '../../terminal/providers/terminal_providers.dart';
 
 import 'package:conduit_core/features/navigation/models/sidebar_navigation_model.dart';
@@ -32,7 +33,12 @@ final sidebarNavigationSnapshotProvider = Provider<SidebarNavigationSnapshot>((
     terminalEnabled: ref.watch(terminalTabVisibleProvider),
     channelsEnabled: ref.watch(channelsFeatureEnabledProvider),
   );
-  final tabs = visibleSidebarTabIds(availability);
+  // Fork: Opknapper only when released or in beta mode.
+  final opknapperAvailable = ref.watch(opknapperAvailableProvider);
+  final tabs = [
+    for (final id in visibleSidebarTabIds(availability))
+      if (id != SidebarTabId.opknapper || opknapperAvailable) id,
+  ];
   final persistedTab = ref.watch(sidebarActiveTabProvider);
   final legacyIndex = ref
       .read(sidebarActiveTabProvider.notifier)

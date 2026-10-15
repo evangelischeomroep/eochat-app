@@ -1257,10 +1257,9 @@ class AppStartupFlow extends _$AppStartupFlow {
       ref.read(notificationSocketListenerProvider.notifier).handleLaunchTap(),
     );
     // Fork: Opknapper's reminders — taps, a cold launch from one, and the
-    // rolling window renewed for the signed-in colleague.
-    if (ForkOverrides.showOpknapper) {
-      unawaited(ref.read(opknapperRemindersProvider.notifier).start());
-    }
+    // rolling window renewed; start() does nothing unless the game is
+    // released or the device is in beta mode.
+    unawaited(ref.read(opknapperRemindersProvider.notifier).start());
     _scheduleDefaultModelPreload(
       keepDefaultModelAutoSelectionAlive: keepDefaultModelAutoSelectionAlive,
     );

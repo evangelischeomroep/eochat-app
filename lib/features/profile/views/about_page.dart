@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -16,6 +18,9 @@ import '../../../shared/widgets/conduit_components.dart';
 import '../widgets/settings_page_scaffold.dart';
 import '../../../shared/widgets/utility_components.dart';
 import '../../../shared/services/app_package_info.dart';
+import '../../../core/services/haptic_service.dart';
+import '../../../shared/widgets/platform_ui/platform_ui.dart';
+import '../../opknapper/opknapper_availability.dart';
 
 class AboutPage extends ConsumerStatefulWidget {
   const AboutPage({super.key});
@@ -116,7 +121,32 @@ class _AboutPageState extends ConsumerState<AboutPage> {
     return InsetGroupedList(
       title: l10n.appInformation,
       children: [
-        UtilityValueRow(label: l10n.appVersion, value: versionLabel),
+        // Fork: seven taps on the version turn beta mode on or off
+        // (opknapper_availability.dart); no hint that it's there.
+        UtilityValueRow(
+          label: l10n.appVersion,
+          value: versionLabel,
+          selectable: false,
+          onTap: () => unawaited(_onVersionTap(context)),
+        ),
+        if (ref.watch(betaModeProvider))
+          UtilityRow(
+            leading: Icon(
+              Icons.science_outlined,
+              size: IconSize.medium,
+              color: theme.buttonPrimary,
+            ),
+            title: _betaTitle,
+            subtitle: _betaSubtitle,
+            trailing: AdaptiveSwitch(
+              value: true,
+              semanticLabel: _betaTitle,
+              onChanged: (value) => unawaited(
+                ref.read(betaModeProvider.notifier).setEnabled(value),
+              ),
+            ),
+            preserveTrailingSemantics: true,
+          ),
         UtilityRow(
           leading: Icon(
             Icons.new_releases_rounded,
@@ -156,6 +186,23 @@ class _AboutPageState extends ConsumerState<AboutPage> {
           onTap: () => _showLicenses(context),
         ),
       ],
+    );
+  }
+
+  // Fork: beta mode's strings are Dutch only, as EOchat's audience is.
+  static const String _betaTitle = 'Bètamodus';
+  static const String _betaSubtitle =
+      'Je test functies die nog niet voor iedereen zijn: Opknapper staat in de zijbalk.';
+
+  Future<void> _onVersionTap(BuildContext context) async {
+    final flipped = await ref.read(betaModeProvider.notifier).registerTap();
+    if (flipped == null || !context.mounted) return;
+    ConduitHaptics.success();
+    UiUtils.showMessage(
+      context,
+      flipped
+          ? 'Bètamodus staat aan. Opknapper staat nu in de zijbalk.'
+          : 'Bètamodus staat uit.',
     );
   }
 

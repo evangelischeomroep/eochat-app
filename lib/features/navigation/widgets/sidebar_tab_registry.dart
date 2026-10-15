@@ -4,7 +4,6 @@ import '../../../l10n/app_localizations.dart';
 import '../../channels/widgets/channel_list_tab.dart';
 import '../../hermes/widgets/hermes_sessions_tab.dart';
 import '../../notes/widgets/notes_list_tab.dart';
-import '../../../core/config/fork_overrides.dart';
 import '../../opknapper/opknapper_config.dart';
 import '../../opknapper/widgets/opknapper_sidebar_tab.dart';
 import '../../terminal/widgets/terminal_tab.dart';
@@ -122,10 +121,10 @@ Widget _opknapperBody({
   required bool active,
 }) => const OpknapperSidebarTab();
 
+/// Released or beta mode is applied by `sidebarNavigationSnapshotProvider`,
+/// which can watch it; this predicate only knows the server's capabilities.
 bool _opknapperVisible(SidebarTabAvailability availability) =>
-    ForkOverrides.showOpknapper &&
-    availability.hasOpenWebUi &&
-    !availability.hermesOnly;
+    availability.hasOpenWebUi && !availability.hermesOnly;
 
 bool _chatsVisible(SidebarTabAvailability availability) =>
     !availability.hermesOnly;

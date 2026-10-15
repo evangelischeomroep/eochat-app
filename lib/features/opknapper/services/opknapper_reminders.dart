@@ -24,7 +24,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import 'package:conduit_core/utils/debug_logger.dart';
 
-import '../../../core/config/fork_overrides.dart';
+import '../opknapper_availability.dart';
 import '../../../shared/services/navigation_service.dart';
 import '../../notifications/services/local_notification_service.dart';
 import '../opknapper_config.dart';
@@ -154,6 +154,15 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   @override
   OpknapperReminderSettings build() {
     ref.onDispose(() => _tapSub?.cancel());
+    // Beta mode turned off (or on): the reminders follow at once.
+    ref.listen<bool>(opknapperAvailableProvider, (previous, next) {
+      if (previous == next) return;
+      if (next) {
+        unawaited(start());
+      } else {
+        unawaited(refresh());
+      }
+    });
     _loading = _load();
     return OpknapperReminderSettings.initial;
   }
@@ -194,8 +203,9 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   /// Once per signed-in start: routes reminder taps, opens the game when a
   /// reminder cold-launched the app, and renews the window.
   Future<void> start() async {
-    if (!ForkOverrides.showOpknapper) return;
     if (!Platform.isIOS && !Platform.isAndroid) return;
+    await ref.read(betaModeProvider.notifier).ready();
+    if (!ref.mounted || !ref.read(opknapperAvailableProvider)) return;
     if (!_started) {
       _started = true;
       _tapSub = OpknapperNotificationTaps.stream.listen(_openFromTap);
@@ -299,7 +309,8 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
     try {
       await ref.read(localNotificationServiceProvider).initialize();
       await _cancelPending();
-      if (!settings.enabled || !ForkOverrides.showOpknapper) return;
+      await ref.read(betaModeProvider.notifier).ready();
+      if (!settings.enabled || !ref.read(opknapperAvailableProvider)) return;
       if (Platform.isAndroid) await _ensureAndroidChannel();
 
       final zone = _zone();

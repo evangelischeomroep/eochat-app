@@ -126,13 +126,14 @@ class ForkOverrides {
   /// screen height, so portrait images don't take over the conversation.
   static const double chatImageMaxScreenHeightFraction = 0.45;
 
-  /// When true, the sidebar gets an Opknapper tab: EO's AI training game
-  /// (ai.eo.nl/opknapper) in a web view, signed in with the colleague's EO
-  /// account, with its daily letter as a local reminder. See
-  /// `lib/features/opknapper/` and FORK.md.
-  static const bool showOpknapper = bool.fromEnvironment(
-    'SHOW_OPKNAPPER',
-    defaultValue: true,
+  /// Opknapper, EO's AI training game (ai.eo.nl/opknapper), as a sidebar
+  /// tab with its daily letter as a local reminder. While false it exists
+  /// only in beta mode, which a tester turns on by tapping the app version on
+  /// the About page seven times (`opknapper_availability.dart`). Set true to
+  /// release it to everyone. See `lib/features/opknapper/` and FORK.md.
+  static const bool opknapperReleased = bool.fromEnvironment(
+    'OPKNAPPER_RELEASED',
+    defaultValue: false,
   );
 
   /// The game's address. The test environment can be swapped in per build

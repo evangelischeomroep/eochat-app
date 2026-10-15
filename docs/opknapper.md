@@ -15,8 +15,17 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
   over a web view of `ForkOverrides.opknapperUrl`
   (default `https://ai.eo.nl/opknapper`; for the slice on test, build with
   `--dart-define=OPKNAPPER_URL=https://app-test-aihub.azurewebsites.net/opknapper`).
-- **Off with one flag:** `--dart-define=SHOW_OPKNAPPER=false` hides the tab
-  and starts nothing.
+- **Beta mode until it's released.** While `ForkOverrides.opknapperReleased`
+  is false (the default), the tab, the page and the reminders exist only on a
+  device in beta mode. A tester turns it on by tapping the app version seven
+  times in a row (Instellingen → Over → App-versie); a message confirms it,
+  and a *Bètamodus* switch then shows on that page to turn it off. Seven taps
+  again turn it off too. Nothing hints at it beforehand. Turned off, the tab
+  goes, an open game returns to chat and pending reminders are cancelled.
+  Kept per device, so it survives updates and sign-outs.
+- **Releasing it** is `opknapperReleased` to true in `fork_overrides.dart`
+  (or `--dart-define=OPKNAPPER_RELEASED=true` for one build), then the usual
+  TestFlight and App Store route. Beta mode stays for the next feature.
 
 ## Sign-in
 

@@ -31,6 +31,8 @@ import '../../../shared/utils/external_link_launcher.dart';
 import '../../../shared/widgets/adaptive_route_shell.dart';
 import '../../../shared/widgets/adaptive_toolbar_components.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
+import '../../../shared/services/navigation_service.dart';
+import '../opknapper_availability.dart';
 import '../opknapper_config.dart';
 import '../services/opknapper_bridge.dart';
 import '../services/opknapper_reminders.dart';
@@ -111,12 +113,19 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
     // Opening the game renews the reminder window (see OpknapperReminders).
     unawaited(ref.read(opknapperRemindersProvider.notifier).markSeen());
     // A logout purge still running must finish before the web view starts,
-    // or it would erase the game's fresh session.
-    unawaited(
-      WebViewCookieHelper.waitForPendingDataOperations().then((_) {
-        if (mounted) setState(() => _ready = true);
-      }),
-    );
+    // or it would erase the game's fresh session. And until it's released,
+    // the game is there only in beta mode: anyone else who lands here (an old
+    // reminder, a link) goes back to chat.
+    unawaited(() async {
+      await WebViewCookieHelper.waitForPendingDataOperations();
+      await ref.read(betaModeProvider.notifier).ready();
+      if (!mounted) return;
+      if (!ref.read(opknapperAvailableProvider)) {
+        NavigationService.router.go(Routes.chat);
+        return;
+      }
+      setState(() => _ready = true);
+    }());
   }
 
   @override
@@ -211,6 +220,10 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
   @override
   Widget build(BuildContext context) {
     final theme = context.conduitTheme;
+    // Beta mode turned off while the game is open: back to chat.
+    ref.listen<bool>(opknapperAvailableProvider, (previous, next) {
+      if (!next) NavigationService.router.go(Routes.chat);
+    });
     return AdaptiveRouteShell(
       backgroundColor: theme.surfaceBackground,
       appBar: _buildAppBar(context),
