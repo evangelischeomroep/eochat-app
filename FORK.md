@@ -152,9 +152,19 @@ carried a branding-string swap. Current known inline-touch files:
 - `ios/Runner/NativeSheetUIFoundation.swift` — `makeNativeSheetCloseBarButton`
   (plain close glyph, `hidesSharedBackground` on iOS 26); the three
   `closeButton()` helpers in `NativeSheetBridge.swift` call it.
+- `lib/core/utils/native_sheet_utils.dart` — since v4.2.0, this shared helper
+  (not `sidebar_user_pill.dart`, which now just calls it) builds the native
+  profile root sections and the Hermes accounts-detail row. Its `appItems`
+  glyphs are patched to `slider.horizontal.3` and `bubble.left` instead of
+  upstream's `paintpalette` and `bubble.left.and.bubble.right`; its Hermes row
+  in `buildNativeAccountsDetail` uses `sfSymbol: 'cube'` instead of upstream's
+  `iconAsset: 'assets/icons/hermes_agent.png'`; and its own support-section
+  (`buildNativeSupportItems`) is gated by `ForkOverrides.showDonationLinks`,
+  same as `sidebar_user_pill.dart`'s `supportTitle`/`supportItems`.
 - `lib/features/navigation/widgets/sidebar_user_pill.dart` — native settings
   rows use `slider.horizontal.3`, `bubble.left` and `cube` (Hermes) instead of
-  `paintpalette`, `bubble.left.and.bubble.right` and the Hermes logo asset.
+  `paintpalette`, `bubble.left.and.bubble.right` and the Hermes logo asset
+  (now via `native_sheet_utils.dart`, see above).
 - `ios/Runner/NativeKeyboardAttachmentBridge.swift` — the attachment input
   view and each tile take `tintColor` from `NativeSheetTheme.shared.accent`
   (was the keyboard window's system blue). Its light/dark style follows the
