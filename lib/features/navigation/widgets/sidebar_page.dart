@@ -6,9 +6,11 @@ import 'package:conduit/l10n/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:conduit_core/features/navigation/models/sidebar_navigation_model.dart';
 import 'package:conduit_core/sync/sync_engine.dart';
 
 import '../../../core/services/haptic_service.dart';
+import '../../../shared/services/navigation_service.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
 import '../../../shared/widgets/adaptive_toolbar_components.dart';
@@ -16,6 +18,7 @@ import '../../../shared/widgets/chrome_gradient_fade.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/widgets/sidebar_layout_constants.dart';
 import '../../../shared/widgets/sidebar_ios26_scaffold.dart';
+import '../../opknapper/opknapper_config.dart';
 import '../providers/sidebar_providers.dart';
 import '../providers/sidebar_tab_scroll_registry.dart';
 import 'sidebar_user_pill.dart';
@@ -42,6 +45,12 @@ void selectSidebarTab(BuildContext context, WidgetRef ref, int index) {
   if (index < 0 || index >= navigation.tabs.length) return;
 
   final selectedTab = sidebarTabDescriptor(navigation.tabs[index]);
+  // Fork: the Game tab has no panel; it opens the game straight away.
+  if (selectedTab.id == SidebarTabId.opknapper) {
+    closeSidebarDrawerIfOverlay(context);
+    NavigationService.router.go(OpknapperConfig.routePath);
+    return;
+  }
   if (selectedTab.id == navigation.selectedTab) {
     if (navigation.isLegacySelection) {
       ref.read(sidebarActiveTabProvider.notifier).set(selectedTab.id);

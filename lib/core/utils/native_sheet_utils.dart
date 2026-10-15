@@ -50,13 +50,18 @@ List<NativeSheetItemConfig> buildNativeAboutItems(
   required String appVersion,
   String? serverName,
   String? serverVersion,
+  bool betaMode = false,
 }) => [
+  // Fork: a navigation row without chevron, not an info row, because info
+  // rows ignore taps and the seven taps that toggle beta mode
+  // (opknapper_availability.dart) would never arrive. Its subtitle says
+  // when beta mode is on.
   NativeSheetItemConfig(
-    id: 'app-version',
+    id: nativeAppVersionTapId,
     title: l10n.appVersion,
-    subtitle: appVersion,
+    subtitle: betaMode ? '$appVersion · bètamodus' : appVersion,
     sfSymbol: 'app.badge',
-    kind: NativeSheetItemKind.info,
+    showsDisclosure: false,
   ),
   if (serverName != null)
     NativeSheetItemConfig(
@@ -605,6 +610,9 @@ const nativeSignOutActionId = 'sign-out';
 const nativeAccountSwitchActionId = 'account-switch';
 const nativeAccountAddActionId = 'account-add';
 const nativeAccountSignOutActionId = 'account-sign-out';
+
+/// The About page's version row; seven taps toggle beta mode.
+const nativeAppVersionTapId = 'app-version';
 const nativeAccountServerActionId = 'account-server';
 const nativeHermesUseActionId = 'account-hermes-use';
 const nativeDirectEditActionId = 'account-direct-edit';

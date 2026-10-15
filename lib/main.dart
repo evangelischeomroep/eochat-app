@@ -94,6 +94,7 @@ import 'core/utils/native_sheet_utils.dart'
         nativeAccountServerActionId,
         nativeAccountSignOutActionId,
         nativeAccountSwitchActionId,
+        nativeAppVersionTapId,
         nativeDirectEditActionId,
         nativeHermesUseActionId,
         nativeAdvancedFeaturesId,
@@ -101,6 +102,10 @@ import 'core/utils/native_sheet_utils.dart'
         nativeMemoryEditorActionPrefix,
         nativeMemoryEditorNewActionId,
         nativeNotificationTargetsActionId;
+import 'core/services/haptic_service.dart';
+import 'features/opknapper/native_sheet_items.dart';
+import 'features/opknapper/opknapper_availability.dart';
+import 'features/opknapper/services/opknapper_reminders.dart';
 import 'shared/utils/ui_utils.dart';
 import 'core/utils/tts_voice_utils.dart';
 import 'core/utils/current_localizations.dart';
@@ -765,6 +770,19 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
 
       if (await _handleNativeAccountAction(event.id, value)) return;
 
+      // Fork: seven taps on the About page's version row toggle beta mode
+      // (opknapper_availability.dart). The sheet stays up, so the row's
+      // subtitle and a haptic say it flipped.
+      if (event.id == nativeAppVersionTapId) {
+        final flipped = await ref.read(betaModeProvider.notifier).registerTap();
+        if (flipped == null) return;
+        ConduitHaptics.success();
+        await ref
+            .read(nativeSheetHydrationServiceProvider)
+            .hydrateDetail(NativeSheetRoutes.helpAbout);
+        return;
+      }
+
       if (event.id == NativeSheetRoutes.directConnections) {
         final request = directConnectionsNativeSheetNavigationRequest;
         unawaited(
@@ -1214,6 +1232,27 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
             await ref
                 .read(appSettingsProvider.notifier)
                 .setNotificationChannelEnabled(value);
+          }
+        case nativeOpknapperReminderId:
+          if (value is bool) {
+            final enabled = await ref
+                .read(opknapperRemindersProvider.notifier)
+                .setEnabled(value);
+            if (value && !enabled) {
+              // Permission refused: show the switch off, and say where to
+              // change it.
+              await ref
+                  .read(nativeSheetHydrationServiceProvider)
+                  .hydrateDetail(NativeSheetRoutes.notificationSettings);
+              await ref
+                  .read(localNotificationServiceProvider)
+                  .openSystemSettings();
+            }
+          }
+        case nativeOpknapperReminderTimeId:
+          final time = OpknapperReminderSettings.parseTime(value);
+          if (time != null) {
+            await ref.read(opknapperRemindersProvider.notifier).setTime(time);
           }
         case 'transport-auto':
           await ref

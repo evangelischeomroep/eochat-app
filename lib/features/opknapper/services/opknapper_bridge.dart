@@ -152,7 +152,9 @@ class OpknapperBridge {
     final mime = message['mime'] is String
         ? message['mime'] as String
         : 'application/pdf';
-    final bytes = base64Decode(data.contains(',') ? data.split(',').last : data);
+    final bytes = base64Decode(
+      data.contains(',') ? data.split(',').last : data,
+    );
     if (bytes.isEmpty || bytes.length > _maxShareBytes) return false;
     final base = await getTemporaryDirectory();
     final dir = Directory(

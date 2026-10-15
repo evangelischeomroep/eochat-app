@@ -464,6 +464,24 @@ void main() {
     }
   });
 
+  test('the About version row takes taps, for the beta mode toggle', () {
+    final row = buildNativeAboutItems(
+      _l10n,
+      appVersion: '1.0',
+    ).singleWhere((item) => item.id == nativeAppVersionTapId);
+    expect(row.kind, NativeSheetItemKind.navigation);
+    expect(row.showsDisclosure, isFalse);
+    expect(row.dismissOnSelect, isFalse);
+    expect(row.subtitle, '1.0');
+
+    final beta = buildNativeAboutItems(
+      _l10n,
+      appVersion: '1.0',
+      betaMode: true,
+    ).singleWhere((item) => item.id == nativeAppVersionTapId);
+    expect(beta.subtitle, '1.0 · bètamodus');
+  });
+
   group('Webhook destinations row', () {
     test('counts the destinations', () {
       String? subtitle(int? count) =>

@@ -200,6 +200,8 @@ enum NativeSheetSettingsStyle {
     static let defaultCellHeight: CGFloat = 48
     static let iconSize: CGFloat = 24
     static let iconSpacing: CGFloat = 12
+    /// Fork: space above a setting group that has no title (default is ~3x).
+    static let emptyHeaderHeight: CGFloat = 17
     static var secondaryForeground: UIColor {
         NativeSheetTheme.shared.secondaryForeground
     }

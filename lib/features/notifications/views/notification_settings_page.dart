@@ -11,6 +11,7 @@ import 'package:conduit_core/services/settings_service.dart';
 import 'package:conduit_core/utils/debug_logger.dart';
 
 import '../../../l10n/app_localizations.dart';
+import '../../opknapper/widgets/opknapper_notification_settings.dart';
 import '../../profile/widgets/settings_page_scaffold.dart';
 import '../../../shared/widgets/utility_components.dart';
 import '../services/local_notification_service.dart';
@@ -119,6 +120,7 @@ class NotificationSettingsPage extends ConsumerWidget {
             ),
           ],
         ),
+        const OpknapperNotificationSettings(),
         const NotificationTargetsSection(),
       ],
     );

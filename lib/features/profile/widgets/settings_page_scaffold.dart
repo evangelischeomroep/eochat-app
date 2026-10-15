@@ -2,7 +2,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 
-const settingsSectionGap = SizedBox(height: Spacing.lg);
+// Fork: a third of upstream's Spacing.lg between setting groups.
+const settingsSectionGap = SizedBox(height: Spacing.lg / 3);
 
 /// Standalone section header for sections that cannot pass their title to
 /// [InsetGroupedSection] (e.g. a header paired with an action button). Renders

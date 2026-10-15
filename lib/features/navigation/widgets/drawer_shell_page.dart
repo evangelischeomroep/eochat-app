@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
+import '../../opknapper/opknapper_availability.dart';
 import '../../../shared/services/navigation_service.dart';
 import '../../../core/services/haptic_service.dart';
 import '../../../l10n/app_localizations.dart';
@@ -53,6 +54,8 @@ class DrawerShellPage extends ConsumerWidget {
       mobileBottomDragGestureExclusion: isTablet
           ? 0.0
           : sidebarBottomBarGestureExclusionHeight(context),
+      // Fork: on the game page only its close button leaves.
+      swipeToOpenEnabled: !ref.watch(opknapperGameOpenProvider),
       tabletDrawerWidth: tabletWidth,
       tabletDrawerMinWidth: minimumSidebarTabletWidth,
       tabletDrawerMaxWidth: maximumSidebarTabletWidth,

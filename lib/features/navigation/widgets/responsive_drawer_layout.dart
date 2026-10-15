@@ -43,6 +43,10 @@ class ResponsiveDrawerLayout extends StatefulWidget {
   final VoidCallback? onOpenStart;
   final double mobileBottomDragGestureExclusion;
 
+  /// Fork: false turns off every swipe that opens the drawer on mobile (the
+  /// game page, where only its close button leaves).
+  final bool swipeToOpenEnabled;
+
   // Tablet-specific configuration
   final double tabletDrawerWidth; // Fixed width for tablet drawer
   final double tabletDrawerMinWidth;
@@ -69,6 +73,7 @@ class ResponsiveDrawerLayout extends StatefulWidget {
     this.contentScaleDelta = 0.02,
     this.onOpenStart,
     this.mobileBottomDragGestureExclusion = 0.0,
+    this.swipeToOpenEnabled = true,
     this.tabletDrawerWidth = defaultSidebarTabletWidth,
     this.tabletDrawerMinWidth = minimumSidebarTabletWidth,
     this.tabletDrawerMaxWidth = maximumSidebarTabletWidth,
@@ -171,7 +176,7 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
       _drawerEdgeDragWidth.clamp(0.0, _edgeWidth).toDouble();
 
   bool _contentDrawerGestureCanStart(PointerEvent event) {
-    if (_controller.value > 0.001) {
+    if (!widget.swipeToOpenEnabled || _controller.value > 0.001) {
       return false;
     }
 
@@ -185,7 +190,9 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   }
 
   bool _prioritizedDrawerGestureCanStart(PointerEvent event) {
-    if (_isTablet(context) || _controller.value > 0.001) {
+    if (!widget.swipeToOpenEnabled ||
+        _isTablet(context) ||
+        _controller.value > 0.001) {
       return false;
     }
 
@@ -468,7 +475,11 @@ class ResponsiveDrawerLayoutState extends State<ResponsiveDrawerLayout>
   }
 
   void _onEdgePointerDown(PointerDownEvent event) {
-    if (_isTablet(context) || _controller.value > 0.001) return;
+    if (!widget.swipeToOpenEnabled ||
+        _isTablet(context) ||
+        _controller.value > 0.001) {
+      return;
+    }
 
     _resetEdgePointerState();
     _edgePointer = event.pointer;

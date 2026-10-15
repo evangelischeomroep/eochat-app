@@ -3376,6 +3376,25 @@ private final class NativeProfileMenuTableViewController: UITableViewController 
         tableSections[section].footer
     }
 
+    // Fork: a third of the default gap between setting groups.
+    override func tableView(
+        _ tableView: UITableView,
+        heightForHeaderInSection section: Int
+    ) -> CGFloat {
+        section > 0 && (tableSections[section].title ?? "").isEmpty
+            ? NativeSheetSettingsStyle.emptyHeaderHeight
+            : UITableView.automaticDimension
+    }
+
+    override func tableView(
+        _ tableView: UITableView,
+        heightForFooterInSection section: Int
+    ) -> CGFloat {
+        (tableSections[section].footer ?? "").isEmpty
+            ? CGFloat.leastNormalMagnitude
+            : UITableView.automaticDimension
+    }
+
     override func tableView(
         _ tableView: UITableView,
         willDisplayHeaderView view: UIView,
@@ -4559,6 +4578,25 @@ private final class NativeDetailTableViewController: UITableViewController {
         titleForFooterInSection section: Int
     ) -> String? {
         tableSections[section].footer
+    }
+
+    // Fork: a third of the default gap between setting groups.
+    override func tableView(
+        _ tableView: UITableView,
+        heightForHeaderInSection section: Int
+    ) -> CGFloat {
+        section > 0 && (tableSections[section].title ?? "").isEmpty
+            ? NativeSheetSettingsStyle.emptyHeaderHeight
+            : UITableView.automaticDimension
+    }
+
+    override func tableView(
+        _ tableView: UITableView,
+        heightForFooterInSection section: Int
+    ) -> CGFloat {
+        (tableSections[section].footer ?? "").isEmpty
+            ? CGFloat.leastNormalMagnitude
+            : UITableView.automaticDimension
     }
 
     override func tableView(

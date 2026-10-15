@@ -64,33 +64,54 @@ abstract final class OpknapperConfig {
 
 /// What a colleague reads in the app around the game.
 abstract final class OpknapperStrings {
-  static const String name = 'Opknapper';
+  static const String name = 'Game';
+  static const String gameName = 'Opknapper';
   static const String tagline = 'Dagelijks oefenen met AI';
   static const String searchHint = 'Zoeken';
-  static const String reminderSection = 'Herinnering';
-  static const String reminderTitle = 'Herinner me aan de dagbrief';
+  static const String reminderTitle = 'Stuur een melding bij nieuwe opdrachten';
   static String reminderSubtitle(String time) => 'Werkdagen om $time';
   static const String reminderOff = 'Uit';
   static const String reminderTime = 'Tijdstip';
-  static const String reminderPickerTitle = 'Herinnering om';
+  static const String reminderPickerTitle = 'Melding om';
   static const String reminderFootnote =
-      'Eén herinnering per werkdag, alleen als je dagbrief nog wacht. '
-      'Kom je een week niet langs, dan wordt het vanzelf stil.';
+      'Elke werkdag staat er een nieuwe opdracht voor je klaar in Opknapper: '
+      'een korte vraag, een oefening of een peiling, in een paar minuten '
+      'gedaan. Je krijgt één melding per werkdag, alleen als er nog iets op '
+      'je wacht. Kom je een week niet langs, dan wordt het vanzelf stil.';
   static const String permissionDenied =
       'Meldingen staan uit voor EOchat. Zet ze aan in Instellingen.';
-  static const String loadFailed = 'Opknapper laadt niet.';
+  static const String loadFailed = 'De game laadt niet.';
   static const String retry = 'Opnieuw';
   static const String reload = 'Herladen';
   static const String openInBrowser = 'Open in browser';
   static const String channelName = 'Opknapper';
-  static const String channelDescription = 'Herinneringen aan je dagbrief';
+  static const String channelDescription = 'Meldingen bij nieuwe opdrachten';
 
   /// A calm line a working day; never urgent (T32's lean, R49).
   static const List<(String, String)> reminders = [
-    ('Er ligt post voor je', 'Je dagbrief wacht in de postvakjes.'),
-    ('Nieuwe dagbrief', 'Een vraag van twee minuten, in de postvakjes.'),
-    ('Post in de hal', 'De hond heeft je dagbrief al gevonden.'),
-    ('Je dagbrief', 'Een korte vraag ligt voor je klaar.'),
+    ('Er ligt post voor je', 'Er staat een nieuwe opdracht voor je klaar.'),
+    (
+      'Nieuwe opdracht',
+      'Een korte opdracht van twee minuten, in de postvakjes.',
+    ),
+    ('Post in de hal', 'De hond heeft je opdracht al gevonden.'),
+    ('Je opdracht van vandaag', 'Een korte vraag ligt voor je klaar.'),
     ('Er ligt post voor je', 'Even langs de postvakjes?'),
   ];
+
+  /// Times the settings offer for the daily notification.
+  static List<String> timeChoices(String current) {
+    final choices = <String>[
+      for (var h = 7; h <= 12; h++) ...[
+        '${h.toString().padLeft(2, '0')}:00',
+        if (h < 12) '${h.toString().padLeft(2, '0')}:30',
+      ],
+    ];
+    if (!choices.contains(current)) {
+      choices
+        ..add(current)
+        ..sort();
+    }
+    return choices;
+  }
 }

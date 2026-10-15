@@ -71,6 +71,9 @@ import 'package:conduit_core/services/settings_service.dart';
 
 import '../../shared/theme/theme_providers.dart';
 import '../../shared/services/app_package_info.dart';
+import '../../features/opknapper/native_sheet_items.dart';
+import '../../features/opknapper/opknapper_availability.dart';
+import '../../features/opknapper/services/opknapper_reminders.dart';
 import '../utils/account_display.dart';
 
 final nativeSheetHydrationServiceProvider =
@@ -769,6 +772,7 @@ class NativeSheetHydrationService {
             appVersion: appVersionLabel,
             serverName: hermesOnly ? null : serverName,
             serverVersion: hermesOnly ? null : serverVersion,
+            betaMode: await _ref.read(betaModeProvider.notifier).ready(),
           ),
         ),
       );
@@ -1146,6 +1150,11 @@ class NativeSheetHydrationService {
       NativeSheetSectionConfig(items: deliveryItems),
       NativeSheetSectionConfig(items: soundItems),
       NativeSheetSectionConfig(items: contentItems),
+      // Fork: the Game's daily notification, once it is available.
+      if (_ref.read(opknapperAvailableProvider))
+        buildNativeOpknapperReminderSection(
+          _ref.read(opknapperRemindersProvider),
+        ),
     ];
   }
 

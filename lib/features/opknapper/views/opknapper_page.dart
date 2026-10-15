@@ -22,6 +22,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
+import 'package:conduit_core/features/navigation/models/sidebar_navigation_model.dart';
+import 'package:conduit_core/features/navigation/providers/sidebar_active_tab_provider.dart';
 import 'package:conduit_core/utils/debug_logger.dart';
 
 import '../../../platform/app_intents_service.dart';
@@ -29,8 +31,6 @@ import '../../../platform/webview_cookie_helper.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/external_link_launcher.dart';
 import '../../../shared/widgets/adaptive_route_shell.dart';
-import '../../../shared/widgets/adaptive_toolbar_components.dart';
-import '../../../shared/widgets/sidebar_layout_contract.dart';
 import '../../../shared/services/navigation_service.dart';
 import '../opknapper_availability.dart';
 import '../opknapper_config.dart';
@@ -57,9 +57,7 @@ String _userAgent() {
 Uri opknapperStartUri({String? open}) {
   final base = OpknapperConfig.gameUri;
   if (open == null || open.isEmpty) return base;
-  return base.replace(
-    queryParameters: {...base.queryParameters, 'open': open},
-  );
+  return base.replace(queryParameters: {...base.queryParameters, 'open': open});
 }
 
 /// Adds the colleague's address to Microsoft's authorize request, unless the
@@ -99,6 +97,8 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
     final centre = box.localToGlobal(box.size.center(Offset.zero));
     return Rect.fromCenter(center: centre, width: 1, height: 1);
   }
+
+  late final OpknapperGameOpen _gameOpen;
   bool _loading = true;
   bool _failed = false;
   bool _ready = false;
@@ -108,8 +108,18 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
   int _webViewGeneration = 0;
 
   @override
+  void dispose() {
+    // After this frame: the drawer shell is rebuilding as the page leaves.
+    final gameOpen = _gameOpen;
+    Future.microtask(() => gameOpen.set(false));
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
+    _gameOpen = ref.read(opknapperGameOpenProvider.notifier);
+    Future.microtask(() => _gameOpen.set(true));
     // Opening the game renews the reminder window (see OpknapperReminders).
     unawaited(ref.read(opknapperRemindersProvider.notifier).markSeen());
     // A logout purge still running must finish before the web view starts,
@@ -225,38 +235,48 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
       if (!next) NavigationService.router.go(Routes.chat);
     });
     return AdaptiveRouteShell(
-      backgroundColor: theme.surfaceBackground,
-      appBar: _buildAppBar(context),
+      // Black behind the game: the strip and the safe area read as one.
+      backgroundColor: _gameBackground,
+      bodySafeArea: true,
       body: !isWebViewSupported
           ? _buildMessage(context, OpknapperStrings.loadFailed, retry: false)
-          : Stack(
+          : Column(
               children: [
-                if (_ready)
-                  Positioned.fill(child: _buildWebView(context))
-                else
-                  const SizedBox.shrink(),
-                if (_loading && !_failed)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: theme.surfaceBackground,
-                      child: const Center(
-                        child: CircularProgressIndicator.adaptive(),
-                      ),
-                    ),
-                  ),
-                if (_failed)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: theme.surfaceBackground,
-                      child: _buildMessage(
-                        context,
-                        OpknapperStrings.loadFailed,
-                        retry: true,
-                      ),
-                    ),
-                  ),
+                _buildCloseStrip(context),
+                Expanded(child: _buildGameStack(context, theme)),
               ],
             ),
+    );
+  }
+
+  static const Color _gameBackground = Color(0xFF000000);
+
+  Widget _buildGameStack(BuildContext context, ConduitThemeExtension theme) {
+    return Stack(
+      children: [
+        if (_ready)
+          Positioned.fill(child: _buildWebView(context))
+        else
+          const SizedBox.shrink(),
+        if (_loading && !_failed)
+          Positioned.fill(
+            child: ColoredBox(
+              color: _gameBackground,
+              child: const Center(child: CircularProgressIndicator.adaptive()),
+            ),
+          ),
+        if (_failed)
+          Positioned.fill(
+            child: ColoredBox(
+              color: _gameBackground,
+              child: _buildMessage(
+                context,
+                OpknapperStrings.loadFailed,
+                retry: true,
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -324,42 +344,39 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
     );
   }
 
-  AdaptiveAppBar _buildAppBar(BuildContext context) {
+  /// Leaves the game for the chat tab.
+  void _close() {
+    ref.read(sidebarActiveTabProvider.notifier).set(SidebarTabId.chats);
+    NavigationService.router.go(Routes.chat);
+  }
+
+  /// A slim strip above the game with just the way out. The game sits below
+  /// it, inside the safe area, so it never runs behind the status bar.
+  Widget _buildCloseStrip(BuildContext context) {
     final theme = context.conduitTheme;
-    final tintColor = theme.textPrimary;
-    final l10n = AppLocalizations.of(context)!;
-    final reload = ConduitAdaptiveAppBarIconButton(
-      icon: Platform.isIOS ? CupertinoIcons.arrow_clockwise : Icons.refresh,
-      iosSymbol: 'arrow.clockwise',
-      semanticLabel: OpknapperStrings.reload,
-      onPressed: () => unawaited(_reload()),
-      iconColor: tintColor,
-    );
-    return buildConduitCenteredAdaptiveAppBar(
-      context: context,
-      tintColor: tintColor,
-      leading: ConduitAdaptiveAppBarIconButton(
-        icon: Platform.isIOS ? CupertinoIcons.line_horizontal_3 : Icons.menu,
-        iosSymbol: 'line.3.horizontal',
-        semanticLabel: l10n.sidebarButtonLabel,
-        onPressed: () =>
-            SidebarDrawerControllerScope.maybeOf(context)?.toggle(),
-        iconColor: tintColor,
-      ),
-      title: Text(
-        OpknapperStrings.name,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: AppTypography.listTitleStyle.copyWith(
-          color: theme.textPrimary,
-          fontWeight: FontWeight.w600,
+    return SizedBox(
+      height: 44,
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: IconButton(
+          key: const ValueKey<String>('opknapper-close'),
+          tooltip: AppLocalizations.of(context)!.close,
+          onPressed: _close,
+          icon: Icon(
+            Platform.isIOS ? CupertinoIcons.xmark : Icons.close,
+            size: 22,
+            color: theme.textPrimary,
+          ),
         ),
       ),
-      actions: [reload],
     );
   }
 
-  Widget _buildMessage(BuildContext context, String text, {required bool retry}) {
+  Widget _buildMessage(
+    BuildContext context,
+    String text, {
+    required bool retry,
+  }) {
     final theme = context.conduitTheme;
     return Center(
       child: Padding(

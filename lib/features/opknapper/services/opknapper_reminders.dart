@@ -332,7 +332,8 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
           settings.time.hour,
           settings.time.minute,
         );
-        final isToday = day.year == now.year &&
+        final isToday =
+            day.year == now.year &&
             day.month == now.month &&
             day.day == now.day;
         final workingDay =

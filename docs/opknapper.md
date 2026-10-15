@@ -7,19 +7,23 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
 
 ## What it is in the app
 
-- **A sidebar tab,** *Opknapper*, second after Chats (SF Symbol `hammer`).
-  Its panel has one row that opens the game in the main pane, and the
-  reminder: on/off and the time, working days only.
+- **A tab,** *Game* (graduation cap), last in the bottom bar. It has no panel
+  of its own: tapping it closes the sidebar and opens the game in the main
+  pane. The daily notification lives in Instellingen → Meldingen, as
+  *Stuur een melding bij nieuwe opdrachten* with a time, working days only.
 - **The game page,** `/opknapper`, inside the drawer shell beside chat,
   notes and channels: the app's own top bar (sidebar button, title, reload)
   over a web view of `ForkOverrides.opknapperUrl`
-  (default `https://ai.eo.nl/opknapper`; for the slice on test, build with
+  (a debug build uses the hub on this machine, `http://localhost:5173/opknapper`;
+  a release build `https://ai.eo.nl/opknapper`; for the slice on test, build with
   `--dart-define=OPKNAPPER_URL=https://app-test-aihub.azurewebsites.net/opknapper`).
 - **Beta mode until it's released.** While `ForkOverrides.opknapperReleased`
   is false (the default), the tab, the page and the reminders exist only on a
   device in beta mode. A tester turns it on by tapping the app version seven
   times in a row (Instellingen → Over → App-versie); a message confirms it,
-  and a *Bètamodus* switch then shows on that page to turn it off. Seven taps
+  and a *Bètamodus* switch then shows on that page to turn it off (on iOS 26,
+  where About is a native sheet, a haptic confirms it and the version row
+  says "bètamodus"). Seven taps
   again turn it off too. Nothing hints at it beforehand. Turned off, the tab
   goes, an open game returns to chat and pending reminders are cancelled.
   Kept per device, so it survives updates and sign-outs.
@@ -47,7 +51,7 @@ browser.
 
 ## Reminders
 
-The dagbrief comes each working day. A web view can't take Web Push, so the
+A new opdracht comes each working day. A web view can't take Web Push, so the
 app schedules local notifications itself, with no server
 (ai-hub-webapp 50, T32's first step).
 
@@ -56,7 +60,7 @@ app schedules local notifications itself, with no server
   a dagbrief is answered (`answered`, which drops today's). A colleague who
   stays away a week stops hearing from the app until they come back — an
   invitation, never a broadcast.
-- **Off by default.** Turned on in the tab, or by the page
+- **Off by default.** Turned on in Meldingen, or by the page
   (`reminders`); turning it on asks iOS for permission.
 - **A tap** opens `/opknapper?open=post`; if the game is already open the page
   gets an `eochat:open` event instead of a reload.

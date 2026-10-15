@@ -1,3 +1,7 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kDebugMode;
+
 /// Fork-specific runtime overrides, ideally kept small for easy upstream merges.
 ///
 /// Values can be overridden per build using `--dart-define`.
@@ -136,12 +140,19 @@ class ForkOverrides {
     defaultValue: false,
   );
 
-  /// The game's address. The test environment can be swapped in per build
-  /// with `--dart-define=OPKNAPPER_URL=https://app-test-aihub…/opknapper`.
-  static const String opknapperUrl = String.fromEnvironment(
-    'OPKNAPPER_URL',
-    defaultValue: 'https://ai.eo.nl/opknapper',
-  );
+  static const String _opknapperUrl = String.fromEnvironment('OPKNAPPER_URL');
+
+  /// The game's address. A debug build runs against the hub on this machine
+  /// (`pnpm dev` in ai-hub-webapp, Vite on :5173; the Android emulator
+  /// reaches the host as 10.0.2.2). A release build uses ai.eo.nl. Swap in
+  /// another per build, e.g. the test slice, with
+  /// `--dart-define=OPKNAPPER_URL=https://app-test-aihub…/opknapper`.
+  static String get opknapperUrl {
+    if (_opknapperUrl.isNotEmpty) return _opknapperUrl;
+    if (!kDebugMode) return 'https://ai.eo.nl/opknapper';
+    final host = Platform.isAndroid ? '10.0.2.2' : 'localhost';
+    return 'http://$host:5173/opknapper';
+  }
 
   static String? get brandNameOverride =>
       _brandName.isEmpty ? null : _brandName;

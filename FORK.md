@@ -271,13 +271,39 @@ carried a branding-string swap. Current known inline-touch files:
     — `opknapper` appended to `SidebarTabId` (persisted by name, so the
     position at the end matters only for upstream merges).
   - `lib/features/navigation/widgets/sidebar_tab_registry.dart` — the tab's
-    descriptor, second in `sidebarTabRegistry`, and its builders.
+    descriptor, last in `sidebarTabRegistry` (right of the tab bar, label
+    *Game*, graduation cap), and its builders. The tab has no panel.
   - `lib/features/navigation/providers/sidebar_providers.dart` — the
     snapshot drops the Opknapper tab unless `opknapperAvailableProvider`
     (released or beta mode); the registry's predicate can't watch providers.
   - `lib/features/profile/views/about_page.dart` — the version row counts
     taps for beta mode (no hint), and a *Bètamodus* switch shows while it's
-    on, so a tester can always find the way out.
+    on, so a tester can always find the way out. This is the Flutter About
+    page, which Android and pre-iOS 26 show.
+  - `lib/core/utils/native_sheet_utils.dart`,
+    `lib/core/services/native_sheet_hydration_service.dart` and
+    `lib/main.dart` — the same taps on iOS 26, where About is a native
+    sheet: its version row was an `info` row, which ignores taps, so it is a
+    chevron-less navigation row now (`nativeAppVersionTapId`), `main.dart`
+    counts the taps, and the row's subtitle says "bètamodus" while it's on.
+  - `lib/features/navigation/widgets/sidebar_page.dart` —
+    `selectSidebarTab` opens the game straight away for the Game tab (closes
+    the drawer, goes to `/opknapper`) instead of switching to a panel.
+  - `lib/features/notifications/views/notification_settings_page.dart`,
+    `lib/core/services/native_sheet_hydration_service.dart` and
+    `lib/main.dart` — the Game's daily notification (switch and time) as a
+    group of the Notifications settings, Flutter and native (iOS 26).
+  - `lib/features/navigation/widgets/responsive_drawer_layout.dart` and
+    `drawer_shell_page.dart` — `swipeToOpenEnabled`: on the game page
+    (`opknapperGameOpenProvider`) no swipe opens the sidebar; only the page's
+    X leaves the game.
+  - `lib/features/profile/widgets/settings_page_scaffold.dart` —
+    `settingsSectionGap` is a third of `Spacing.lg`, and
+    `ios/Runner/NativeSheetBridge.swift` /
+    `NativeSheetUIFoundation.swift` give untitled native setting groups a
+    third of the default gap (UI polish).
+  - `lib/core/config/fork_overrides.dart` — `opknapperUrl` defaults to the
+    hub on this machine (`localhost:5173`) in debug builds.
   - `lib/core/router/app_router.dart` — `/opknapper` inside the drawer
     `ShellRoute`, beside chat, notes and channels.
   - `lib/core/providers/app_startup_providers.dart` — starts

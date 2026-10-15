@@ -27,6 +27,19 @@ final opknapperAvailableProvider = Provider<bool>(
   (ref) => ForkOverrides.opknapperReleased || ref.watch(betaModeProvider),
 );
 
+/// True while the game page is on screen. The drawer shell turns its swipe
+/// to open off then, so only the page's close button leaves the game.
+final opknapperGameOpenProvider = NotifierProvider<OpknapperGameOpen, bool>(
+  OpknapperGameOpen.new,
+);
+
+class OpknapperGameOpen extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool open) => state = open;
+}
+
 class BetaMode extends Notifier<bool> {
   static const String _key = 'eochat.betaMode';
 

@@ -5,7 +5,6 @@ import '../../channels/widgets/channel_list_tab.dart';
 import '../../hermes/widgets/hermes_sessions_tab.dart';
 import '../../notes/widgets/notes_list_tab.dart';
 import '../../opknapper/opknapper_config.dart';
-import '../../opknapper/widgets/opknapper_sidebar_tab.dart';
 import '../../terminal/widgets/terminal_tab.dart';
 import '../../terminal/controllers/terminal_sidebar_tab_behavior.dart';
 import '../controllers/sidebar_tab_behavior.dart';
@@ -116,10 +115,12 @@ String _opknapperLabel(AppLocalizations l10n) => OpknapperStrings.name;
 String _opknapperSearchHint(AppLocalizations l10n) =>
     OpknapperStrings.searchHint;
 
+/// The Game tab has no panel of its own: selecting it opens the game in the
+/// main pane (`selectSidebarTab`), so this body is never shown.
 Widget _opknapperBody({
   required bool showBottomNavigation,
   required bool active,
-}) => const OpknapperSidebarTab();
+}) => const SizedBox.shrink();
 
 /// Released or beta mode is applied by `sidebarNavigationSnapshotProvider`,
 /// which can watch it; this predicate only knows the server's capabilities.
@@ -159,18 +160,6 @@ const sidebarTabRegistry = <SidebarTabDescriptor>[
     selectedSfSymbol: 'bubble.left.fill',
     isVisible: _chatsVisible,
     createAction: chatSidebarCreateAction,
-  ),
-  // Fork: second, so the game sits beside chats in the tab bar.
-  SidebarTabDescriptor(
-    id: SidebarTabId.opknapper,
-    labelBuilder: _opknapperLabel,
-    searchHintBuilder: _opknapperSearchHint,
-    bodyBuilder: _opknapperBody,
-    materialIcon: Icons.handyman_outlined,
-    selectedMaterialIcon: Icons.handyman,
-    sfSymbol: 'hammer',
-    selectedSfSymbol: 'hammer.fill',
-    isVisible: _opknapperVisible,
   ),
   SidebarTabDescriptor(
     id: SidebarTabId.hermes,
@@ -226,6 +215,18 @@ const sidebarTabRegistry = <SidebarTabDescriptor>[
     selectedSfSymbol: 'number',
     isVisible: _channelsVisible,
     createAction: channelSidebarCreateAction,
+  ),
+  // Fork: last, at the right of the tab bar.
+  SidebarTabDescriptor(
+    id: SidebarTabId.opknapper,
+    labelBuilder: _opknapperLabel,
+    searchHintBuilder: _opknapperSearchHint,
+    bodyBuilder: _opknapperBody,
+    materialIcon: Icons.school_outlined,
+    selectedMaterialIcon: Icons.school,
+    sfSymbol: 'graduationcap',
+    selectedSfSymbol: 'graduationcap.fill',
+    isVisible: _opknapperVisible,
   ),
 ];
 
