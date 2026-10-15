@@ -1,7 +1,8 @@
 import 'package:meta/meta.dart';
 
 /// Stable, persistence-safe identity for a sidebar destination.
-enum SidebarTabId { chats, hermes, terminal, notes, channels }
+// Fork (EOchat): `opknapper` is the training game's tab (lib/features/opknapper).
+enum SidebarTabId { chats, hermes, terminal, notes, channels, opknapper }
 
 /// Data-only capability snapshot used to decide which destinations exist.
 @immutable

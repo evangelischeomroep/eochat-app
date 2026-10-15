@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/utils/current_localizations.dart';
+import '../../opknapper/services/opknapper_reminders.dart';
 
 import 'package:conduit_core/utils/debug_logger.dart';
 
@@ -144,6 +145,8 @@ class LocalNotificationService {
     // The plugin singleton keeps this callback registered after dispose(), so a
     // late tap could otherwise add to a closed controller and throw.
     if (_taps.isClosed) return;
+    // Fork: Opknapper's reminders carry their own payload.
+    if (OpknapperNotificationTaps.consume(response.payload)) return;
     final tap = NotificationTap.tryDecode(response.payload);
     if (tap != null) {
       _taps.add(tap);

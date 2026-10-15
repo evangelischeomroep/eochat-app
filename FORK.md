@@ -262,6 +262,27 @@ carried a branding-string swap. Current known inline-touch files:
   bubble's 2/3+ grids in `user_message_bubble.dart` pass
   `preserveAspectRatio: false` to keep uniform tiles.
 
+- Opknapper, EO's AI training game, as a sidebar tab (fork-only code in
+  `lib/features/opknapper/`, gated by `ForkOverrides.showOpknapper`, address
+  in `ForkOverrides.opknapperUrl`). Its hooks into upstream files:
+  - `packages/conduit_core/lib/features/navigation/models/sidebar_navigation_model.dart`
+    — `opknapper` appended to `SidebarTabId` (persisted by name, so the
+    position at the end matters only for upstream merges).
+  - `lib/features/navigation/widgets/sidebar_tab_registry.dart` — the tab's
+    descriptor, second in `sidebarTabRegistry`, and its builders.
+  - `lib/core/router/app_router.dart` — `/opknapper` inside the drawer
+    `ShellRoute`, beside chat, notes and channels.
+  - `lib/core/providers/app_startup_providers.dart` — starts
+    `opknapperRemindersProvider` after the notification listener.
+  - `lib/features/notifications/services/local_notification_service.dart` —
+    `_onResponse` hands an Opknapper payload to `OpknapperNotificationTaps`
+    before the message decoder sees it.
+  - `android/app/src/main/AndroidManifest.xml` — flutter_local_notifications'
+    scheduled-notification receivers and `RECEIVE_BOOT_COMPLETED`, which
+    `zonedSchedule` needs on Android.
+  - `pubspec.yaml` — `timezone` as a direct dependency (it was already in the
+    lock through flutter_local_notifications).
+
 If a new fork behavior needs another upstream file, document why in the PR.
 
 This list drifts out of date by nature — it was missing 8 real deviations before

@@ -29,6 +29,8 @@ import '../../features/navigation/views/folder_page.dart';
 import '../../features/navigation/widgets/drawer_shell_page.dart';
 import '../../features/navigation/views/splash_launcher_page.dart';
 import '../../features/notes/views/notes_list_page.dart';
+import '../../features/opknapper/opknapper_config.dart';
+import '../../features/opknapper/views/opknapper_page.dart';
 import '../../shared/widgets/adaptive_route_shell.dart';
 import '../../shared/widgets/platform_ui/platform_ui.dart';
 import '../../features/channels/views/channel_page.dart';
@@ -191,6 +193,15 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               child: NoteEditorPage(key: ValueKey(noteId), noteId: noteId),
             );
           },
+        ),
+        // Fork: Opknapper, the AI training game, in the main pane.
+        GoRoute(
+          path: OpknapperConfig.routePath,
+          name: OpknapperConfig.routeName,
+          pageBuilder: (context, state) => _buildNoTransitionPage(
+            state: state,
+            child: OpknapperPage(open: state.uri.queryParameters['open']),
+          ),
         ),
         GoRoute(
           path: Routes.channel,

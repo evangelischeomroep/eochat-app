@@ -4,6 +4,9 @@ import '../../../l10n/app_localizations.dart';
 import '../../channels/widgets/channel_list_tab.dart';
 import '../../hermes/widgets/hermes_sessions_tab.dart';
 import '../../notes/widgets/notes_list_tab.dart';
+import '../../../core/config/fork_overrides.dart';
+import '../../opknapper/opknapper_config.dart';
+import '../../opknapper/widgets/opknapper_sidebar_tab.dart';
 import '../../terminal/widgets/terminal_tab.dart';
 import '../../terminal/controllers/terminal_sidebar_tab_behavior.dart';
 import '../controllers/sidebar_tab_behavior.dart';
@@ -109,6 +112,21 @@ Widget _channelsBody({
   required bool active,
 }) => const ChannelListTab();
 
+// Fork: Opknapper, EO's AI training game (lib/features/opknapper).
+String _opknapperLabel(AppLocalizations l10n) => OpknapperStrings.name;
+String _opknapperSearchHint(AppLocalizations l10n) =>
+    OpknapperStrings.searchHint;
+
+Widget _opknapperBody({
+  required bool showBottomNavigation,
+  required bool active,
+}) => const OpknapperSidebarTab();
+
+bool _opknapperVisible(SidebarTabAvailability availability) =>
+    ForkOverrides.showOpknapper &&
+    availability.hasOpenWebUi &&
+    !availability.hermesOnly;
+
 bool _chatsVisible(SidebarTabAvailability availability) =>
     !availability.hermesOnly;
 
@@ -142,6 +160,18 @@ const sidebarTabRegistry = <SidebarTabDescriptor>[
     selectedSfSymbol: 'bubble.left.fill',
     isVisible: _chatsVisible,
     createAction: chatSidebarCreateAction,
+  ),
+  // Fork: second, so the game sits beside chats in the tab bar.
+  SidebarTabDescriptor(
+    id: SidebarTabId.opknapper,
+    labelBuilder: _opknapperLabel,
+    searchHintBuilder: _opknapperSearchHint,
+    bodyBuilder: _opknapperBody,
+    materialIcon: Icons.handyman_outlined,
+    selectedMaterialIcon: Icons.handyman,
+    sfSymbol: 'hammer',
+    selectedSfSymbol: 'hammer.fill',
+    isVisible: _opknapperVisible,
   ),
   SidebarTabDescriptor(
     id: SidebarTabId.hermes,

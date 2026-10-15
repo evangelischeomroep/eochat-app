@@ -71,6 +71,7 @@ import 'package:conduit_core/features/hermes/models/hermes_model.dart';
 
 import '../../features/notifications/providers/notification_socket_listener.dart';
 import '../../features/notifications/services/local_notification_service.dart';
+import '../../features/opknapper/services/opknapper_reminders.dart';
 import '../../shared/theme/theme_providers.dart';
 
 part 'app_startup_providers.g.dart';
@@ -1255,6 +1256,11 @@ class AppStartupFlow extends _$AppStartupFlow {
     unawaited(
       ref.read(notificationSocketListenerProvider.notifier).handleLaunchTap(),
     );
+    // Fork: Opknapper's reminders — taps, a cold launch from one, and the
+    // rolling window renewed for the signed-in colleague.
+    if (ForkOverrides.showOpknapper) {
+      unawaited(ref.read(opknapperRemindersProvider.notifier).start());
+    }
     _scheduleDefaultModelPreload(
       keepDefaultModelAutoSelectionAlive: keepDefaultModelAutoSelectionAlive,
     );
