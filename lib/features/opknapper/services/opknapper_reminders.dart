@@ -19,7 +19,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart' show TimeOfDay;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:timezone/data/latest.dart' as tzdata;
+import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
 import 'package:conduit_core/utils/debug_logger.dart';
@@ -139,6 +139,8 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
+  // latest_all, not latest: `latest` leaves out link names such as
+  // Europe/Amsterdam (a link to Brussels), which then isn't found.
   static bool _zonesReady = false;
   StreamSubscription<Map<String, Object?>>? _tapSub;
   bool _started = false;

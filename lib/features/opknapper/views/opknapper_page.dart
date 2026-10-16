@@ -99,6 +99,9 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
   }
 
   late final OpknapperGameOpen _gameOpen;
+
+  /// The last navigation we cancelled to load another in its place.
+  String? _replacedNavigation;
   bool _loading = true;
   bool _failed = false;
   bool _ready = false;
@@ -184,6 +187,7 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
         ref.read(currentUserProvider2)?.email,
       );
       if (hinted != null) {
+        _replacedNavigation = uri.toString();
         unawaited(
           controller.loadUrl(urlRequest: URLRequest(url: WebUri.uri(hinted))),
         );
@@ -314,17 +318,32 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
       shouldOverrideUrlLoading: _onNavigation,
       onLoadStop: (controller, url) {
         if (!mounted) return;
-        // Microsoft's sign-in pages count as loaded too: show them.
-        setState(() => _loading = false);
+        // Microsoft's sign-in pages count as loaded too: show them. A page
+        // that loads has outlived any error from a navigation we replaced.
+        setState(() {
+          _loading = false;
+          _failed = false;
+        });
       },
       onReceivedError: (controller, request, error) {
         if (request.isForMainFrame != true) return;
-        // A navigation we cancelled ourselves isn't a failure.
+        // A navigation we cancelled ourselves isn't a failure. WebKit reports
+        // that as "frame load interrupted" (WebKitErrorDomain 102), not as a
+        // cancellation, when the login hint replaces Microsoft's request.
         if (error.type == WebResourceErrorType.CANCELLED) return;
+        final url = request.url.toString();
+        if (url == _replacedNavigation ||
+            error.description.contains('code=102')) {
+          return;
+        }
         DebugLogger.warning(
           'load-error',
           scope: _scope,
-          data: {'type': error.type.toString()},
+          data: {
+            'type': error.type.toString(),
+            'description': error.description,
+            'url': request.url.toString(),
+          },
         );
         if (mounted) setState(() => _failed = true);
       },
