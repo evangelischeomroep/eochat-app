@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "Novinky",
+      "intro": "Ahoj! Open WebUI 0.12.2 funguje a kanály ukazují aplikace, které v nich odpovídají, a mohou tě upozorňovat jen na zmínky. Hlasové hovory pokračují i přes hluk v pozadí a gesta avatara a tlačítko reproduktoru funguje od začátku hovorů v Androidu.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2: aplikace funguje bez upozornění na kompatibilitu. Chaty, které zahájí hovor v reálném čase, dostanou vygenerovaný název a štítky podle tvého nastavení názvů a štítků.",
+          "icon": "direct"
+        },
+        {
+          "text": "Kanály: zprávy od aplikací ukazují název aplikace, karty, tlačítka a odkazy. Stisknutím tlačítka ho pošleš aplikaci a odpovědi, které vidíš jen ty, se objeví pod zprávou, dokud je nezavřeš. Nastav kanál nebo přímou zprávu na Jen zmínky a vyhneš se odznakům a oznámením, pokud tě někdo nezmíní.",
+          "icon": "direct"
+        },
+        {
+          "text": "Hlasové hovory: hluk v pozadí už neutne hlas v reálném čase uprostřed věty; hlas se pozastaví a pokračuje, pokud nic nezaznělo. Gesta avatara už nezdržují odpovědi o tři sekundy. V Androidu funguje tlačítko reproduktoru od začátku hovoru a hovor už během prvních dvou minut neblokuje tvé vlastní telefonní hovory.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "Nouveautés",
+      "intro": "Bonjour ! Open WebUI 0.12.2 fonctionne, et les canaux affichent les applications qui y répondent et peuvent vous notifier uniquement pour les mentions. Les appels vocaux continuent malgré le bruit de fond et les gestes de l’avatar, et le bouton haut-parleur fonctionne dès le début des appels sur Android.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2 : l’app fonctionne sans avertissement de compatibilité. Les discussions lancées par un appel en temps réel reçoivent un titre et des tags générés, selon vos réglages de titres et de tags.",
+          "icon": "direct"
+        },
+        {
+          "text": "Canaux : les messages des applications affichent le nom de l’application, des cartes, des boutons et des liens. Appuyer sur un bouton l’envoie à l’application, et les réponses visibles uniquement par vous apparaissent sous le message jusqu’à ce que vous les ignoriez. Réglez un canal ou un message direct sur Mentions uniquement pour éviter badges et notifications, sauf si l’on vous mentionne.",
+          "icon": "direct"
+        },
+        {
+          "text": "Appels vocaux : le bruit de fond ne coupe plus la voix en temps réel en pleine phrase ; elle se met en pause et reprend si rien n’a été dit. Les gestes de l’avatar ne retardent plus les réponses de trois secondes. Sur Android, le bouton haut-parleur fonctionne dès le début de l’appel, et un appel ne bloque plus vos propres appels téléphoniques pendant ses deux premières minutes.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

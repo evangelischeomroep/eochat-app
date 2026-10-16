@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "Co nowego",
+      "intro": "Cześć! Open WebUI 0.12.2 działa, a kanały pokazują aplikacje, które w nich odpowiadają, i mogą powiadamiać Cię tylko o wzmiankach. Rozmowy głosowe trwają mimo hałasu w tle i gestów awatara, a przycisk głośnika działa od początku rozmów na Androidzie.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2: aplikacja działa bez ostrzeżenia o zgodności. Czaty rozpoczęte przez rozmowę na żywo dostają wygenerowany tytuł i tagi, zgodnie z Twoimi ustawieniami tytułów i tagów.",
+          "icon": "direct"
+        },
+        {
+          "text": "Kanały: wiadomości od aplikacji pokazują nazwę aplikacji, karty, przyciski i linki. Naciśnięcie przycisku wysyła go do aplikacji, a odpowiedzi widoczne tylko dla Ciebie pojawiają się pod wiadomością, dopóki ich nie zamkniesz. Ustaw kanał lub wiadomość bezpośrednią na Tylko wzmianki, aby pominąć plakietki i powiadomienia, chyba że ktoś Cię wspomni.",
+          "icon": "direct"
+        },
+        {
+          "text": "Rozmowy głosowe: hałas w tle nie przerywa już głosu na żywo w połowie zdania; głos się zatrzymuje i mówi dalej, jeśli nic nie zostało powiedziane. Gesty awatara nie opóźniają już odpowiedzi o trzy sekundy. Na Androidzie przycisk głośnika działa od początku rozmowy, a rozmowa nie blokuje już Twoich połączeń telefonicznych przez pierwsze dwie minuty.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

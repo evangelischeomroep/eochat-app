@@ -1,6 +1,6 @@
 name: conduit
 description: Open-source mobile client for Open-WebUI
-version: 4.2.0+151
+version: 4.2.1+152
 publish_to: 'none'
 
 # Configure sqlite3 build hook to use system SQLite on iOS/macOS instead of downloading

@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "Novità",
+      "intro": "Ciao! Open WebUI 0.12.2 funziona, e i canali mostrano le app che vi rispondono e possono avvisarti solo per le menzioni. Le chiamate vocali proseguono nonostante il rumore di fondo e i gesti dell’avatar, e il pulsante dell’altoparlante funziona dall’inizio delle chiamate su Android.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2: l’app funziona senza avviso di compatibilità. Le chat avviate da una chiamata in tempo reale ricevono titolo e tag generati, secondo le tue impostazioni di titoli e tag.",
+          "icon": "direct"
+        },
+        {
+          "text": "Canali: i messaggi delle app mostrano il nome dell’app, schede, pulsanti e link. Premere un pulsante lo invia all’app, e le risposte visibili solo a te compaiono sotto il messaggio finché non le chiudi. Imposta un canale o un messaggio diretto su Solo menzioni per evitare badge e notifiche, a meno che non ti menzionino.",
+          "icon": "direct"
+        },
+        {
+          "text": "Chiamate vocali: il rumore di fondo non interrompe più la voce in tempo reale a metà frase; si mette in pausa e riprende se non è stato detto nulla. I gesti dell’avatar non ritardano più le risposte di tre secondi. Su Android il pulsante dell’altoparlante funziona dall’inizio della chiamata, e una chiamata non blocca più le tue telefonate nei primi due minuti.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

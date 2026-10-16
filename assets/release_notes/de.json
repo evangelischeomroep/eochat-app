@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "Neuigkeiten",
+      "intro": "Hallo! Open WebUI 0.12.2 funktioniert, und Kanäle zeigen die Apps, die darin antworten, und können dich nur bei Erwähnungen benachrichtigen. Sprachanrufe laufen trotz Hintergrundgeräuschen und Avatar-Gesten weiter, und die Lautsprechertaste funktioniert bei Android-Anrufen von Anfang an.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2: Die App funktioniert ohne Kompatibilitätswarnung. Chats, die ein Echtzeitanruf startet, bekommen einen generierten Titel und Tags, gemäß deinen Einstellungen für Titel und Tags.",
+          "icon": "direct"
+        },
+        {
+          "text": "Kanäle: Nachrichten von Apps zeigen den Namen der App, Karten, Schaltflächen und Links. Ein Tipp auf eine Schaltfläche schickt sie an die App, und Antworten, die nur du siehst, erscheinen unter der Nachricht, bis du sie ausblendest. Stell einen Kanal oder eine Direktnachricht auf „Nur Erwähnungen“, um Badges und Benachrichtigungen zu vermeiden, außer du wirst erwähnt.",
+          "icon": "direct"
+        },
+        {
+          "text": "Sprachanrufe: Hintergrundgeräusche schneiden der Echtzeitstimme nicht mehr mitten im Satz das Wort ab; sie pausiert und spricht weiter, wenn nichts gesagt wurde. Avatar-Gesten halten Antworten nicht mehr drei Sekunden auf. Unter Android funktioniert die Lautsprechertaste ab Anrufbeginn, und ein Anruf blockiert in den ersten zwei Minuten nicht mehr deine eigenen Telefonate.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

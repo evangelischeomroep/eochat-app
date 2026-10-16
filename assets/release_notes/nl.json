@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "Nieuw",
+      "intro": "Hoi! Open WebUI 0.12.2 werkt, en kanalen tonen de apps die erin antwoorden en kunnen je alleen bij vermeldingen een melding sturen. Spraakgesprekken gaan door ondanks achtergrondgeluid en avatargebaren, en de luidsprekerknop werkt vanaf het begin van Android-gesprekken.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2: de app werkt zonder compatibiliteitswaarschuwing. Chats die een realtime gesprek start, krijgen een gegenereerde titel en tags, volgens je instellingen voor titels en tags.",
+          "icon": "direct"
+        },
+        {
+          "text": "Kanalen: berichten van apps tonen de naam van de app, kaarten, knoppen en links. Een knop indrukken stuurt die naar de app, en antwoorden die alleen jij ziet verschijnen onder het bericht tot je ze sluit. Zet een kanaal of direct bericht op Alleen vermeldingen om badges en meldingen over te slaan, tenzij je wordt vermeld.",
+          "icon": "direct"
+        },
+        {
+          "text": "Spraakgesprekken: achtergrondgeluid kapt de realtime stem niet meer midden in een zin af; hij pauzeert en gaat verder als er niets is gezegd. Avatargebaren houden antwoorden niet meer drie seconden op. Op Android werkt de luidsprekerknop vanaf het begin van een gesprek, en een gesprek blokkeert de eerste twee minuten niet meer je eigen telefoongesprekken.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }

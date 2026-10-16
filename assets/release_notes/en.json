@@ -205,6 +205,25 @@
           "icon": "polish"
         }
       ]
+    },
+    {
+      "version": "4.2.1",
+      "title": "What's new",
+      "intro": "Hi! Open WebUI 0.12.2 works, and channels show the apps that answer in them and can notify you for mentions only. Voice calls keep going through background noise and avatar gestures, and the speaker button works from the start of Android calls.",
+      "bullets": [
+        {
+          "text": "Open WebUI 0.12.2: the app works without a compatibility warning. Chats a realtime call starts get a generated title and tags, following your title and tag settings.",
+          "icon": "direct"
+        },
+        {
+          "text": "Channels: messages from apps show the app's name, cards, buttons and links. Pressing a button sends it to the app, and replies only you can see appear under the message until you dismiss them. Set a channel or direct message to Mentions only to skip badges and notifications unless you're mentioned.",
+          "icon": "direct"
+        },
+        {
+          "text": "Voice calls: background noise no longer cuts off a realtime voice mid-sentence; it pauses, and carries on if nothing was said. Avatar gestures no longer hold up replies for three seconds. On Android, the speaker button works from the start of a call, and a call no longer blocks your own phone calls for its first two minutes.",
+          "icon": "polish"
+        }
+      ]
     }
   ]
 }
