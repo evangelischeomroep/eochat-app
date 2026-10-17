@@ -438,7 +438,7 @@
 				F1DBCF1E2E601A39004C2540 /* Embed Foundation Extensions */,
 				9740EEB61CF901F6004384FC /* Run Script */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
-				510E52ED21213A0F5B8BF5E3 /* [EOchat] Generate objective_c.framework dSYM */,
+				D5C9E53F59ED40B57B88790B /* [EOchat] Generate objective_c.framework dSYM */,
 			);
 			buildRules = (
 			);
@@ -631,7 +631,22 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
-		510E52ED21213A0F5B8BF5E3 /* [EOchat] Generate objective_c.framework dSYM */ = {
+		9740EEB61CF901F6004384FC /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		D5C9E53F59ED40B57B88790B /* [EOchat] Generate objective_c.framework dSYM */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -648,21 +663,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\nif [ \"${CONFIGURATION}\" != \"Release\" ] && [ \"${CONFIGURATION}\" != \"Profile\" ]; then\n  exit 0\nfi\nFRAMEWORK_BIN=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/objective_c.framework/objective_c\"\nif [ ! -f \"${FRAMEWORK_BIN}\" ]; then\n  echo \"warning: objective_c.framework not found at ${FRAMEWORK_BIN}, skipping dSYM generation\"\n  exit 0\nfi\nmkdir -p \"${DWARF_DSYM_FOLDER_PATH}\"\n/usr/bin/xcrun dsymutil \"${FRAMEWORK_BIN}\" -o \"${DWARF_DSYM_FOLDER_PATH}/objective_c.framework.dSYM\"\n";
-		};
-		9740EEB61CF901F6004384FC /* Run Script */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Run Script";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
 		};
 		DE631DFCBC56A5A8B5E0A4FD /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
