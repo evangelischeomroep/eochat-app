@@ -1,14 +1,12 @@
 // Fork-only (EOchat): who sees Opknapper.
 //
-// Until it's released, Opknapper is there only in beta mode: a hidden switch
-// a tester turns on by tapping the app version on the About page seven times
-// in a row (Instellingen → Over). The same seven taps turn it off again, and
-// while it's on the About page shows a visible switch for it too.
+// Opknapper is released to everyone by default. Beta mode stays available
+// for testing other features in the production app.
 //
-// Releasing it to everyone is one line: `ForkOverrides.opknapperReleased`
-// to true (or `--dart-define=OPKNAPPER_RELEASED=true` for one build).
-// Beta mode then changes nothing for the game, and stays the place for the
-// next feature that wants testing in the production app first.
+// With `--dart-define=OPKNAPPER_RELEASED=false`, the game exists only in beta
+// mode: a hidden switch a tester toggles by tapping the app version seven
+// times in a row (Instellingen → Over). While beta mode is on, the About page
+// also shows a visible switch to turn it off.
 
 import 'dart:async';
 

@@ -275,9 +275,11 @@ carried a branding-string swap. Current known inline-touch files:
 
 - Opknapper, EO's AI training game, as a sidebar tab (fork-only code in
   `lib/features/opknapper/`, address in `ForkOverrides.opknapperUrl`).
-  Until `ForkOverrides.opknapperReleased` is true it exists only in beta
-  mode: seven taps on the app version (Over) turn it on or off per device
-  (`opknapper_availability.dart`). Its hooks into upstream files:
+  `ForkOverrides.opknapperReleased` defaults to true, so it is available
+  without beta mode. A build with `--dart-define=OPKNAPPER_RELEASED=false`
+  restricts it to beta mode: seven taps on the app version (Over) turn that
+  on or off per device (`opknapper_availability.dart`). Its hooks into
+  upstream files:
   - `packages/conduit_core/lib/features/navigation/models/sidebar_navigation_model.dart`
     — `opknapper` appended to `SidebarTabId` (persisted by name, so the
     position at the end matters only for upstream merges).

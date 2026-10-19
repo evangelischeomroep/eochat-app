@@ -472,7 +472,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('persistent tablet uses bottom navigation with all five tabs', (
+  testWidgets('persistent tablet uses bottom navigation with all six tabs', (
     tester,
   ) async {
     final controllers = SidebarTestSidebarHarnessControllers();
@@ -496,7 +496,14 @@ void main() {
           .getSize(find.byKey(const ValueKey<String>('sidebar-page-surface')))
           .width,
     );
-    for (final label in ['Chats', 'Hermes', 'Notes', 'Terminal', 'Channels']) {
+    for (final label in [
+      'Chats',
+      'Hermes',
+      'Notes',
+      'Terminal',
+      'Channels',
+      'Game',
+    ]) {
       expect(sidebarTestBottomNavTabLabel(label), findsOneWidget);
     }
 
@@ -542,6 +549,8 @@ void main() {
       sidebarTestBuildHarness(
         controllers: controllers,
         hermesEnabled: true,
+        // Keep five tabs so this exercises the native bar with Game visible.
+        terminalServers: const [],
         persistentTabletSidebar: true,
       ),
     );
@@ -568,7 +577,12 @@ void main() {
 
     final controllers = SidebarTestSidebarHarnessControllers();
     await tester.pumpWidget(
-      sidebarTestBuildHarness(controllers: controllers, hermesEnabled: true),
+      sidebarTestBuildHarness(
+        controllers: controllers,
+        hermesEnabled: true,
+        // Keep five tabs so this exercises the native bar with Game visible.
+        terminalServers: const [],
+      ),
     );
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -579,8 +593,8 @@ void main() {
       'Chats',
       'Hermes',
       'Notes',
-      'Terminal',
       'Channels',
+      'Game',
     ]);
     expect(tabBar.items[1].icon, isNull);
     expect(tabBar.items[1].imageAsset?.size, 26);

@@ -17,19 +17,21 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
   (a debug build uses the hub on this machine, `http://localhost:5173/opknapper`;
   a release build `https://ai.eo.nl/opknapper`; for the slice on test, build with
   `--dart-define=OPKNAPPER_URL=https://app-test-aihub.azurewebsites.net/opknapper`).
-- **Beta mode until it's released.** While `ForkOverrides.opknapperReleased`
-  is false (the default), the tab, the page and the reminders exist only on a
-  device in beta mode. A tester turns it on by tapping the app version seven
+- **Available to everyone.** `ForkOverrides.opknapperReleased` defaults to
+  true, so the tab, page and reminder settings are available without beta
+  mode. The usual TestFlight and App Store release makes this available to
+  installed clients. Reminders remain off until the user enables them.
+- **Beta mode for testing.** A build with
+  `--dart-define=OPKNAPPER_RELEASED=false` restricts the game to devices in
+  beta mode. A tester turns it on by tapping the app version seven
   times in a row (Instellingen → Over → App-versie); a message confirms it,
   and a *Bètamodus* switch then shows on that page to turn it off (on iOS 26,
   where About is a native sheet, a haptic confirms it and the version row
   says "bètamodus"). Seven taps
-  again turn it off too. Nothing hints at it beforehand. Turned off, the tab
-  goes, an open game returns to chat and pending reminders are cancelled.
-  Kept per device, so it survives updates and sign-outs.
-- **Releasing it** is `opknapperReleased` to true in `fork_overrides.dart`
-  (or `--dart-define=OPKNAPPER_RELEASED=true` for one build), then the usual
-  TestFlight and App Store route. Beta mode stays for the next feature.
+  again turn it off too. Nothing hints at it beforehand. In these restricted
+  builds, turning beta mode off hides the tab, returns an open game to chat
+  and cancels pending reminders. Beta mode is kept per device, so it survives
+  updates and sign-outs. In default builds it does not affect the game.
 
 ## Sign-in
 
