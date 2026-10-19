@@ -1833,6 +1833,7 @@ void main() {
 
     expect(find.byKey(const ValueKey('expanded-composer-shell')), findsNothing);
     expect(find.byKey(const ValueKey('composer-quick-pills')), findsNothing);
+    expect(find.byType(HorizontalOverflowFade), findsNothing);
     expect(find.text('Web'), findsNothing);
     expect(
       find.descendant(
@@ -1841,45 +1842,6 @@ void main() {
       ),
       findsOneWidget,
     );
-  });
-
-  testWidgets('a single quick pill paints no overflow cue (issue #745)', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          apiServiceProvider.overrideWithValue(null),
-          appSettingsProvider.overrideWith(_QuickPillAppSettingsNotifier.new),
-          webSearchAvailableProvider.overrideWithValue(true),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: conduitLocalizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: ModernChatInput(onSendMessage: (_) {})),
-        ),
-      ),
-    );
-    await tester.pump();
-
-    // The pill row has room to spare, so the trailing cue must not paint. It
-    // used to draw the page background over the composer surface, which read
-    // as a black square next to the mic.
-    final fade = find.byType(HorizontalOverflowFade);
-    expect(fade, findsOneWidget);
-    expect(
-      find.descendant(of: fade, matching: find.byType(ShaderMask)),
-      findsNothing,
-    );
-    check(
-      tester
-          .widgetList<DecoratedBox>(
-            find.descendant(of: fade, matching: find.byType(DecoratedBox)),
-          )
-          .map((box) => box.decoration)
-          .whereType<BoxDecoration>()
-          .where((decoration) => decoration.gradient != null),
-    ).isEmpty();
   });
 }
 
