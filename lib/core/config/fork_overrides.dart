@@ -141,14 +141,19 @@ class ForkOverrides {
   static const double chatImageMaxScreenHeightFraction = 0.45;
 
   /// Opknapper, EO's AI training game (ai.eo.nl/opknapper), as a sidebar
-  /// tab with its daily letter as a local reminder. Released to everyone by
-  /// default. Set false to restrict it to beta mode, which a tester turns on
-  /// by tapping the app version on the About page seven times
-  /// (`opknapper_availability.dart`). See `lib/features/opknapper/` and FORK.md.
+  /// tab with its daily letter as a local reminder. Released to everyone at
+  /// [opknapperReleaseAt]; before that it exists only in beta mode, which a
+  /// tester turns on by tapping the app version on the About page seven
+  /// times, and in debug builds (`opknapper_availability.dart`). Set
+  /// `--dart-define=OPKNAPPER_RELEASED=true` to release it in one build
+  /// regardless of the date. See `lib/features/opknapper/` and FORK.md.
   static const bool opknapperReleased = bool.fromEnvironment(
     'OPKNAPPER_RELEASED',
-    defaultValue: true,
   );
+
+  /// 25 Oct 2026 18:00 Dutch time. Summer time ends that same night, so
+  /// 18:00 is CET (UTC+1).
+  static final DateTime opknapperReleaseAt = DateTime.utc(2026, 10, 25, 17);
 
   static const String _opknapperUrl = String.fromEnvironment('OPKNAPPER_URL');
 

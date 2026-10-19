@@ -1,15 +1,19 @@
 // Fork-only (EOchat): who sees Opknapper.
 //
-// Opknapper is released to everyone by default. Beta mode stays available
-// for testing other features in the production app.
+// Opknapper is released to everyone at `ForkOverrides.opknapperReleaseAt`
+// (25 Oct 2026 18:00). Until then it is there only in beta mode, a hidden
+// switch a tester toggles by tapping the app version seven times in a row
+// (Instellingen → Over), and in debug builds. While beta mode is on, the
+// About page also shows a visible switch to turn it off.
 //
-// With `--dart-define=OPKNAPPER_RELEASED=false`, the game exists only in beta
-// mode: a hidden switch a tester toggles by tapping the app version seven
-// times in a row (Instellingen → Over). While beta mode is on, the About page
-// also shows a visible switch to turn it off.
+// An app left open across the release moment shows the tab when it passes,
+// or on its next return to the foreground. After the release beta mode
+// changes nothing for the game and stays the place for the next feature.
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -22,8 +26,66 @@ final betaModeProvider = NotifierProvider<BetaMode, bool>(BetaMode.new);
 
 /// Whether Opknapper's tab, page and reminders exist on this device.
 final opknapperAvailableProvider = Provider<bool>(
-  (ref) => ForkOverrides.opknapperReleased || ref.watch(betaModeProvider),
+  (ref) =>
+      ref.watch(opknapperReleasedProvider) ||
+      kDebugMode ||
+      ref.watch(betaModeProvider),
 );
+
+/// Whether the release moment has passed. Flips to true on its own while
+/// the app is running.
+final opknapperReleasedProvider = NotifierProvider<OpknapperReleased, bool>(
+  OpknapperReleased.new,
+);
+
+class OpknapperReleased extends Notifier<bool> {
+  /// The clock, swappable in tests.
+  @visibleForTesting
+  static DateTime Function() now = DateTime.now;
+
+  Timer? _timer;
+  AppLifecycleListener? _lifecycle;
+
+  @override
+  bool build() {
+    ref.onDispose(_stopWatching);
+    if (_released()) return true;
+    _scheduleTimer();
+    // The timer's clock can stand still while the app is suspended, so look
+    // again whenever it comes back.
+    _lifecycle = AppLifecycleListener(onResume: _check);
+    return false;
+  }
+
+  void _scheduleTimer() {
+    _timer?.cancel();
+    _timer = Timer(
+      ForkOverrides.opknapperReleaseAt.difference(now().toUtc()),
+      _check,
+    );
+  }
+
+  bool _released() =>
+      ForkOverrides.opknapperReleased ||
+      !now().toUtc().isBefore(ForkOverrides.opknapperReleaseAt);
+
+  void _check() {
+    if (!ref.mounted || state) return;
+    if (!_released()) {
+      _scheduleTimer();
+      return;
+    }
+    _stopWatching();
+    state = true;
+  }
+
+  void _stopWatching() {
+    _timer?.cancel();
+    _timer = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
+  }
+}
 
 /// True while the game page is on screen. The drawer shell turns its swipe
 /// to open off then, so only the page's close button leaves the game.
