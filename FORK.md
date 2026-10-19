@@ -201,9 +201,10 @@ carried a branding-string swap. Current known inline-touch files:
   longer passes a colour (see the fade entry below).
   `ForkOverrides.replaceComposerQuickPillsWithCounter` breaks out of that
   loop and skips the code-interpreter pill entirely; instead the fork-owned
-  `ComposerActiveToolsBadge` sits after both `_buildOverflowButton` call
-  sites, counting the selected items `buildIosKeyboardAttachmentActions`
-  yields. Why: the user wanted no pills under the input, only a count of
+  `ComposerActiveToolsBadge` sits inside `_buildOverflowButton`, sharing its
+  tap target and a neutral outline whenever tools are active, counting the
+  selected items `buildIosKeyboardAttachmentActions` yields. Why: the user
+  wanted no pills under the input, only a count of
   what is switched on in the `+` menu. Fork ARB key:
   `composerActiveToolsCount`.
 - `lib/shared/widgets/server_version_warning_card.dart` — `showWarning`

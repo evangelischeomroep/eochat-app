@@ -3449,7 +3449,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     final Color placeholderFocused = placeholderColor;
     final List<Widget> quickPills = <Widget>[];
 
-    // Fork: with the counter beside `+`, no pill reaches the composer.
+    // Fork: with the counter inside `+`, no pill reaches the composer.
     final int activeOverflowCount =
         ForkOverrides.replaceComposerQuickPillsWithCounter
         ? buildIosKeyboardAttachmentActions(
@@ -3755,9 +3755,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                   tooltip: l10n.more,
                   dense: true,
                   nativeActions: nativeAttachmentActions,
+                  activeCount: activeOverflowCount,
                 ),
-                if (activeOverflowCount > 0)
-                  ComposerActiveToolsBadge(count: activeOverflowCount),
                 const SizedBox(width: Spacing.xs),
               ],
               if (quickPills.isNotEmpty)
@@ -3904,9 +3903,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                     tooltip: l10n.more,
                     dense: true,
                     nativeActions: nativeAttachmentActions,
+                    activeCount: activeOverflowCount,
                   ),
-                  if (activeOverflowCount > 0)
-                    ComposerActiveToolsBadge(count: activeOverflowCount),
                   const SizedBox(width: Spacing.xs),
                 ],
                 Expanded(
@@ -4395,6 +4393,7 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     required String tooltip,
     bool dense = false,
     List<IosKeyboardAttachmentActionConfig> nativeActions = const [],
+    int activeCount = 0,
   }) {
     final double buttonSize = conduitScaledControlExtent(
       context,
@@ -4434,6 +4433,17 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
           ? _cupertinoComposerOverflowIconExtent
           : _materialComposerOverflowIconExtent,
     );
+    final VoidCallback? onPressed = enabled
+        ? () => unawaited(_handleOverflowButtonPressed(nativeActions))
+        : null;
+    final icon = ConduitSystemAdaptiveIcon(
+      overflowIcon,
+      size: iconSize,
+      color: iconColor,
+    );
+    final activeLabel = activeCount > 0
+        ? '$tooltip, ${AppLocalizations.of(context)!.composerActiveToolsCount(activeCount)}'
+        : tooltip;
 
     return Focus(
       key: const ValueKey('composer-overflow-button'),
@@ -4441,24 +4451,62 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
       skipTraversal: true,
       descendantsAreFocusable: false,
       child: AdaptiveTooltip(
-        message: tooltip,
-        child: _buildComposerIconButton(
-          onPressed: enabled
-              ? () {
-                  unawaited(_handleOverflowButtonPressed(nativeActions));
-                }
-              : null,
-          size: buttonSize,
-          forcePlain: true,
-          iosSymbol: attachmentPanelVisible ? 'xmark' : 'plus',
-          iosSymbolSize: iconSize,
-          iosSymbolColor: iconColor,
-          child: ConduitSystemAdaptiveIcon(
-            overflowIcon,
-            size: iconSize,
-            color: iconColor,
-          ),
-        ),
+        message: activeLabel,
+        child: activeCount > 0
+            ? SizedBox(
+                height: buttonSize,
+                child: AdaptiveButton.child(
+                  onPressed: onPressed,
+                  enabled: enabled,
+                  semanticLabel: activeLabel,
+                  style: AdaptiveButtonStyle.plain,
+                  color: iconColor,
+                  minSize: Size(buttonSize, buttonSize),
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+                  borderRadius: BorderRadius.circular(AppBorderRadius.round),
+                  useSmoothRectangleBorder: false,
+                  child: Container(
+                    key: const ValueKey('composer-active-tools-outline'),
+                    height: conduitScaledControlExtent(
+                      context,
+                      baseExtent: _composerPrimaryVisualSize,
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: iconColor.withValues(
+                          alpha: enabled ? 0.5 : Alpha.disabled,
+                        ),
+                        width: BorderWidth.thin,
+                      ),
+                      borderRadius: BorderRadius.circular(
+                        AppBorderRadius.round,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        icon,
+                        const SizedBox(width: Spacing.xs),
+                        ComposerActiveToolsBadge(
+                          count: activeCount,
+                          color: iconColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : _buildComposerIconButton(
+                onPressed: onPressed,
+                semanticLabel: tooltip,
+                size: buttonSize,
+                forcePlain: true,
+                iosSymbol: attachmentPanelVisible ? 'xmark' : 'plus',
+                iosSymbolSize: iconSize,
+                iosSymbolColor: iconColor,
+                child: icon,
+              ),
       ),
     );
   }

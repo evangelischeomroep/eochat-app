@@ -84,7 +84,7 @@ class ForkOverrides {
 
   /// When true, the composer shows no quick pills at all (web search, image
   /// generation, filters, tools, code interpreter). Instead a small counter
-  /// beside the `+` button says how many items from that menu are switched
+  /// inside the `+` button says how many items from that menu are switched
   /// on; toggling happens in the menu itself. Supersedes
   /// [hideInactiveComposerQuickPills] while set.
   static const bool replaceComposerQuickPillsWithCounter = bool.fromEnvironment(

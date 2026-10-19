@@ -1809,7 +1809,7 @@ void main() {
     );
   });
 
-  testWidgets('an enabled quick pill becomes a counter beside the add button', (
+  testWidgets('the inline tool count opens and closes the add menu', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1818,7 +1818,7 @@ void main() {
           apiServiceProvider.overrideWithValue(null),
           appSettingsProvider.overrideWith(_QuickPillAppSettingsNotifier.new),
           webSearchAvailableProvider.overrideWithValue(true),
-          // EOchat shows no quick pills; an enabled tool is counted beside
+          // EOchat shows no quick pills; an enabled tool is counted inside
           // `+` instead (ForkOverrides.replaceComposerQuickPillsWithCounter).
           webSearchEnabledProvider.overrideWith(_EnabledWebSearchNotifier.new),
         ],
@@ -1842,6 +1842,33 @@ void main() {
       ),
       findsOneWidget,
     );
+    final count = find.byKey(const ValueKey('composer-active-tools-badge'));
+    final button = find.byKey(const ValueKey('composer-overflow-button'));
+    expect(find.descendant(of: button, matching: count), findsOneWidget);
+
+    final semantics = tester.ensureSemantics();
+    try {
+      expect(find.bySemanticsLabel('More, 1 tool on'), findsOneWidget);
+      await tester.tap(count);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.close), findsOneWidget);
+
+      await tester.tap(count);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.add), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'first line\nsecond line');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('expanded-composer-shell')),
+        findsOneWidget,
+      );
+      await tester.tap(count);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.close), findsOneWidget);
+    } finally {
+      semantics.dispose();
+    }
   });
 }
 

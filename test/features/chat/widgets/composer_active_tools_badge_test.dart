@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
-  testWidgets('stays a circle inside the 44pt single-line composer row', (
+  testWidgets('keeps the inline count compact inside the 44pt composer row', (
     tester,
   ) async {
     await tester.pumpWidget(
