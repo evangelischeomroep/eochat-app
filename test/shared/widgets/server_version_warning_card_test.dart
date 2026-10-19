@@ -5,6 +5,7 @@ import 'package:conduit_core/persistence/preferences_store.dart';
 import 'package:conduit_core/providers/app_providers.dart';
 import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
 import 'package:conduit/features/chat/views/chat_page.dart';
+import 'package:conduit/features/opknapper/opknapper_availability.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:conduit/l10n/conduit_localizations.dart';
 import 'package:conduit/shared/widgets/server_version_warning_card.dart';
@@ -25,6 +26,15 @@ class _FixedBackendConfigNotifier extends BackendConfigNotifier {
   Future<BackendConfig?> build() async => _config;
 }
 
+class _FixedBetaMode extends BetaMode {
+  _FixedBetaMode(this._enabled);
+
+  final bool _enabled;
+
+  @override
+  bool build() => _enabled;
+}
+
 ServerConfig _server(String id) =>
     ServerConfig(id: id, name: id, url: 'https://$id.example');
 
@@ -33,6 +43,7 @@ Widget _buildCard({
   required BackendConfig? config,
   Widget? body,
   String activeServerId = 'A',
+  bool betaMode = true,
 }) {
   return ProviderScope(
     overrides: [
@@ -43,6 +54,7 @@ Widget _buildCard({
         () => _FixedBackendConfigNotifier(config),
       ),
       authNavigationStateProvider.overrideWith((ref) => authState),
+      betaModeProvider.overrideWith(() => _FixedBetaMode(betaMode)),
     ],
     child: MaterialApp(
       theme: ThemeData(platform: TargetPlatform.android),
@@ -176,6 +188,21 @@ void main() {
       );
       final state = tester.state<ScrollableState>(scrollable);
       check(state.position.maxScrollExtent).equals(0);
+    });
+
+    testWidgets('hides the warning when beta mode is off', (tester) async {
+      await tester.pumpWidget(
+        _buildCard(
+          authState: AuthNavigationState.authenticated,
+          config: const BackendConfig(version: '0.12.3', serverId: 'A'),
+          betaMode: false,
+        ),
+      );
+      await tester.pump();
+
+      check(
+        find.byKey(const ValueKey('server-version-warning-card')).evaluate(),
+      ).isEmpty();
     });
 
     testWidgets('hides the warning for a supported server', (tester) async {

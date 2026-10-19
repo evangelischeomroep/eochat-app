@@ -117,6 +117,7 @@ untouched ("perfect").
 | 45 | "Redeneerniveau" row in the model selector | `433142f9` | Hidden via `ForkOverrides.showReasoningEffortInModelSelector` (default false): Flutter sheet skips the row, Dart sends no effort options natively and the Swift `actionRows` drops the row when nothing is selectable. |
 | 46 | Quick pills replaced by a counter beside `+` | PR #2 | `ForkOverrides.replaceComposerQuickPillsWithCounter` (default true): no web/image/filter/tool/code-interpreter pills; `ComposerActiveToolsBadge` shows how many `+` menu items are selected (same item list as the native panel, Hermes/direct filtering included). Composer stays compact unless multiline. |
 | 47 | Active-tools counter stretched into an oval in the single-line composer | — | Compact row passes a loose 44pt height and the badge `Container` has `alignment`, so it grew to fill it; `maxHeight: IconSize.chip` keeps it a circle. Single digits drop the horizontal padding (digit + 2×4pt was 20pt wide on an 18pt chip); 10+ stays a pill |
+| 48 | "Server niet ondersteund" card shown to everyone | — | `ServerVersionWarningCard` also requires `betaModeProvider` (hidden About toggle) |
 
 ---
 

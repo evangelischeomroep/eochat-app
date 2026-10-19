@@ -8,6 +8,7 @@ import 'package:conduit_core/providers/app_providers.dart';
 import 'package:conduit_core/utils/server_version_compat.dart';
 import 'package:conduit_core/features/auth/providers/unified_auth_providers.dart';
 
+import '../../features/opknapper/opknapper_availability.dart';
 import '../../l10n/app_localizations.dart';
 import '../theme/theme_extensions.dart';
 import 'conduit_components.dart';
@@ -39,6 +40,8 @@ class ServerVersionWarningCard extends ConsumerWidget {
         ?.value
         ?.version;
     final dismissedTokens = ref.watch(serverVersionWarningDismissedProvider);
+    // Fork: only testers with beta (developer) mode on see the warning.
+    final betaMode = ref.watch(betaModeProvider);
 
     // serverIncompatibleProvider is only true once the active server id is
     // known, so the token is always attributable to a real server here.
@@ -47,6 +50,7 @@ class ServerVersionWarningCard extends ConsumerWidget {
       version: serverVersion,
     );
     final showWarning =
+        betaMode &&
         authState == AuthNavigationState.authenticated &&
         serverIsNewerThanSupported &&
         !dismissedTokens.contains(token);

@@ -206,6 +206,10 @@ carried a branding-string swap. Current known inline-touch files:
   yields. Why: the user wanted no pills under the input, only a count of
   what is switched on in the `+` menu. Fork ARB key:
   `composerActiveToolsCount`.
+- `lib/shared/widgets/server_version_warning_card.dart` — `showWarning`
+  also requires `betaModeProvider` (the hidden About-page toggle). Why: the
+  "Server niet ondersteund" card is noise for regular users; only testers
+  need to know the server runs ahead of the app.
 - `lib/shared/widgets/horizontal_overflow_fade.dart` — the trailing fade is
   a `ShaderMask` (`BlendMode.dstIn`) over the child instead of a painted
   gradient in a theme colour. Upstream's painted overlay can only match an
