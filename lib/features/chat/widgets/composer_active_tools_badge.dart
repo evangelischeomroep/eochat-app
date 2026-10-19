@@ -20,11 +20,16 @@ class ComposerActiveToolsBadge extends StatelessWidget {
       excludeSemantics: true,
       child: Container(
         key: const ValueKey<String>('composer-active-tools-badge'),
+        // Fixed height: the compact composer row hands down a loose height,
+        // and an aligned Container would stretch into an oval to fill it.
         constraints: const BoxConstraints(
           minWidth: IconSize.chip,
           minHeight: IconSize.chip,
+          maxHeight: IconSize.chip,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+        // A single digit fits the chip square; only wider counts need
+        // padding, which turns the circle into a pill.
+        padding: EdgeInsets.symmetric(horizontal: count < 10 ? 0 : Spacing.xs),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: theme.buttonPrimary,
