@@ -19,7 +19,7 @@ NativeSheetSectionConfig buildNativeOpknapperReminderSection(
       NativeSheetItemConfig(
         id: nativeOpknapperReminderId,
         title: OpknapperStrings.reminderTitle,
-        sfSymbol: 'graduationcap',
+        sfSymbol: 'pawprint',
         kind: NativeSheetItemKind.toggle,
         value: settings.enabled,
       ),

@@ -7,7 +7,7 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
 
 ## What it is in the app
 
-- **A tab,** *Game* (graduation cap), last in the bottom bar. It has no panel
+- **A tab,** *Game* (paw print), last in the bottom bar. It has no panel
   of its own: tapping it closes the sidebar and opens the game in the main
   pane. The daily notification lives in Instellingen → Meldingen, as
   *Stuur een melding bij nieuwe opdrachten* with a time, working days only.
@@ -17,19 +17,23 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
   (a debug build uses the hub on this machine, `http://localhost:5173/opknapper`;
   a release build `https://ai.eo.nl/opknapper`; for the slice on test, build with
   `--dart-define=OPKNAPPER_URL=https://app-test-aihub.azurewebsites.net/opknapper`).
-- **Beta mode until it's released.** While `ForkOverrides.opknapperReleased`
-  is false (the default), the tab, the page and the reminders exist only on a
-  device in beta mode. A tester turns it on by tapping the app version seven
+- **Released on 25 Oct 2026 at 18:00.** From `ForkOverrides.opknapperReleaseAt`
+  (18:00 Dutch time, CET since summer time ends that night) the tab, page and
+  reminder settings are there for everyone. An app left open shows the tab
+  the moment it passes, or on its next return to the foreground. Reminders
+  remain off until the user enables them. `--dart-define=OPKNAPPER_RELEASED=true`
+  releases it in one build regardless of the date.
+- **Beta mode until then.** Before the release moment the game exists only
+  in debug builds and on devices in beta mode. A tester turns it on by
+  tapping the app version seven
   times in a row (Instellingen → Over → App-versie); a message confirms it,
   and a *Bètamodus* switch then shows on that page to turn it off (on iOS 26,
   where About is a native sheet, a haptic confirms it and the version row
   says "bètamodus"). Seven taps
-  again turn it off too. Nothing hints at it beforehand. Turned off, the tab
-  goes, an open game returns to chat and pending reminders are cancelled.
-  Kept per device, so it survives updates and sign-outs.
-- **Releasing it** is `opknapperReleased` to true in `fork_overrides.dart`
-  (or `--dart-define=OPKNAPPER_RELEASED=true` for one build), then the usual
-  TestFlight and App Store route. Beta mode stays for the next feature.
+  again turn it off too. Nothing hints at it beforehand. Before the release,
+  turning beta mode off hides the tab, returns an open game to chat and
+  cancels pending reminders. Beta mode is kept per device, so it survives
+  updates and sign-outs. After the release it does not affect the game.
 
 ## Sign-in
 
