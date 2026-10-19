@@ -501,81 +501,70 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      testWidgets(
-        'with Advanced off, the panel row selects it, and the panel and '
-        'composer show it',
-        (tester) async {
-          final container = await pump(tester, block: null, advanced: false);
-          await openPanel(tester);
+      testWidgets('with Advanced off, the panel row selects it, and the panel and '
+          'composer show it', (tester) async {
+        final container = await pump(tester, block: null, advanced: false);
+        await openPanel(tester);
 
-          expect(find.text('Code interpreter'), findsOneWidget);
+        expect(find.text('Code interpreter'), findsOneWidget);
+        await tester.tap(find.text('Code interpreter'));
+        await tester.pumpAndSettle();
+        expect(container.read(codeInterpreterEnabledProvider), isTrue);
+
+        // The panel's check mark and the composer's own indicator both show it.
+        expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+        expect(find.byIcon(Icons.code), findsWidgets);
+      });
+
+      // EOchat shows no pill for it (ForkOverrides
+      // .replaceComposerQuickPillsWithCounter); the counter beside `+` says
+      // it is on, and the panel turns it off.
+      Finder badge() =>
+          find.byKey(const ValueKey<String>('composer-active-tools-badge'));
+
+      testWidgets(
+        'a chosen interpreter is counted and turns off in the panel',
+        (tester) async {
+          final container = await pump(tester, block: null);
+          container.read(codeInterpreterEnabledProvider.notifier).set(true);
+          await tester.pump();
+
+          expect(
+            find.byKey(
+              const ValueKey<String>('composer-code-interpreter-pill'),
+            ),
+            findsNothing,
+          );
+          expect(
+            find.descendant(of: badge(), matching: find.text('1')),
+            findsOneWidget,
+          );
+
+          await openPanel(tester);
           await tester.tap(find.text('Code interpreter'));
           await tester.pumpAndSettle();
-          expect(container.read(codeInterpreterEnabledProvider), isTrue);
 
-          // The panel's check mark and the composer's own indicator both show it.
-          expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-          expect(find.byIcon(Icons.code), findsWidgets);
+          expect(container.read(codeInterpreterEnabledProvider), isFalse);
+          expect(badge(), findsNothing);
         },
       );
 
-      testWidgets('a chosen interpreter stays in view and turns off there', (
-        tester,
-      ) async {
-        final container = await pump(tester, block: null);
-        container.read(codeInterpreterEnabledProvider.notifier).set(true);
-        await tester.pump();
-
-        final pill = find.widgetWithText(GestureDetector, 'Code interpreter');
-        expect(pill, findsWidgets);
-        await tester.tap(find.text('Code interpreter').first);
-        await tester.pump();
-
-        expect(container.read(codeInterpreterEnabledProvider), isFalse);
-        expect(find.text('Code interpreter'), findsNothing);
-      });
-
-      testWidgets('a chosen interpreter that can no longer run says why, and '
-          'turns off from there', (tester) async {
+      testWidgets('a chosen interpreter that can no longer run says why in '
+          'the panel, and turns off from there', (tester) async {
         final container = await pump(tester, block: null);
         container.read(codeInterpreterEnabledProvider.notifier).set(true);
         // The account loses the interpreter after it was chosen.
-        container.read(_block.notifier).block = CodeInterpreterBlock.noPermission;
+        container.read(_block.notifier).block =
+            CodeInterpreterBlock.noPermission;
         await tester.pump();
 
-        final pill = find.byKey(
-          const ValueKey<String>('composer-code-interpreter-pill'),
-        );
-        expect(pill, findsOneWidget);
-        // It reads as not in effect, with a warning, and says why.
-        expect(
-          find.descendant(
-            of: pill,
-            matching: find.byIcon(Icons.warning_amber_rounded),
-          ),
-          findsOneWidget,
-        );
-        expect(
-          tester.getSemantics(pill),
-          matchesSemantics(
-            isButton: true,
-            hasEnabledState: true,
-            isEnabled: true,
-            hasTapAction: true,
-            label: 'Code interpreter',
-            hint: l10n.codeInterpreterUnavailable,
-          ),
-        );
+        expect(badge(), findsOneWidget);
 
-        // A tap explains instead of switching it off silently.
-        await tester.tap(pill);
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-        expect(container.read(codeInterpreterEnabledProvider), isTrue);
+        await openPanel(tester);
         expect(find.text(l10n.codeInterpreterUnavailable), findsOneWidget);
+        await tester.tap(find.text('Code interpreter'));
+        await tester.pumpAndSettle();
 
-        await tester.tap(find.text(l10n.codeInterpreterTurnOff));
-        await tester.pump();
         expect(container.read(codeInterpreterEnabledProvider), isFalse);
       });
 
@@ -600,18 +589,19 @@ void main() {
         expect(container.read(codeInterpreterEnabledProvider), isFalse);
       });
 
-      testWidgets('a browser-engine server is explained only with Advanced on', (
-        tester,
-      ) async {
-        await pump(
-          tester,
-          block: CodeInterpreterBlock.unsupportedEngine,
-          advanced: false,
-        );
-        await openPanel(tester);
+      testWidgets(
+        'a browser-engine server is explained only with Advanced on',
+        (tester) async {
+          await pump(
+            tester,
+            block: CodeInterpreterBlock.unsupportedEngine,
+            advanced: false,
+          );
+          await openPanel(tester);
 
-        expect(find.text('Code interpreter'), findsNothing);
-      });
+          expect(find.text('Code interpreter'), findsNothing);
+        },
+      );
 
       testWidgets('Hermes never shows it', (tester) async {
         final container = await pump(
@@ -773,14 +763,13 @@ void main() {
 
     test('is an action row only when the command is available', () {
       expect(
-        items(
-          available: false,
-        ).any((item) => item.id == ComposerOverflowActionIds.compareModels),
+        items(available: false)
+            .any((item) => item.id == ComposerOverflowActionIds.compareModels),
         isFalse,
       );
-      final item = items(
-        available: true,
-      ).singleWhere((item) => item.id == ComposerOverflowActionIds.compareModels);
+      final item = items(available: true).singleWhere(
+        (item) => item.id == ComposerOverflowActionIds.compareModels,
+      );
       expect(item.kind, ComposerOverflowItemKind.action);
       expect(item.section, ComposerOverflowSection.features);
       expect(item.selected, isFalse);
@@ -788,9 +777,9 @@ void main() {
     });
 
     test('reaches the native iOS panel under the id the composer handles', () {
-      final action = nativeActions(
-        available: true,
-      ).singleWhere((action) => action.id == ComposerOverflowActionIds.compareModels);
+      final action = nativeActions(available: true).singleWhere(
+        (action) => action.id == ComposerOverflowActionIds.compareModels,
+      );
       expect(action.section, 'features');
       expect(action.selected, isFalse);
       expect(action.label, l10n.chatCompareModelsAction);

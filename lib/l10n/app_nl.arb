@@ -4281,5 +4281,6 @@
   "accountsRemoveAddressMessage": "EOchat probeert dit adres niet meer. Je accounts blijven ingelogd.",
   "accountsAddressConfirmTitle": "Dit adres controleren?",
   "accountsAddressConfirmMessage": "Om zeker te weten dat {host} deze server is, stuurt EOchat er de sessie van een hier opgeslagen account naartoe. Ga alleen verder als je dit adres vertrouwt.",
-  "accountsAddressConfirmAction": "Adres controleren"
+  "accountsAddressConfirmAction": "Adres controleren",
+  "composerActiveToolsCount": "{count, plural, one{{count} tool aan} other{{count} tools aan}}"
 }

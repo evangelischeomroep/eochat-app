@@ -4281,5 +4281,6 @@
   "accountsRemoveAddressMessage": "Conduit versucht diese Adresse nicht mehr. Deine Konten bleiben angemeldet.",
   "accountsAddressConfirmTitle": "Diese Adresse prüfen?",
   "accountsAddressConfirmMessage": "Um sicherzugehen, dass {host} dieser Server ist, schickt Conduit dorthin die Sitzung eines hier gespeicherten Kontos. Fahre nur fort, wenn du dieser Adresse vertraust.",
-  "accountsAddressConfirmAction": "Adresse prüfen"
+  "accountsAddressConfirmAction": "Adresse prüfen",
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}"
 }

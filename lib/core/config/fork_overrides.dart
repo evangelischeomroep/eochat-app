@@ -82,6 +82,16 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  /// When true, the composer shows no quick pills at all (web search, image
+  /// generation, filters, tools, code interpreter). Instead a small counter
+  /// beside the `+` button says how many items from that menu are switched
+  /// on; toggling happens in the menu itself. Supersedes
+  /// [hideInactiveComposerQuickPills] while set.
+  static const bool replaceComposerQuickPillsWithCounter = bool.fromEnvironment(
+    'REPLACE_COMPOSER_QUICK_PILLS_WITH_COUNTER',
+    defaultValue: true,
+  );
+
   /// When true, an assistant row does not paint the avatar + model-name
   /// header when its model is the conversation's active model — the app-bar
   /// model pill already names it. The header still appears for responses

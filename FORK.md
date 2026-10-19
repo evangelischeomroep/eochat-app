@@ -199,6 +199,13 @@ carried a branding-string swap. Current known inline-touch files:
   `ForkOverrides.hideInactiveComposerQuickPills` is set (three one-line
   guards: web, image, filter). The quick-pill `HorizontalOverflowFade` no
   longer passes a colour (see the fade entry below).
+  `ForkOverrides.replaceComposerQuickPillsWithCounter` breaks out of that
+  loop and skips the code-interpreter pill entirely; instead the fork-owned
+  `ComposerActiveToolsBadge` sits after both `_buildOverflowButton` call
+  sites, counting the selected items `buildIosKeyboardAttachmentActions`
+  yields. Why: the user wanted no pills under the input, only a count of
+  what is switched on in the `+` menu. Fork ARB key:
+  `composerActiveToolsCount`.
 - `lib/shared/widgets/horizontal_overflow_fade.dart` — the trailing fade is
   a `ShaderMask` (`BlendMode.dstIn`) over the child instead of a painted
   gradient in a theme colour. Upstream's painted overlay can only match an

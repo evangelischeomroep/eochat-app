@@ -1809,7 +1809,7 @@ void main() {
     );
   });
 
-  testWidgets('explicit quick-pill selection keeps pill composer visible', (
+  testWidgets('an enabled quick pill becomes a counter beside the add button', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -1818,8 +1818,8 @@ void main() {
           apiServiceProvider.overrideWithValue(null),
           appSettingsProvider.overrideWith(_QuickPillAppSettingsNotifier.new),
           webSearchAvailableProvider.overrideWithValue(true),
-          // EOchat only shows quick pills for tools that are enabled
-          // (ForkOverrides.hideInactiveComposerQuickPills).
+          // EOchat shows no quick pills; an enabled tool is counted beside
+          // `+` instead (ForkOverrides.replaceComposerQuickPillsWithCounter).
           webSearchEnabledProvider.overrideWith(_EnabledWebSearchNotifier.new),
         ],
         child: MaterialApp(
@@ -1831,12 +1831,16 @@ void main() {
     );
     await tester.pump();
 
+    expect(find.byKey(const ValueKey('expanded-composer-shell')), findsNothing);
+    expect(find.byKey(const ValueKey('composer-quick-pills')), findsNothing);
+    expect(find.text('Web'), findsNothing);
     expect(
-      find.byKey(const ValueKey('expanded-composer-shell')),
+      find.descendant(
+        of: find.byKey(const ValueKey('composer-active-tools-badge')),
+        matching: find.text('1'),
+      ),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('composer-quick-pills')), findsOneWidget);
-    expect(find.text('Web'), findsOneWidget);
   });
 
   testWidgets('a single quick pill paints no overflow cue (issue #745)', (

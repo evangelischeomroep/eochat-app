@@ -8900,5 +8900,15 @@
   "accountsAddressConfirmAction": "Check address",
   "@accountsAddressConfirmAction": {
     "description": "Confirms sending a saved account's session to a new address of an Open WebUI server, to check that it reaches the same server."
+  },
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}",
+  "@composerActiveToolsCount": {
+    "description": "Accessibility label for the counter next to the composer's + button: how many tools, capabilities and integrations from that menu are switched on.",
+    "placeholders": {
+      "count": {
+        "type": "int",
+        "example": "2"
+      }
+    }
   }
 }

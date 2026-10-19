@@ -7920,5 +7920,6 @@
         "example": "gpt-realtime-2.1-mini"
       }
     }
-  }
+  },
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}"
 }

@@ -102,6 +102,7 @@ import 'chat_draft_queue_sheet.dart';
 import 'chat_input_intents.dart';
 import 'expanded_text_editor.dart';
 import 'chat_comparison_widgets.dart';
+import 'composer_active_tools_badge.dart';
 import 'composer_overflow_items.dart';
 import 'composer_overflow_menu.dart';
 import 'mention_text_controller.dart';
@@ -3448,8 +3449,31 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     final Color placeholderFocused = placeholderColor;
     final List<Widget> quickPills = <Widget>[];
 
+    // Fork: with the counter beside `+`, no pill reaches the composer.
+    final int activeOverflowCount =
+        ForkOverrides.replaceComposerQuickPillsWithCounter
+        ? buildIosKeyboardAttachmentActions(
+            l10n: l10n,
+            attachmentAvailability: attachmentAvailability,
+            hermesMode: isHermesComposer,
+            directMode: isDirectComposer,
+            webSearchAvailable: webSearchAvailable,
+            webSearchEnabled: webSearchEnabled,
+            imageGenerationAvailable: imageGenAvailable,
+            imageGenerationEnabled: imageGenEnabled,
+            availableTools: availableTools,
+            selectedToolIds: selectedToolIds,
+            availableFilters: availableFilters,
+            selectedFilterIds: selectedFilterIds,
+            connections: nativeConnections,
+            codeInterpreter: codeInterpreterOffer,
+          ).where((action) => action.selected).length
+        : 0;
+
     for (final id in selectedQuickPills) {
-      if (isHermesComposer || isDirectComposer) {
+      if (isHermesComposer ||
+          isDirectComposer ||
+          ForkOverrides.replaceComposerQuickPillsWithCounter) {
         break;
       }
       final filterId = ComposerOverflowActionIds.filterIdFrom(id);
@@ -3581,7 +3605,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
     // warning glyph, and a tap says why before offering to turn it off.
     if (codeInterpreterOffer?.selected == true &&
         !isHermesComposer &&
-        !isDirectComposer) {
+        !isDirectComposer &&
+        !ForkOverrides.replaceComposerQuickPillsWithCounter) {
       final block = codeInterpreterOffer!.block;
       final blockReason = block == null
           ? null
@@ -3731,6 +3756,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                   dense: true,
                   nativeActions: nativeAttachmentActions,
                 ),
+                if (activeOverflowCount > 0)
+                  ComposerActiveToolsBadge(count: activeOverflowCount),
                 const SizedBox(width: Spacing.xs),
               ],
               if (quickPills.isNotEmpty)
@@ -3878,6 +3905,8 @@ class _ModernChatInputState extends ConsumerState<ModernChatInput>
                     dense: true,
                     nativeActions: nativeAttachmentActions,
                   ),
+                  if (activeOverflowCount > 0)
+                    ComposerActiveToolsBadge(count: activeOverflowCount),
                   const SizedBox(width: Spacing.xs),
                 ],
                 Expanded(
