@@ -36,13 +36,29 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
 ai.eo.nl sits behind App Service Authentication with Entra ID: an
 unauthenticated request is sent to Microsoft and back, and the hub reads the
 colleague from Easy Auth's headers. The game's web view uses the app's default
-website data store — the same one the EOchat SSO sign-in used — so Microsoft's
-session cookie is usually still there and the game opens signed in, no prompt.
-When it isn't (the Microsoft session expired, or the SSO sign-in cleared
-cookies for a fresh session), the page rewrites Microsoft's authorize request
-with the colleague's EOchat address as `login_hint` and `domain_hint=eo.nl`,
-so there's no account picker; at most the password and MFA, once. The web view
-uses the SSO page's mobile Safari user agent, plus ` EOchatApp/Opknapper`.
+website data store — the same one the EOchat SSO sign-in used — so within one
+run of the app Microsoft's session is still there and the game opens signed
+in, no prompt.
+
+Both cookies that hold that sign-in are session cookies: Easy Auth's
+`AppServiceAuthSession` never carries an expiry, and Microsoft's is persistent
+only for a colleague who chose to stay signed in. WebKit drops session cookies
+when the app quits, so after every restart the game asked for a sign-in again
+(TestFlight, 19 Oct 2026). Now `OpknapperSession`
+(`services/opknapper_session.dart`) writes `AppServiceAuthSession*` back with
+a 90-day expiry whenever a page of the game's host loads, and the store keeps
+it on disk. The server decides how long it counts: `login.cookieExpiration` on
+the App Service, 14 days, set with ai-hub-webapp's
+`scripts/set-sign-in-lifetime.sh` (the default, 8 hours, would ask every
+morning). Logout clears the whole store, this cookie with it; switching to
+another EOchat account drops it before the game opens (whose it is sits in
+preferences, `opknapper.session.owner`).
+
+When a sign-in is needed after all (the first time, or once the 14 days are
+up), the page rewrites Microsoft's authorize request with the colleague's
+EOchat address as `login_hint` and `domain_hint=eo.nl`, so there's no account
+picker; at most the password and MFA, once. The web view uses the SSO page's
+mobile Safari user agent, plus ` EOchatApp/Opknapper`.
 
 Navigation stays inside for the game's host and Microsoft's sign-in hosts.
 A link to `chat.eo.nl` (a guide's start link, `?q=` the prompt) opens a new
@@ -93,6 +109,10 @@ The page's side is `opknapper/web/app-bridge.js` in ai-hub-webapp.
 
 ## Not done, and why
 
+- **Signing the game in with EOchat's own token** (19 Oct): it would work,
+  but only by letting the game's paths past Easy Auth and having the hub
+  check Open WebUI tokens itself — a second sign-in system on ai.eo.nl.
+  Keeping Easy Auth's cookie is one setting and one file.
 - **Push from the server** (an upvote, a klus on a day of its own): needs the
   push entitlement, an APNs key and a device token per colleague (50, T32).
 - **The page kept alive across tabs:** leaving `/opknapper` disposes the web

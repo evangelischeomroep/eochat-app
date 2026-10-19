@@ -4,10 +4,13 @@
 // Sign-in: ai.eo.nl sits behind App Service Authentication with Entra ID, so
 // the page needs no sign-in of its own. The web view shares the app's
 // default website data store with the SSO sign-in that signed the colleague
-// in to EOchat, so Microsoft's session is usually still there and the game
-// opens signed in without a prompt. When it isn't, the authorize request gets
-// the colleague's EO address as `login_hint` (and `domain_hint=eo.nl`), so
-// Microsoft skips the account picker and asks at most for the password.
+// in to EOchat, so within one run of the app Microsoft's session is still
+// there and the game opens signed in. Both that session and ai.eo.nl's own
+// are session cookies, gone when the app quits, so OpknapperSession keeps
+// ai.eo.nl's on disk once the game has loaded. When the colleague still has
+// to sign in, the authorize request gets their EO address as `login_hint`
+// (and `domain_hint=eo.nl`), so Microsoft skips the account picker and asks
+// at most for the password.
 
 import 'dart:async';
 import 'dart:collection';
@@ -36,6 +39,7 @@ import '../opknapper_availability.dart';
 import '../opknapper_config.dart';
 import '../services/opknapper_bridge.dart';
 import '../services/opknapper_reminders.dart';
+import '../services/opknapper_session.dart';
 
 const String _scope = 'opknapper/page';
 
@@ -137,6 +141,11 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
         NavigationService.router.go(Routes.chat);
         return;
       }
+      // A sign-in kept for another EOchat account goes before the game opens.
+      await OpknapperSession.prepare(
+        account: ref.read(currentUserProvider2)?.email,
+      );
+      if (!mounted) return;
       setState(() => _ready = true);
     }());
   }
@@ -324,6 +333,17 @@ class _OpknapperPageState extends ConsumerState<OpknapperPage> {
           _loading = false;
           _failed = false;
         });
+        // Loaded on the game's own host means signed in: keep that sign-in
+        // past this run of the app.
+        final page = url?.uriValue;
+        if (page != null) {
+          unawaited(
+            OpknapperSession.keep(
+              page,
+              account: ref.read(currentUserProvider2)?.email,
+            ),
+          );
+        }
       },
       onReceivedError: (controller, request, error) {
         if (request.isForMainFrame != true) return;
