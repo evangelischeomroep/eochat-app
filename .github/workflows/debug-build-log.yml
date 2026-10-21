@@ -16,8 +16,8 @@ jobs:
         env:
           ASC_P8_KEY: ${{ secrets.ASC_P8_KEY }}
         run: |
-          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_8S2MXC2RH7.p8
-          chmod 600 scripts/AuthKey_8S2MXC2RH7.p8
+          echo "$ASC_P8_KEY" | base64 -d > scripts/AuthKey_SNL4WUUBST.p8
+          chmod 600 scripts/AuthKey_SNL4WUUBST.p8
 
       - name: Fetch and print latest failed build log
         run: |
@@ -30,9 +30,9 @@ jobs:
           from urllib import request as urllib_request, error as urllib_error
 
           APP_ID        = "6763726069"
-          KEY_ID        = "8S2MXC2RH7"
+          KEY_ID        = "SNL4WUUBST"
           ISSUER_ID     = "69a6de79-b43b-47e3-e053-5b8c7c11a4d1"
-          P8_PATH       = Path("scripts/AuthKey_8S2MXC2RH7.p8")
+          P8_PATH       = Path("scripts/AuthKey_SNL4WUUBST.p8")
           BASE_URL      = "https://api.appstoreconnect.apple.com/v1"
           CI_PRODUCT_ID = "60947880-F680-490A-BA80-9230D5768E95"
 
@@ -83,30 +83,86 @@ jobs:
               a = action["attributes"]
               action_id = action["id"]
               print(f"\nAction: {a.get('name')} — {a.get('completionStatus')}")
+              issue_summaries = a.get("issueSummaries")
+              if issue_summaries:
+                  print(f"  Issue summaries: {issue_summaries}")
 
               if a.get("completionStatus") in ("FAILED","ERRORED"):
-                  # Get artifacts for this action
+                  # Print full issues for this action (often has the real compiler error)
+                  issues = get(f"/ciBuildActions/{action_id}/issues")
+                  for issue in issues.get("data", []):
+                      ia = issue["attributes"]
+                      print(f"  Issue: {ia}")
+
+                  # Get artifacts for this action -- try ALL of them, not just
+                  # ones with "log" in the name (the real build log can be under
+                  # other names/asset types).
                   arts = get(f"/ciBuildActions/{action_id}/artifacts")
+                  print(f"  Artifact count: {len(arts.get('data', []))}")
                   for art in arts.get("data", []):
                       aa = art["attributes"]
-                      print(f"  Artifact: {aa.get('fileName')} ({aa.get('fileSize')} bytes)")
-                      if "log" in aa.get("fileName","").lower() or "log" in str(aa.get("assetType","")).lower():
-                          dl_url = aa.get("downloadUrl")
-                          if dl_url:
-                              print(f"  Downloading log from {dl_url[:60]}...")
-                              import zipfile, io
-                              raw = download_bytes(dl_url)
+                      print(f"  Artifact: {aa.get('fileName')} type={aa.get('assetType')} ({aa.get('fileSize')} bytes)")
+                      dl_url = aa.get("downloadUrl")
+                      if not dl_url:
+                          print("    (no downloadUrl)")
+                          continue
+                      print(f"  Downloading from {dl_url[:80]}...")
+                      import zipfile, io
+                      raw = download_bytes(dl_url)
+                      try:
+                          zf = zipfile.ZipFile(io.BytesIO(raw))
+                          for name in zf.namelist():
+                              print(f"    Zip entry: {name} ({zf.getinfo(name).file_size} bytes)")
                               try:
-                                  zf = zipfile.ZipFile(io.BytesIO(raw))
-                                  for name in zf.namelist():
-                                      print(f"    Zip entry: {name}")
-                                      content = zf.read(name).decode("utf-8", errors="replace")
-                                      # Print lines with error keywords
-                                      for line in content.splitlines():
-                                          lower = line.lower()
-                                          if any(k in lower for k in ["error:", "failed", "phasescript", "exit code", "command /bin/sh"]):
-                                              print(f"    >>> {line.strip()[:200]}")
-                              except Exception as e:
-                                  print(f"    Not a zip: {e} — printing raw (truncated)")
-                                  print(raw[:2000].decode("utf-8", errors="replace"))
+                                  entry_content = zf.read(name).decode("utf-8", errors="replace")
+                              except Exception:
+                                  continue
+                              lines = entry_content.splitlines()
+
+                              # 1) Print wide context (60 lines before, 10 after)
+                              # around the actual "nonzero exit code" / "exited with"
+                              # failure marker(s) -- the real shell error (cp/rsync/
+                              # codesign output, "No such file", etc.) immediately
+                              # precedes it and was getting drowned out by compiler
+                              # "note:" noise before.
+                              fail_markers = ("nonzero exit code", "exited with", "** archive failed **", "the following build commands failed")
+                              printed_ranges = []
+                              for i, line in enumerate(lines):
+                                  low = line.lower()
+                                  if any(m in low for m in fail_markers):
+                                      start = max(0, i - 60)
+                                      end = min(len(lines), i + 10)
+                                      printed_ranges.append((start, end))
+                              # merge overlapping ranges
+                              printed_ranges.sort()
+                              merged = []
+                              for s, e in printed_ranges:
+                                  if merged and s <= merged[-1][1]:
+                                      merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+                                  else:
+                                      merged.append((s, e))
+                              for s, e in merged:
+                                  print(f"    ----- context lines {s}-{e} around failure marker -----")
+                                  for line in lines[s:e]:
+                                      print(f"    CTX| {line.rstrip()[:500]}")
+
+                              # 2) Also print any line mentioning the specific pod/
+                              # script phase we suspect (onnxruntime / xcframework /
+                              # vad), with a little context, in case the failure
+                              # marker above didn't catch it.
+                              suspect_markers = ("onnxruntime", "xcframework", "copy xcframeworks", "/vad", "codesign")
+                              for i, line in enumerate(lines):
+                                  low = line.lower()
+                                  if any(m in low for m in suspect_markers):
+                                      s = max(0, i - 2)
+                                      e = min(len(lines), i + 3)
+                                      print(f"    ~~~~~ suspect-keyword context {s}-{e} ~~~~~")
+                                      for cline in lines[s:e]:
+                                          print(f"    SUSP| {cline.rstrip()[:500]}")
+
+                              if not merged:
+                                  print("    (no 'nonzero exit code'/'exited with' marker found in this file)")
+                      except Exception as e:
+                          print(f"    Not a zip: {e} -- printing raw (truncated, first 4000 bytes)")
+                          print(raw[:4000].decode("utf-8", errors="replace"))
           PYEOF
