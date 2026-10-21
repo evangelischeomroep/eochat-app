@@ -21,7 +21,7 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
   (18:00 Dutch time, CET since summer time ends that night) the tab, page and
   reminder settings are there for everyone. An app left open shows the tab
   the moment it passes, or on its next return to the foreground. Reminders
-  remain off until the user enables them. `--dart-define=OPKNAPPER_RELEASED=true`
+  are on unless the user turns them off. `--dart-define=OPKNAPPER_RELEASED=true`
   releases it in one build regardless of the date.
 - **Beta mode until then.** Before the release moment the game exists only
   in debug builds and on devices in beta mode. A tester turns it on by
@@ -80,9 +80,19 @@ app schedules local notifications itself, with no server
   a dagbrief is answered (`answered`, which drops today's). A colleague who
   stays away a week stops hearing from the app until they come back — an
   invitation, never a broadcast.
-- **Off by default.** Turned on in Meldingen, or by the page
-  (`reminders`); turning it on asks iOS for permission.
-- **A tap** opens `/opknapper?open=post`; if the game is already open the page
+- **Mondays: the week's notification** at 09:00, when the game's week turns
+  (*Met welke collega ben jij gematcht?*), in place of the daily one, also
+  when today's question is already answered.
+- **Launch: once, Monday 26 Oct 2026 at 09:00** (the game's first Monday),
+  in place of that day's reminders. Scheduled from the first start of the
+  build on, also before the release, so it reaches colleagues who don't open
+  the app over the weekend. Its tap opens the game as is.
+- **On by default,** until the colleague turns it off in Meldingen or the
+  page does (`reminders`). Turning it on asks the OS for permission; with the
+  default on, the game asks once on its first open (`seen`). A refused
+  permission leaves the choice on.
+- **A daily tap** opens `/opknapper?open=post`, the weekly and launch taps
+  `/opknapper`; if the game is already open the page
   gets an `eochat:open` event instead of a reload.
 - Ids `0x4F500000 + day`, so they never collide with message notifications,
   and an account switch (which cancels every notification) is repaired on the

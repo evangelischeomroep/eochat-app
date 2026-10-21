@@ -77,7 +77,8 @@ abstract final class OpknapperStrings {
       'Elke werkdag staat er een nieuwe opdracht voor je klaar in Opknapper: '
       'een korte vraag, een oefening of een peiling, in een paar minuten '
       'gedaan. Je krijgt één melding per werkdag, alleen als er nog iets op '
-      'je wacht. Kom je een week niet langs, dan wordt het vanzelf stil.';
+      'je wacht, en op maandag één over de nieuwe week. Kom je een week niet '
+      'langs, dan wordt het vanzelf stil.';
   static const String permissionDenied =
       'Meldingen staan uit voor EOchat. Zet ze aan in Instellingen.';
   static const String loadFailed = 'De game laadt niet.';
@@ -87,17 +88,27 @@ abstract final class OpknapperStrings {
   static const String channelName = 'Opknapper';
   static const String channelDescription = 'Meldingen bij nieuwe opdrachten';
 
-  /// A calm line a working day; never urgent (T32's lean, R49).
-  static const List<(String, String)> reminders = [
-    ('Er ligt post voor je', 'Er staat een nieuwe opdracht voor je klaar.'),
-    (
-      'Nieuwe opdracht',
-      'Een korte opdracht van twee minuten, in de postvakjes.',
-    ),
-    ('Post in de hal', 'De hond heeft je opdracht al gevonden.'),
-    ('Je opdracht van vandaag', 'Een korte vraag ligt voor je klaar.'),
-    ('Er ligt post voor je', 'Even langs de postvakjes?'),
-  ];
+  /// The working-day notification; never urgent (T32's lean, R49).
+  static const (String, String) dailyReminder = (
+    'Er staat een nieuwe vraag klaar in de game!',
+    'Je vindt hem in de postvakjes.',
+  );
+
+  /// Monday 09:00, when the game's week turns and a new weekbrief and
+  /// ansichtkaart pairing are there. Takes the place of that day's
+  /// [dailyReminder].
+  static const (String, String) weeklyReminder = (
+    'Met welke collega ben jij gematcht?',
+    'Er staat een nieuwe week klaar in de game. Met wie ga jij hem deze week '
+        'voltooien?',
+  );
+
+  /// Once, on the game's first Monday, in place of that day's reminders.
+  static const (String, String) launchReminder = (
+    'Speel vanaf vandaag onze game Opknapper in de app!',
+    'Word AI-vaardig en AI-wijs met leuke vragen, stellingen, puzzels en '
+        'opdrachten. Elke werkdag en elke week nieuwe content.',
+  );
 
   /// Times the settings offer for the daily notification.
   static List<String> timeChoices(String current) {

@@ -10,6 +10,12 @@
 // who stays away for a week stops hearing from the app until they come back —
 // an invitation, never a broadcast (R49: being away costs a moment, never a
 // lesson).
+//
+// Mondays get the weekly notification instead of the daily one, at 09:00,
+// when the game's week turns (ai-hub-webapp `server/ansichtkaart.js`). The
+// game's first Monday gets the launch notification instead of both; it is
+// scheduled from the first start of this build on, also before the release,
+// so it reaches colleagues who don't open the app over the weekend.
 
 import 'dart:async';
 import 'dart:convert';
@@ -39,9 +45,9 @@ class OpknapperReminderSettings {
     this.loaded = false,
   });
 
-  /// Off until the colleague turns it on, in the tab or from the game.
+  /// On until the colleague turns it off, in the tab or from the game.
   static const OpknapperReminderSettings initial = OpknapperReminderSettings(
-    enabled: false,
+    enabled: true,
     time: TimeOfDay(hour: 8, minute: 45),
   );
 
@@ -86,8 +92,8 @@ abstract final class OpknapperNotificationTaps {
 
   static Stream<Map<String, Object?>> get stream => _taps.stream;
 
-  static String encode({String open = 'post'}) =>
-      jsonEncode({'kind': kind, 'open': open});
+  static String encode({String? open}) =>
+      jsonEncode({'kind': kind, 'open': ?open});
 
   static Map<String, Object?>? decode(String? payload) {
     if (payload == null || payload.isEmpty) return null;
@@ -119,6 +125,8 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   static const String _enabledKey = 'opknapper.reminders.enabled';
   static const String _minutesKey = 'opknapper.reminders.minutes';
   static const String _answeredDayKey = 'opknapper.reminders.answeredDay';
+  static const String _permissionAskedKey =
+      'opknapper.reminders.permissionAsked';
   static const String _channelId = 'opknapper';
 
   /// How many working days ahead are scheduled.
@@ -131,6 +139,13 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   static const int _idSpan = 100000;
 
   static final DateTime _epoch = DateTime.utc(2026, 1, 1);
+
+  /// The hour the game's week turns on Monday, Dutch time.
+  static const int _weekTurnHour = 9;
+
+  /// The game's first Monday (ai-hub-webapp `server/time.js` EPOCH), 09:00:
+  /// the one-off launch notification.
+  static const (int, int, int) _launchDay = (2026, 10, 26);
 
   /// EO works in one time zone; the reminder follows the Dutch clock,
   /// summer time included.
@@ -172,7 +187,7 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   Future<void> _load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final enabled = prefs.getBool(_enabledKey) ?? false;
+      final enabled = prefs.getBool(_enabledKey) ?? true;
       final minutes = prefs.getInt(_minutesKey);
       if (!ref.mounted) return;
       state = state.copyWith(
@@ -207,7 +222,9 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   Future<void> start() async {
     if (!Platform.isIOS && !Platform.isAndroid) return;
     await ref.read(betaModeProvider.notifier).ready();
-    if (!ref.mounted || !ref.read(opknapperAvailableProvider)) return;
+    // Also before the release: the launch notification is scheduled then,
+    // and its tap, after the release, must find the game.
+    if (!ref.mounted) return;
     if (!_started) {
       _started = true;
       _tapSub = OpknapperNotificationTaps.stream.listen(_openFromTap);
@@ -274,7 +291,32 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   }
 
   /// The game was opened: the window starts again from today.
-  Future<void> markSeen() => refresh();
+  Future<void> markSeen() async {
+    await _askPermissionOnce();
+    await refresh();
+  }
+
+  /// Reminders are on by default, so nobody turned them on and the OS was
+  /// never asked. The first time the game is opened, ask once. A refusal
+  /// leaves the choice on: only the colleague turns it off.
+  Future<void> _askPermissionOnce() async {
+    if (!Platform.isIOS && !Platform.isAndroid) return;
+    final settings = await _ready();
+    if (!settings.enabled) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_permissionAskedKey) ?? false) return;
+      await prefs.setBool(_permissionAskedKey, true);
+      await ref.read(localNotificationServiceProvider).initialize();
+      await ref.read(localNotificationServiceProvider).requestPermissions();
+    } catch (error) {
+      DebugLogger.warning(
+        'permission-ask-failed',
+        scope: _scope,
+        data: {'error': error.toString()},
+      );
+    }
+  }
 
   /// Today's letter is answered: no reminder for it later today, also when
   /// the game is opened again later that day.
@@ -312,11 +354,18 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
       await ref.read(localNotificationServiceProvider).initialize();
       await _cancelPending();
       await ref.read(betaModeProvider.notifier).ready();
-      if (!settings.enabled || !ref.read(opknapperAvailableProvider)) return;
+      if (!settings.enabled) return;
       if (Platform.isAndroid) await _ensureAndroidChannel();
 
       final zone = _zone();
       final now = tz.TZDateTime.now(zone);
+      final (ly, lm, ld) = _launchDay;
+      final launch = tz.TZDateTime(zone, ly, lm, ld, _weekTurnHour);
+      if (launch.isAfter(now)) {
+        await _schedule(launch, OpknapperStrings.launchReminder);
+      }
+      if (!ref.read(opknapperAvailableProvider)) return;
+
       if (!skipToday) {
         final prefs = await SharedPreferences.getInstance();
         skipToday = prefs.getString(_answeredDayKey) == _dayKey(now);
@@ -326,22 +375,37 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
       var guard = 0;
       while (scheduled < windowDays && guard < 14) {
         guard++;
-        final at = tz.TZDateTime(
-          zone,
-          day.year,
-          day.month,
-          day.day,
-          settings.time.hour,
-          settings.time.minute,
-        );
         final isToday =
             day.year == now.year &&
             day.month == now.month &&
             day.day == now.day;
+        final isLaunchDay = day.year == ly && day.month == lm && day.day == ld;
         final workingDay =
             day.weekday >= DateTime.monday && day.weekday <= DateTime.friday;
-        if (workingDay && at.isAfter(now) && !(isToday && skipToday)) {
-          await _schedule(at);
+        // Monday: the week's notification at the week's turn, also when
+        // today's question is already answered.
+        final weekly = day.weekday == DateTime.monday;
+        final at = weekly
+            ? tz.TZDateTime(zone, day.year, day.month, day.day, _weekTurnHour)
+            : tz.TZDateTime(
+                zone,
+                day.year,
+                day.month,
+                day.day,
+                settings.time.hour,
+                settings.time.minute,
+              );
+        if (workingDay &&
+            !isLaunchDay &&
+            at.isAfter(now) &&
+            (weekly || !(isToday && skipToday))) {
+          await _schedule(
+            at,
+            weekly
+                ? OpknapperStrings.weeklyReminder
+                : OpknapperStrings.dailyReminder,
+            open: weekly ? null : 'post',
+          );
           scheduled++;
         }
         day = tz.TZDateTime(zone, day.year, day.month, day.day + 1);
@@ -404,9 +468,13 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
         );
   }
 
-  Future<void> _schedule(tz.TZDateTime at) async {
-    final lines = OpknapperStrings.reminders;
-    final (title, body) = lines[at.day % lines.length];
+  /// [open] is passed on to the game as `?open=`; null opens it as is.
+  Future<void> _schedule(
+    tz.TZDateTime at,
+    (String, String) lines, {
+    String? open,
+  }) async {
+    final (title, body) = lines;
     await _plugin.zonedSchedule(
       id: _idFor(at),
       title: title,
@@ -429,7 +497,7 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
         ),
       ),
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      payload: OpknapperNotificationTaps.encode(),
+      payload: OpknapperNotificationTaps.encode(open: open),
     );
   }
 }
