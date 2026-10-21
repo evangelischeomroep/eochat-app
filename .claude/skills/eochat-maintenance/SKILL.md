@@ -128,6 +128,14 @@ build dirties `ios/Podfile.lock` or `project.pbxproj`, check the diff is a
 checksum or Xcode formatting only, then commit it once (see pitfalls);
 restoring it on every run just hides it.
 
+The shipped version (`pubspec.yaml` `version:`) must stay above the last
+version Apple approved: once a version is approved its train closes, and
+builds under it bounce with ITMS-90186 / ITMS-90062. Shipping fork work
+between upstream releases means bumping the patch ahead of upstream (4.2.1
+approved → 4.2.2). An upstream sync then takes the higher of the two, never
+a version at or below the last approved one. `.conduit-sync-version` keeps
+recording the upstream release and is not bumped with it.
+
 Direct pushes to main are allowed for this workflow (rule bypass is logged),
 but leave main clean and equal to origin/main when you stop.
 
