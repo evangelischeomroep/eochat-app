@@ -83,8 +83,8 @@ app schedules local notifications itself, with no server
 - **Mondays: the week's notification** at 09:00, when the game's week turns
   (*Met welke collega ben jij gematcht?*), in place of the daily one, also
   when today's question is already answered.
-- **Launch: once, Monday 26 Oct 2026 at 09:00** (the game's first Monday),
-  in place of that day's reminders. Scheduled from the first start of the
+- **Launch: once, Monday 26 Oct 2026 at 14:00** (the game's first Monday,
+  after the AI team's morning check), in place of that day's reminders. Scheduled from the first start of the
   build on, also before the release, so it reaches colleagues who don't open
   the app over the weekend. Its tap opens the game as is.
 - **On by default,** until the colleague turns it off in Meldingen or the

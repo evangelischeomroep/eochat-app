@@ -13,9 +13,10 @@
 //
 // Mondays get the weekly notification instead of the daily one, at 09:00,
 // when the game's week turns (ai-hub-webapp `server/ansichtkaart.js`). The
-// game's first Monday gets the launch notification instead of both; it is
-// scheduled from the first start of this build on, also before the release,
-// so it reaches colleagues who don't open the app over the weekend.
+// game's first Monday gets the launch notification instead of both, at
+// 14:00, after the AI team's morning check; it is scheduled from the first
+// start of this build on, also before the release, so it reaches colleagues
+// who don't open the app over the weekend.
 
 import 'dart:async';
 import 'dart:convert';
@@ -143,9 +144,13 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   /// The hour the game's week turns on Monday, Dutch time.
   static const int _weekTurnHour = 9;
 
-  /// The game's first Monday (ai-hub-webapp `server/time.js` EPOCH), 09:00:
-  /// the one-off launch notification.
+  /// The game's first Monday (ai-hub-webapp `server/time.js` EPOCH): the
+  /// one-off launch notification, at [_launchHour].
   static const (int, int, int) _launchDay = (2026, 10, 26);
+
+  /// The public launch, Dutch time: the afternoon, so the AI team has the
+  /// morning to check the game and the trailer before colleagues hear of it.
+  static const int _launchHour = 14;
 
   /// EO works in one time zone; the reminder follows the Dutch clock,
   /// summer time included.
@@ -360,7 +365,7 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
       final zone = _zone();
       final now = tz.TZDateTime.now(zone);
       final (ly, lm, ld) = _launchDay;
-      final launch = tz.TZDateTime(zone, ly, lm, ld, _weekTurnHour);
+      final launch = tz.TZDateTime(zone, ly, lm, ld, _launchHour);
       if (launch.isAfter(now)) {
         await _schedule(launch, OpknapperStrings.launchReminder);
       }
