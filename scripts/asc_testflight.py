@@ -7,8 +7,9 @@ Usage:
   # Discover CI product ID and AI-team group ID (run once to verify setup):
   python3 scripts/asc_testflight.py --discover
 
-  # Wait for Xcode Cloud build for a given app version to succeed, then add to AI-team:
-  python3 scripts/asc_testflight.py --version 3.4.2
+  # Wait for the Xcode Cloud build of a commit (default: $GITHUB_SHA, else HEAD)
+  # to succeed, then add it to AI-team:
+  python3 scripts/asc_testflight.py --version 3.4.2 [--commit <sha>]
 
   # Add to AI-team without waiting (build must already exist):
   python3 scripts/asc_testflight.py --version 3.4.2 --no-wait
@@ -37,6 +38,7 @@ Requirements:
 import argparse
 import base64
 import json
+import os
 import subprocess
 import sys
 import time
@@ -148,12 +150,39 @@ def get_ai_team_group_id() -> str:
     raise RuntimeError(f"Group '{GROUP_NAME}' not found. Available groups: {names}")
 
 
-def get_latest_build_run(ci_product_id: str, version: str) -> dict | None:
+def get_latest_build_run(ci_product_id: str) -> dict | None:
     """Return the most recent build run (sort=-number is the valid ASC sort field)."""
     data = get(f"/ciProducts/{ci_product_id}/buildRuns?sort=-number&limit=10")
     if data["data"]:
         return data["data"][0]
     return None
+
+
+def get_build_run_for_commit(ci_product_id: str, commit: str) -> dict | None:
+    """Return the most recent build run of the given commit, or None if Xcode
+    Cloud hasn't started one yet.
+
+    The newest run alone isn't enough: this job and Xcode Cloud start on the
+    same push, and when the job polls first the newest run is the previous
+    push's, already succeeded — so its build would be added instead.
+    """
+    data = get(f"/ciProducts/{ci_product_id}/buildRuns?sort=-number&limit=20")
+    for run in data["data"]:
+        sha = ((run["attributes"].get("sourceCommit") or {}).get("commitSha") or "").lower()
+        if sha and (sha.startswith(commit.lower()) or commit.lower().startswith(sha)):
+            return run
+    return None
+
+
+def resolve_commit(commit: str | None) -> str:
+    """The commit to wait for: --commit, else the workflow's GITHUB_SHA, else local HEAD."""
+    if commit:
+        return commit
+    if os.environ.get("GITHUB_SHA"):
+        return os.environ["GITHUB_SHA"]
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True,
+    ).stdout.strip()
 
 
 def get_build_run_failure_reason(build_run_id: str) -> str:
@@ -169,16 +198,16 @@ def get_build_run_failure_reason(build_run_id: str) -> str:
         return f"Could not fetch actions: {e}"
 
 
-def wait_for_build_run(ci_product_id: str, version: str) -> dict:
-    """Poll until a build run for the given version completes successfully."""
-    print(f"Waiting for Xcode Cloud build for v{version}…")
+def wait_for_build_run(ci_product_id: str, version: str, commit: str) -> dict:
+    """Poll until the build run of the given commit completes successfully."""
+    print(f"Waiting for Xcode Cloud build of {commit[:7]} (v{version})…")
     deadline = time.time() + POLL_TIMEOUT
     seen_id = None
 
     while time.time() < deadline:
-        run = get_latest_build_run(ci_product_id, version)
+        run = get_build_run_for_commit(ci_product_id, commit)
         if run is None:
-            print("  No build run found yet, waiting…")
+            print(f"  No build run for {commit[:7]} yet, waiting…")
             time.sleep(POLL_INTERVAL)
             continue
 
@@ -190,7 +219,7 @@ def wait_for_build_run(ci_product_id: str, version: str) -> dict:
         if run_id != seen_id:
             seen_id = run_id
             started = attrs.get("startedDate", "?")
-            print(f"  Build run {run_id} started {started}")
+            print(f"  Build run #{attrs.get('number', '?')} ({run_id}) started {started}")
 
         print(f"  [{datetime.now(timezone.utc).strftime('%H:%M:%S')}] status={status} completion={completed}")
 
@@ -571,7 +600,7 @@ def cmd_discover():
     print("\n✅ Setup looks good.")
 
 
-def cmd_add_to_testflight(version: str, wait: bool):
+def cmd_add_to_testflight(version: str, wait: bool, commit: str | None = None):
     if not P8_PATH.exists():
         print(f"❌ .p8 key not found at {P8_PATH}", file=sys.stderr)
         sys.exit(1)
@@ -581,7 +610,7 @@ def cmd_add_to_testflight(version: str, wait: bool):
     print(f"CI product: {ci_product_id}  |  AI-team group: {group_id}")
 
     if wait:
-        build_run = wait_for_build_run(ci_product_id, version)
+        build_run = wait_for_build_run(ci_product_id, version, resolve_commit(commit))
         try:
             build_id = get_app_store_build_from_run(build_run["id"])
         except RuntimeError:
@@ -608,6 +637,9 @@ def main():
     parser.add_argument("--check-last-build", action="store_true", help="Show status and failure reason of most recent Xcode Cloud run")
     parser.add_argument("--version", help="App version string to add to TestFlight (e.g. 3.4.2)")
     parser.add_argument("--no-wait", action="store_true", help="Skip polling; add immediately")
+    parser.add_argument("--commit", metavar="SHA",
+                        help="Commit whose Xcode Cloud build to wait for "
+                             "(default: $GITHUB_SHA, else local HEAD)")
 
     # --- App Store submission command ---
     parser.add_argument("--submit-for-review", action="store_true",
@@ -639,7 +671,7 @@ def main():
     elif args.list_builds:
         cmd_list_builds()
     elif args.check_last_build:
-        run = get_latest_build_run(CI_PRODUCT_ID, "")
+        run = get_latest_build_run(CI_PRODUCT_ID)
         if not run:
             print("No build runs found.")
         else:
@@ -667,7 +699,7 @@ def main():
     elif args.describe_app_store_version:
         cmd_describe_app_store_version(args.describe_app_store_version)
     elif args.version:
-        cmd_add_to_testflight(args.version, wait=not args.no_wait)
+        cmd_add_to_testflight(args.version, wait=not args.no_wait, commit=args.commit)
     else:
         parser.print_help()
         sys.exit(1)

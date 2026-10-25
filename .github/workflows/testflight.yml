@@ -1,7 +1,7 @@
 name: TestFlight
 
 # Triggered on every push to main (each push also triggers Xcode Cloud).
-# Waits for the Xcode Cloud build to succeed, then adds it to the AI-team
+# Waits for the Xcode Cloud build of the pushed commit to succeed, then adds it to the AI-team
 # TestFlight group — no laptop needed.
 #
 # One-time setup required:
@@ -64,4 +64,6 @@ jobs:
           echo "Targeting version $VERSION"
 
       - name: Wait for Xcode Cloud build and add to TestFlight
-        run: python3 scripts/asc_testflight.py --version ${{ steps.ver.outputs.version }}
+        # --commit: wait for this push's Xcode Cloud run, not whichever run is
+        # newest — this job can poll before Xcode Cloud has registered it.
+        run: python3 scripts/asc_testflight.py --version ${{ steps.ver.outputs.version }} --commit ${{ github.sha }}
