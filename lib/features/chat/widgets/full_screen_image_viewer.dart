@@ -475,6 +475,8 @@ class _FullScreenImageViewerState extends ConsumerState<FullScreenImageViewer>
     final entry = _entries[_index];
     if (entry == null) return;
     final container = ProviderScope.containerOf(context, listen: false);
+    // Read before any await: the context must not cross async gaps.
+    final shareOrigin = _globalRectOf(context);
     Directory? directory;
     try {
       final image = await _loadViewerImageBytes(
@@ -496,7 +498,7 @@ class _FullScreenImageViewerState extends ConsumerState<FullScreenImageViewer>
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(file.path, mimeType: image.type.mimeType)],
-          sharePositionOrigin: _globalRectOf(context),
+          sharePositionOrigin: shareOrigin,
         ),
       );
     } catch (e) {
