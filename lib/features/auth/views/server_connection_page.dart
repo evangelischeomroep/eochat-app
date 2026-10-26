@@ -1881,11 +1881,20 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
             ? l10n.accountsAddAddress
             : l10n.accountsEditAddress,
         onTitleLongPress: _editingRoutes ? null : _toggleReviewerMode,
-        backNavigation: UtilityBackNavigation(
-          label: l10n.back,
-          buttonKey: const ValueKey<String>('server-connection-back-button'),
-          onPressed: _goBack,
-        ),
+        // EOchat fork: with a preconfigured server, first-time setup has no
+        // backend chooser to go back to.
+        backNavigation:
+            ForkOverrides.hasPreconfiguredServer &&
+                !widget.addingAccount &&
+                !_editingRoutes
+            ? null
+            : UtilityBackNavigation(
+                label: l10n.back,
+                buttonKey: const ValueKey<String>(
+                  'server-connection-back-button',
+                ),
+                onPressed: _goBack,
+              ),
         bottomAction: _buildConnectButton(),
         body: Form(
           key: _formKey,

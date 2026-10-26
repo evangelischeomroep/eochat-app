@@ -70,7 +70,11 @@ carried a branding-string swap. Current known inline-touch files:
   false, reproducing pure upstream), so the Flutter-free package stays free
   of `ForkOverrides`/Flutter imports while still letting `app_router.dart`
   inject the fork's stuck-loading and preconfigured-server behavior at the
-  two exact branch points upstream's base logic used to have them.
+  two exact branch points upstream's base logic used to have them. Since
+  upstream added Hermes, a first run without a server lands on upstream's backend
+  chooser; `hasPreconfiguredServer` sends it to the server-connection page
+  instead, which connects to chat.eo.nl on its own, and that page drops its
+  Back button (there is no chooser to return to).
 - `lib/core/providers/app_startup_providers.dart`
 - `lib/features/auth/views/server_connection_page.dart`
 - `lib/features/auth/views/authentication_page.dart`

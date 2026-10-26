@@ -99,9 +99,10 @@ String incompleteHermesDestination({
 /// fork-specific routing behavior without this Flutter-free function
 /// depending on the app's config layer: a fork that detects a stuck loading
 /// state can force the authentication page via [authStuckOverride], and a
-/// fork with a preconfigured server can skip straight to sign-in from the
-/// server-connection page via [hasPreconfiguredServer]. Both default to
-/// false, which reproduces upstream's behavior.
+/// fork with a preconfigured server can skip the backend chooser on first
+/// run and go straight to sign-in from the server-connection page via
+/// [hasPreconfiguredServer]. Both default to false, which reproduces
+/// upstream's behavior.
 String? resolveRouteRedirect(
   String location,
   ProviderRead read, {
@@ -303,7 +304,11 @@ String? resolveRouteRedirect(
         location == Routes.login) {
       return null;
     }
-    return Routes.backendChooser;
+    // A preconfigured server is the only backend such a build offers: first
+    // run connects to it rather than asking which backend to use.
+    return hasPreconfiguredServer
+        ? Routes.serverConnection
+        : Routes.backendChooser;
   }
 
   // Allow staying on server connection page

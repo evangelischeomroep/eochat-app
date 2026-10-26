@@ -252,6 +252,23 @@ void main() {
       check(resolveRouteRedirect(Routes.serverConnection, read)).isNull();
     });
 
+    test('a preconfigured server skips the chooser and connects to it', () {
+      final noServer = _reader(
+        activeServer: const AsyncData(null),
+        auth: AuthNavigationState.needsLogin,
+      );
+      final connected = _reader(auth: AuthNavigationState.needsLogin);
+      String? redirect(String location, ProviderRead read) =>
+          resolveRouteRedirect(location, read, hasPreconfiguredServer: true);
+
+      check(redirect(Routes.splash, noServer))
+          .equals(Routes.serverConnection);
+      check(redirect(Routes.chat, noServer)).equals(Routes.serverConnection);
+      check(redirect(Routes.serverConnection, noServer)).isNull();
+      check(redirect(Routes.serverConnection, connected))
+          .equals(Routes.authentication);
+    });
+
     test('Hermes-only setup waits on secrets, then recovers in settings', () {
       const hermes = HermesConfig(enabled: true);
       final loading = _reader(
