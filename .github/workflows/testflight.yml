@@ -55,10 +55,21 @@ jobs:
           # upstream Conduit release the fork is synced to. Those two happened
           # to match, so a shipped-version bump that left the sync marker alone
           # would silently make this job poll for a version that never appears.
-          VERSION=$(sed -n 's/^version:[[:space:]]*\([^+]*\)+.*/\1/p' pubspec.yaml)
-          if [ -z "$VERSION" ]; then
+          #
+          # Xcode Cloud's ci_post_clone.sh ships the build as the next patch
+          # when App Store Connect has closed pubspec's version (approved), so
+          # ask the same question here to log the version it really ships as.
+          PUBSPEC_VERSION=$(sed -n 's/^version:[[:space:]]*\([^+]*\)+.*/\1/p' pubspec.yaml)
+          if [ -z "$PUBSPEC_VERSION" ]; then
             echo "::error::Could not parse version from pubspec.yaml"
             exit 1
+          fi
+          if ! VERSION=$(python3 scripts/asc_testflight.py --next-version "$PUBSPEC_VERSION"); then
+            echo "::warning::Could not ask App Store Connect for the approved version; assuming $PUBSPEC_VERSION"
+            VERSION=$PUBSPEC_VERSION
+          fi
+          if [ "$VERSION" != "$PUBSPEC_VERSION" ]; then
+            echo "::notice::pubspec.yaml says $PUBSPEC_VERSION, which Apple has approved, so this build ships as $VERSION. Bump pubspec.yaml to $VERSION when convenient."
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Targeting version $VERSION"

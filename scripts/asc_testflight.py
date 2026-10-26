@@ -26,6 +26,10 @@ Usage:
       --build-id <build-uuid> \\
       --whats-new "Bug fixes and performance improvements."
 
+  # Print the marketing version a build must ship as (used by
+  # ios/ci_scripts/ci_post_clone.sh and the TestFlight workflow):
+  python3 scripts/asc_testflight.py --next-version 4.2.3
+
   # Delete an existing, not-yet-submitted App Store version (e.g. to clean up
   # an orphan left behind by a --submit-for-review run that failed partway):
   python3 scripts/asc_testflight.py --delete-app-store-version 1.3
@@ -33,6 +37,8 @@ Usage:
 Requirements:
   None — uses only Python stdlib + the openssl binary (always present on macOS)
 """
+
+from __future__ import annotations  # Xcode Cloud's python3 is 3.9
 
 import argparse
 import base64
@@ -597,6 +603,67 @@ def cmd_add_to_testflight(version: str, wait: bool):
 
 
 # ---------------------------------------------------------------------------
+# Version guard
+# ---------------------------------------------------------------------------
+# App Store version states in which that version's build train is still open.
+# Once Apple approves a version its train closes: a build uploaded under it
+# bounces with ITMS-90186 / ITMS-90062. Every state not listed here (approved,
+# released, replaced, or one Apple adds later) counts as closed, so an unknown
+# state costs at most an unneeded patch bump, never a bounce. PENDING_CONTRACT
+# only exists in the deprecated appStoreState, the fallback field.
+OPEN_VERSION_STATES = {
+    "PREPARE_FOR_SUBMISSION", "READY_FOR_REVIEW", "WAITING_FOR_REVIEW",
+    "IN_REVIEW", "WAITING_FOR_EXPORT_COMPLIANCE", "DEVELOPER_REJECTED",
+    "REJECTED", "METADATA_REJECTED", "INVALID_BINARY",
+    "PENDING_CONTRACT",
+}
+
+
+def _parse_version(version: str) -> tuple[int, int, int]:
+    """'4.2' -> (4, 2, 0); raises ValueError on anything but 1-3 numbers."""
+    parts = [int(p) for p in version.strip().split(".")]
+    if not 1 <= len(parts) <= 3:
+        raise ValueError(f"not a marketing version: {version!r}")
+    return tuple(parts + [0] * (3 - len(parts)))  # type: ignore[return-value]
+
+
+def highest_closed_version() -> str | None:
+    """The highest App Store version string whose build train has closed."""
+    data = get(
+        f"/apps/{APP_ID}/appStoreVersions"
+        f"?filter[platform]=IOS&limit=200"
+    )
+    closed = []
+    for v in data.get("data", []):
+        a = v["attributes"]
+        if (a.get("appVersionState") or a.get("appStoreState")) in OPEN_VERSION_STATES:
+            continue
+        try:
+            closed.append((_parse_version(a["versionString"]), a["versionString"]))
+        except (KeyError, ValueError):
+            continue
+    return max(closed)[1] if closed else None
+
+
+def next_version(pubspec_version: str, closed: str | None) -> str:
+    """pubspec's version if it is above the last closed one, else the next patch."""
+    if closed is None or _parse_version(pubspec_version) > _parse_version(closed):
+        return pubspec_version
+    major, minor, patch = _parse_version(closed)
+    return f"{major}.{minor}.{patch + 1}"
+
+
+def cmd_next_version(pubspec_version: str) -> None:
+    """Print only the version to ship on stdout, so callers can capture it."""
+    _parse_version(pubspec_version)  # fail fast on a malformed argument
+    closed = highest_closed_version()
+    ship = next_version(pubspec_version, closed)
+    print(f"Highest approved App Store version: {closed or 'none'}; "
+          f"pubspec.yaml: {pubspec_version}; ships as: {ship}", file=sys.stderr)
+    print(ship)
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main():
@@ -608,6 +675,10 @@ def main():
     parser.add_argument("--check-last-build", action="store_true", help="Show status and failure reason of most recent Xcode Cloud run")
     parser.add_argument("--version", help="App version string to add to TestFlight (e.g. 3.4.2)")
     parser.add_argument("--no-wait", action="store_true", help="Skip polling; add immediately")
+    parser.add_argument("--next-version", metavar="VER",
+                        help="Print the marketing version a build must ship as: VER "
+                             "(pubspec.yaml's) if it is above the highest approved App "
+                             "Store version, else the next patch above that one")
 
     # --- App Store submission command ---
     parser.add_argument("--submit-for-review", action="store_true",
@@ -666,6 +737,8 @@ def main():
         cmd_delete_app_store_version(args.delete_app_store_version)
     elif args.describe_app_store_version:
         cmd_describe_app_store_version(args.describe_app_store_version)
+    elif args.next_version:
+        cmd_next_version(args.next_version)
     elif args.version:
         cmd_add_to_testflight(args.version, wait=not args.no_wait)
     else:

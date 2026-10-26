@@ -11,6 +11,37 @@ echo "=== Ensuring git submodules are initialized ==="
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 git submodule update --init --recursive
 
+echo "=== Version guard: ship above the last approved App Store version ==="
+# Once Apple approves a version its build train closes, and a build still
+# under it bounces after upload (ITMS-90186 / ITMS-90062). Ask App Store
+# Connect for the highest approved version; if pubspec.yaml isn't above it,
+# this build ships as the next patch. Only this clone's pubspec.yaml changes,
+# before `flutter pub get` writes FLUTTER_BUILD_NAME (CFBundleShortVersionString);
+# nothing is committed. Fails open: without the key or the API, the build
+# ships as pubspec.yaml says.
+#
+# Needs ASC_P8_KEY on the Xcode Cloud workflow (Environment → Environment
+# Variables, marked Secret): the same base64 of scripts/AuthKey_SNL4WUUBST.p8
+# as the GitHub secret of that name.
+PUBSPEC_VERSION=$(sed -n 's/^version:[[:space:]]*\([^+]*\)+.*/\1/p' pubspec.yaml)
+ASC_KEY_FILE="$CI_PRIMARY_REPOSITORY_PATH/scripts/AuthKey_SNL4WUUBST.p8"
+if [ -z "${ASC_P8_KEY:-}" ]; then
+  echo "WARNING: ASC_P8_KEY is not set on this Xcode Cloud workflow; skipping the version guard (shipping as $PUBSPEC_VERSION)."
+elif ! printf '%s' "$ASC_P8_KEY" | base64 --decode > "$ASC_KEY_FILE" 2>/dev/null; then
+  echo "WARNING: ASC_P8_KEY did not decode; skipping the version guard (shipping as $PUBSPEC_VERSION)."
+elif SHIP_VERSION=$(python3 scripts/asc_testflight.py --next-version "$PUBSPEC_VERSION"); then
+  if [ "$SHIP_VERSION" != "$PUBSPEC_VERSION" ]; then
+    sed "s/^version:[[:space:]]*[^+]*+/version: $SHIP_VERSION+/" pubspec.yaml > pubspec.yaml.guard
+    mv pubspec.yaml.guard pubspec.yaml
+    echo "pubspec.yaml says $PUBSPEC_VERSION, whose train App Store Connect has closed: this build ships as $SHIP_VERSION."
+  fi
+  grep '^version:' pubspec.yaml || true
+else
+  echo "WARNING: could not ask App Store Connect for the approved version; shipping as $PUBSPEC_VERSION."
+fi
+# Only the guard wrote the key here (it is gitignored), so it goes again.
+if [ -n "${ASC_P8_KEY:-}" ]; then rm -f "$ASC_KEY_FILE"; fi
+
 echo "=== Installing Flutter (stable) ==="
 git clone https://github.com/flutter/flutter.git \
   --depth 1 \

@@ -128,13 +128,19 @@ build dirties `ios/Podfile.lock` or `project.pbxproj`, check the diff is a
 checksum or Xcode formatting only, then commit it once (see pitfalls);
 restoring it on every run just hides it.
 
-The shipped version (`pubspec.yaml` `version:`) must stay above the last
-version Apple approved: once a version is approved its train closes, and
-builds under it bounce with ITMS-90186 / ITMS-90062. Shipping fork work
-between upstream releases means bumping the patch ahead of upstream (4.2.1
-approved → 4.2.2). An upstream sync then takes the higher of the two, never
-a version at or below the last approved one. `.conduit-sync-version` keeps
-recording the upstream release and is not bumped with it.
+The shipped version must stay above the last version Apple approved: once a
+version is approved its train closes, and builds under it bounce with
+ITMS-90186 / ITMS-90062. `ci_post_clone.sh` guards this on Xcode Cloud: it
+asks App Store Connect (`asc_testflight.py --next-version`) for the highest
+approved version and, if `pubspec.yaml` isn't above it, ships the build as
+the next patch (4.2.3 approved → 4.2.4), changing only the clone. It needs
+`ASC_P8_KEY` as a secret environment variable on the Xcode Cloud workflow
+and fails open without it. The TestFlight job logs the version the build
+really ships as and leaves a notice when it differs from `pubspec.yaml`:
+bump pubspec to match when convenient, so git tells the truth. An upstream
+sync takes the higher of upstream's and the shipped version.
+`.conduit-sync-version` keeps recording the upstream release and is not
+bumped with it.
 
 Direct pushes to main are allowed for this workflow (rule bypass is logged),
 but leave main clean and equal to origin/main when you stop.
