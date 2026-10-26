@@ -335,6 +335,15 @@ carried a branding-string swap. Current known inline-touch files:
     `zonedSchedule` needs on Android.
   - `pubspec.yaml` — `timezone` as a direct dependency (it was already in the
     lock through flutter_local_notifications).
+- `lib/features/navigation/widgets/sidebar_tab_registry.dart` — two tab
+  tweaks. The Channels tab's predicate also requires
+  `ForkOverrides.showChannelsTab` (default false): EO doesn't use channels,
+  so the tab is gone while the feature itself stays (automation
+  destinations etc.). `debugShowChannelsTab`, set in
+  `test/flutter_test_config.dart`, keeps upstream's sidebar tests covering
+  it. The terminal tab carries a folder (`folder` / `folder.fill`,
+  `Icons.folder*`) and its label `sidebarTerminalTab` reads *Files* /
+  *Bestanden* (en/nl ARB): users know it as the file browser.
 
 If a new fork behavior needs another upstream file, document why in the PR.
 

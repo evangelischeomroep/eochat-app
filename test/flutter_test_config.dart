@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:conduit_core/persistence/preferences_store.dart';
 import 'package:conduit_core/utils/debug_logger.dart';
+import 'package:conduit/features/navigation/widgets/sidebar_tab_registry.dart';
 import 'package:conduit/platform/flutter_flush_scheduler.dart';
 import 'package:conduit/platform/flutter_post_frame_scheduler.dart';
 import 'package:conduit/platform/just_audio_playback.dart';
@@ -47,5 +48,8 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   // ports; installing the app's adapters keeps tests on those paths.
   LocationPort.hostDefault = const GeolocatorLocationPort();
   WakelockPort.hostDefault = const WakelockPlusPort();
+  // Fork: EOchat hides the Channels tab (ForkOverrides.showChannelsTab);
+  // upstream's sidebar tests still cover it.
+  debugShowChannelsTab = true;
   await testMain();
 }

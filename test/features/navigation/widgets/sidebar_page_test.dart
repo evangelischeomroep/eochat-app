@@ -221,7 +221,7 @@ void main() {
     await tester.pump();
 
     expect(sidebarTestBottomNavTabLabel('Notes'), findsNothing);
-    expect(sidebarTestBottomNavTabLabel('Terminal'), findsNothing);
+    expect(sidebarTestBottomNavTabLabel('Files'), findsNothing);
     expect(sidebarTestBottomNavTabLabel('Channels'), findsNothing);
   });
 
@@ -234,7 +234,7 @@ void main() {
         sidebarTestBuildHarness(controllers: controllers),
       );
 
-      await tester.tap(sidebarTestBottomNavTabLabel('Terminal'));
+      await tester.tap(sidebarTestBottomNavTabLabel('Files'));
       await tester.pump();
 
       final terminalLayer = tester.widget<Opacity>(
@@ -261,7 +261,7 @@ void main() {
       tester.element(find.byType(SidebarPage)),
     );
 
-    await tester.tap(sidebarTestBottomNavTabLabel('Terminal'));
+    await tester.tap(sidebarTestBottomNavTabLabel('Files'));
     await tester.pump();
     check(container.read(terminalSidebarPanelProvider))
         .equals(TerminalSidebarPanel.files);
@@ -429,7 +429,7 @@ void main() {
       NavigationDestinationLabelBehavior.alwaysShow,
     );
     expect(sidebarTestBottomNavTabLabel('Chats'), findsOneWidget);
-    expect(sidebarTestBottomNavTabLabel('Terminal'), findsOneWidget);
+    expect(sidebarTestBottomNavTabLabel('Files'), findsOneWidget);
     expect(sidebarTestBottomNavTabLabel('Notes'), findsOneWidget);
     expect(sidebarTestBottomNavTabLabel('Channels'), findsOneWidget);
   });
@@ -500,7 +500,7 @@ void main() {
       'Chats',
       'Hermes',
       'Notes',
-      'Terminal',
+      'Files',
       'Channels',
       'Game',
     ]) {
@@ -757,7 +757,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(sidebarTestBottomNavTabLabel('Terminal'), findsNothing);
+    expect(sidebarTestBottomNavTabLabel('Files'), findsNothing);
     expect(find.byType(TerminalTab), findsNothing);
   });
 
@@ -773,7 +773,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(sidebarTestBottomNavTabLabel('Terminal'), findsOneWidget);
+    expect(sidebarTestBottomNavTabLabel('Files'), findsOneWidget);
     expect(find.byType(TerminalTab), findsOneWidget);
   });
 
@@ -791,7 +791,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(sidebarTestBottomNavTabLabel('Terminal'), findsNothing);
+    expect(sidebarTestBottomNavTabLabel('Files'), findsNothing);
     expect(sidebarTestBottomNavTabLabel('Channels'), findsOneWidget);
     expect(find.byIcon(Icons.add), findsWidgets);
 

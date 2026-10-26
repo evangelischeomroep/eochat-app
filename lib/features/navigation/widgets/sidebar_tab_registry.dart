@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../core/config/fork_overrides.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../channels/widgets/channel_list_tab.dart';
 import '../../hermes/widgets/hermes_sessions_tab.dart';
@@ -143,7 +145,13 @@ bool _terminalVisible(SidebarTabAvailability availability) =>
     !availability.hermesOnly &&
     availability.terminalEnabled;
 
+/// Fork: tests set this to keep upstream's Channels tab in the registry
+/// while [ForkOverrides.showChannelsTab] hides it in the app.
+@visibleForTesting
+bool debugShowChannelsTab = false;
+
 bool _channelsVisible(SidebarTabAvailability availability) =>
+    (ForkOverrides.showChannelsTab || debugShowChannelsTab) &&
     availability.hasOpenWebUi &&
     !availability.hermesOnly &&
     availability.channelsEnabled;
@@ -194,10 +202,12 @@ const sidebarTabRegistry = <SidebarTabDescriptor>[
     labelBuilder: _terminalLabel,
     searchHintBuilder: _terminalSearchHint,
     bodyBuilder: _terminalBody,
-    materialIcon: Icons.terminal_rounded,
-    selectedMaterialIcon: Icons.terminal,
-    sfSymbol: 'terminal',
-    selectedSfSymbol: 'terminal',
+    // Fork: labelled "Bestanden" (Files); the tab is used as a file
+    // browser, so it carries a folder instead of a terminal glyph.
+    materialIcon: Icons.folder_outlined,
+    selectedMaterialIcon: Icons.folder,
+    sfSymbol: 'folder',
+    selectedSfSymbol: 'folder.fill',
     isVisible: _terminalVisible,
     behavior: terminalSidebarTabBehavior,
   ),

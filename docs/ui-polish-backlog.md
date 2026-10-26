@@ -118,6 +118,8 @@ untouched ("perfect").
 | 46 | Quick pills replaced by a counter beside `+` | PR #2 | `ForkOverrides.replaceComposerQuickPillsWithCounter` (default true): no web/image/filter/tool/code-interpreter pills; `ComposerActiveToolsBadge` shows how many `+` menu items are selected (same item list as the native panel, Hermes/direct filtering included). Composer stays compact unless multiline. |
 | 47 | Active-tools counter stretched into an oval in the single-line composer | `37a2c09e` | Compact row passes a loose 44pt height and the badge `Container` has `alignment`, so it grew to fill it; `maxHeight: IconSize.chip` keeps it a circle. Single digits drop the horizontal padding (digit + 2×4pt was 20pt wide on an 18pt chip); 10+ stays a pill |
 | 48 | "Server niet ondersteund" card shown to everyone | `e4457d6a` | `ServerVersionWarningCard` also requires `betaModeProvider` (hidden About toggle) |
+| 49 | "Kanalen" tab not used at EO | pending | Hidden via `ForkOverrides.showChannelsTab` (default false) in the registry predicate; channels feature itself untouched. Tests keep it via `debugShowChannelsTab` in `flutter_test_config.dart`. |
+| 50 | "Terminal" tab reads as a developer tool | pending | Label `sidebarTerminalTab` → *Bestanden* (nl) / *Files* (en), icon `folder` / `folder.fill` (SF) and `Icons.folder*` (Material). Other locales keep *Terminal*. |
 
 ---
 

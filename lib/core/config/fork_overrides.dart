@@ -92,6 +92,13 @@ class ForkOverrides {
     defaultValue: true,
   );
 
+  /// When false, the Channels tab is left out of the sidebar/tab bar. EO
+  /// doesn't use Open WebUI channels; the feature itself stays untouched.
+  static const bool showChannelsTab = bool.fromEnvironment(
+    'SHOW_CHANNELS_TAB',
+    defaultValue: false,
+  );
+
   /// When true, an assistant row does not paint the avatar + model-name
   /// header when its model is the conversation's active model — the app-bar
   /// model pill already names it. The header still appears for responses

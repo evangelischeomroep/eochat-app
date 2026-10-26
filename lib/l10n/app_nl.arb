@@ -1120,7 +1120,7 @@
   "chatSaved": "Chat opgeslagen in geschiedenis",
   "chatSaveFailed": "Chat opslaan mislukt",
   "sidebarChatsTab": "Chats",
-  "sidebarTerminalTab": "Terminal",
+  "sidebarTerminalTab": "Bestanden",
   "@sidebarTerminalTab": {
     "description": "Label for the Terminal tab in the sidebar"
   },

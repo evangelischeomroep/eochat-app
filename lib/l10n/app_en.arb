@@ -3077,7 +3077,7 @@
   "@sidebarChatsTab": {
     "description": "Label for the Chats tab in the sidebar"
   },
-  "sidebarTerminalTab": "Terminal",
+  "sidebarTerminalTab": "Files",
   "@sidebarTerminalTab": {
     "description": "Label for the Terminal tab in the sidebar"
   },

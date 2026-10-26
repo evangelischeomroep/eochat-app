@@ -351,7 +351,7 @@ void main() {
 
     expect(find.byType(SidebarProfileAppBarLeading), findsOneWidget);
 
-    await tester.tap(sidebarTestBottomNavTabLabel('Terminal'));
+    await tester.tap(sidebarTestBottomNavTabLabel('Files'));
     await tester.pumpAndSettle();
 
     expect(find.byType(SidebarProfileAppBarLeading), findsOneWidget);
