@@ -68,17 +68,22 @@ abstract final class OpknapperStrings {
   static const String gameName = 'Opknapper';
   static const String tagline = 'Dagelijks oefenen met AI';
   static const String searchHint = 'Zoeken';
-  static const String reminderTitle = 'Stuur een melding bij nieuwe opdrachten';
-  static String reminderSubtitle(String time) => 'Werkdagen om $time';
+  static const String reminderTitle = 'Meldingen van de game';
+  static String reminderSubtitle(String time) =>
+      'Maandag om 09:00 en donderdag om $time';
+  static const String reminderDailyTitle = 'Ook elke werkdag';
+  static const String reminderDailySubtitle =
+      'Een melding bij elke nieuwe vraag';
   static const String reminderOff = 'Uit';
   static const String reminderTime = 'Tijdstip';
   static const String reminderPickerTitle = 'Melding om';
   static const String reminderFootnote =
-      'Elke werkdag staat er een nieuwe opdracht voor je klaar in Opknapper: '
-      'een korte vraag, een oefening of een peiling, in een paar minuten '
-      'gedaan. Je krijgt één melding per werkdag, alleen als er nog iets op '
-      'je wacht, en op maandag één over de nieuwe week. Kom je een week niet '
-      'langs, dan wordt het vanzelf stil.';
+      'Op maandag begint er een nieuwe week in Opknapper, met een nieuwe '
+      'Weekchallenge; op donderdag krijg je een seintje voordat de week om '
+      'is. Je hebt altijd een week om alles af te maken, dus je hoeft '
+      'niet elke dag te komen. Wil je toch bij elke nieuwe vraag een melding, '
+      'zet dan "Ook elke werkdag" aan. Kom je een week niet langs, dan wordt '
+      'het vanzelf stil.';
   static const String permissionDenied =
       'Meldingen staan uit voor EOchat. Zet ze aan in Instellingen.';
   static const String loadFailed = 'De game laadt niet.';
@@ -86,21 +91,30 @@ abstract final class OpknapperStrings {
   static const String reload = 'Herladen';
   static const String openInBrowser = 'Open in browser';
   static const String channelName = 'Opknapper';
-  static const String channelDescription = 'Meldingen bij nieuwe opdrachten';
+  static const String channelDescription = 'Meldingen over de game';
 
-  /// The working-day notification; never urgent (T32's lean, R49).
+  /// The daily option's notification, Tuesday, Wednesday and Friday; never
+  /// urgent (T32's lean, R49).
   static const (String, String) dailyReminder = (
     'Er staat een nieuwe vraag klaar in de game!',
     'Je vindt hem in de postvakjes.',
   );
 
   /// Monday 09:00, when the game's week turns and a new weekbrief and
-  /// ansichtkaart pairing are there. Takes the place of that day's
-  /// [dailyReminder].
+  /// ansichtkaart pairing are there.
   static const (String, String) weeklyReminder = (
     'Met welke collega ben jij gematcht?',
     'Er staat een nieuwe week klaar in de game. Met wie ga jij hem deze week '
         'voltooien?',
+  );
+
+  /// Thursday at the chosen time, before the week turns on Monday at 09:00.
+  /// Says what may still wait, never that something was missed: it can't
+  /// know what the colleague did.
+  static const (String, String) weekEndReminder = (
+    'De week is bijna om',
+    'Kijk in je postvakjes of er nog iets op je wacht; '
+        'maandag 9:00 verdwijnen ze.',
   );
 
   /// Once, on the game's first Monday, in place of that day's reminders.
@@ -110,7 +124,7 @@ abstract final class OpknapperStrings {
         'opdrachten. Elke werkdag en elke week nieuwe content.',
   );
 
-  /// Times the settings offer for the daily notification.
+  /// Times the settings offer for Thursday's and the daily notifications.
   static List<String> timeChoices(String current) {
     final choices = <String>[
       for (var h = 7; h <= 12; h++) ...[

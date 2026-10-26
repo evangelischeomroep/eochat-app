@@ -1249,6 +1249,23 @@ class _ConduitAppState extends ConsumerState<ConduitApp> {
                   .openSystemSettings();
             }
           }
+        case nativeOpknapperReminderDailyId:
+          if (value is bool) {
+            final enabled = await ref
+                .read(opknapperRemindersProvider.notifier)
+                .setDaily(value);
+            // On with the reminders off turns them on too: show the switch
+            // as it now is, and if permission was refused, say where to
+            // change it.
+            await ref
+                .read(nativeSheetHydrationServiceProvider)
+                .hydrateDetail(NativeSheetRoutes.notificationSettings);
+            if (value && !enabled) {
+              await ref
+                  .read(localNotificationServiceProvider)
+                  .openSystemSettings();
+            }
+          }
         case nativeOpknapperReminderTimeId:
           final time = OpknapperReminderSettings.parseTime(value);
           if (time != null) {

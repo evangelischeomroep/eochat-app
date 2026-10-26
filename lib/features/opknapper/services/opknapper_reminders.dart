@@ -1,20 +1,26 @@
-// Fork-only (EOchat): Opknapper's daily-letter reminders.
+// Fork-only (EOchat): Opknapper's reminders.
 //
-// The game's dagbrief comes each working day (ai-hub-webapp, T32's first
-// step). A web view can't take Web Push, so the app schedules the reminders
-// itself, as local notifications, and asks no server for anything.
+// The game's week turns on Monday at 09:00 (ai-hub-webapp
+// `server/ansichtkaart.js`), and a Vraag van de dag comes each working day. A
+// web view can't take Web Push, so the app schedules the reminders itself, as
+// local notifications, and asks no server for anything.
 //
-// The schedule is a rolling window: the next five working days at the
-// colleague's chosen time, rebuilt whenever the game is opened or a letter is
-// answered. So a letter answered today drops today's reminder, and a colleague
-// who stays away for a week stops hearing from the app until they come back —
-// an invitation, never a broadcast (R49: being away costs a moment, never a
-// lesson).
+// By default two a week: Monday at 09:00, when the week turns, and Thursday
+// at the colleague's chosen time, before the week is over. A Vraag van de dag
+// waits four working days in the game, so nobody has to come daily, and two
+// reminders a week keep the app from nagging; a colleague who wants one for
+// every new vraag turns on the daily option, which adds the other working
+// days at the same time.
 //
-// Mondays get the weekly notification instead of the daily one, at 09:00,
-// when the game's week turns (ai-hub-webapp `server/ansichtkaart.js`). The
-// game's first Monday gets the launch notification instead of both, at
-// 14:00, after the AI team's morning check; it is scheduled from the first
+// The schedule is a rolling window: what falls in the next six working days,
+// so the next Monday and Thursday are always in it, rebuilt whenever the game
+// is opened or a letter is answered. So a letter answered today drops today's
+// daily reminder, and a colleague who stays away for a week stops hearing
+// from the app until they come back — an invitation, never a broadcast (R49:
+// being away costs a moment, never a lesson).
+//
+// The game's first Monday gets the launch notification in place of Monday's,
+// at 14:00, after the AI team's morning check; it is scheduled from the first
 // start of this build on, also before the release, so it reaches colleagues
 // who don't open the app over the weekend.
 
@@ -38,22 +44,34 @@ import '../opknapper_config.dart';
 
 const String _scope = 'opknapper/reminders';
 
+/// The three kinds of reminder: the week turning (Monday), the week nearly
+/// over (Thursday), and the daily option's.
+enum _Reminder { week, weekEnd, day }
+
 /// The colleague's reminder choice.
 class OpknapperReminderSettings {
   const OpknapperReminderSettings({
     required this.enabled,
     required this.time,
+    this.daily = false,
     this.loaded = false,
   });
 
-  /// On until the colleague turns it off, in the tab or from the game.
+  /// The week's two on until the colleague turns them off, in the tab or from
+  /// the game; the daily ones off until they turn them on.
   static const OpknapperReminderSettings initial = OpknapperReminderSettings(
     enabled: true,
     time: TimeOfDay(hour: 8, minute: 45),
   );
 
+  /// Monday's and Thursday's reminders.
   final bool enabled;
+
+  /// Thursday's time, and the daily reminders'.
   final TimeOfDay time;
+
+  /// Also a reminder on the other working days, for each new Vraag van de dag.
+  final bool daily;
 
   /// False until the stored choice has been read.
   final bool loaded;
@@ -62,14 +80,22 @@ class OpknapperReminderSettings {
       '${time.hour.toString().padLeft(2, '0')}:'
       '${time.minute.toString().padLeft(2, '0')}';
 
-  OpknapperReminderSettings copyWith({bool? enabled, TimeOfDay? time}) =>
-      OpknapperReminderSettings(
-        enabled: enabled ?? this.enabled,
-        time: time ?? this.time,
-        loaded: true,
-      );
+  OpknapperReminderSettings copyWith({
+    bool? enabled,
+    TimeOfDay? time,
+    bool? daily,
+  }) => OpknapperReminderSettings(
+    enabled: enabled ?? this.enabled,
+    time: time ?? this.time,
+    daily: daily ?? this.daily,
+    loaded: true,
+  );
 
-  Map<String, Object?> toJson() => {'enabled': enabled, 'time': timeLabel};
+  Map<String, Object?> toJson() => {
+    'enabled': enabled,
+    'time': timeLabel,
+    'daily': daily,
+  };
 
   /// Parses `HH:mm`, as the page sends it.
   static TimeOfDay? parseTime(Object? value) {
@@ -125,13 +151,15 @@ final opknapperRemindersProvider =
 class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
   static const String _enabledKey = 'opknapper.reminders.enabled';
   static const String _minutesKey = 'opknapper.reminders.minutes';
+  static const String _dailyKey = 'opknapper.reminders.daily';
   static const String _answeredDayKey = 'opknapper.reminders.answeredDay';
   static const String _permissionAskedKey =
       'opknapper.reminders.permissionAsked';
   static const String _channelId = 'opknapper';
 
-  /// How many working days ahead are scheduled.
-  static const int windowDays = 5;
+  /// How many working days ahead are scheduled, today included: six, so the
+  /// next Monday and Thursday always fall in the window.
+  static const int windowDays = 6;
 
   /// Reminder ids are this base plus the day's number since 1 Jan 2026, so
   /// each day has one id and ours never collide with the message counter,
@@ -194,9 +222,11 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
       final prefs = await SharedPreferences.getInstance();
       final enabled = prefs.getBool(_enabledKey) ?? true;
       final minutes = prefs.getInt(_minutesKey);
+      final daily = prefs.getBool(_dailyKey) ?? false;
       if (!ref.mounted) return;
       state = state.copyWith(
         enabled: enabled,
+        daily: daily,
         time: minutes == null
             ? null
             : TimeOfDay(hour: (minutes ~/ 60) % 24, minute: minutes % 60),
@@ -220,6 +250,7 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_enabledKey, state.enabled);
     await prefs.setInt(_minutesKey, state.time.hour * 60 + state.time.minute);
+    await prefs.setBool(_dailyKey, state.daily);
   }
 
   /// Once per signed-in start: routes reminder taps, opens the game when a
@@ -272,9 +303,10 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
     }
   }
 
-  /// Turns the reminder on or off. Turning it on asks for permission; returns
-  /// whether reminders can be shown.
-  Future<bool> setEnabled(bool enabled, {TimeOfDay? time}) async {
+  /// Turns the reminders on or off. Turning them on asks for permission;
+  /// returns whether reminders can be shown. [daily], when given, sets the
+  /// daily option with it.
+  Future<bool> setEnabled(bool enabled, {TimeOfDay? time, bool? daily}) async {
     await _ready();
     var granted = true;
     if (enabled) {
@@ -282,7 +314,23 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
           .read(localNotificationServiceProvider)
           .requestPermissions();
     }
-    state = state.copyWith(enabled: enabled && granted, time: time);
+    state = state.copyWith(
+      enabled: enabled && granted,
+      time: time,
+      daily: daily,
+    );
+    await _persist();
+    await refresh();
+    return state.enabled;
+  }
+
+  /// The daily option. Turning it on with the reminders off turns them on
+  /// too, so the switch never does nothing; returns whether reminders can be
+  /// shown.
+  Future<bool> setDaily(bool daily) async {
+    final settings = await _ready();
+    if (daily && !settings.enabled) return setEnabled(true, daily: true);
+    state = state.copyWith(daily: daily);
     await _persist();
     await refresh();
     return state.enabled;
@@ -345,7 +393,7 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
       '${day.day.toString().padLeft(2, '0')}';
 
   /// Rebuilds the window: cancels every pending Opknapper reminder and, when
-  /// on, schedules the next [windowDays] working days.
+  /// on, schedules what falls in the next [windowDays] working days.
   Future<void> refresh({bool skipToday = false}) {
     final run = _refreshTail.then((_) => _refresh(skipToday: skipToday));
     _refreshTail = run.catchError((Object _) {});
@@ -377,48 +425,74 @@ class OpknapperReminders extends Notifier<OpknapperReminderSettings> {
       }
       var day = tz.TZDateTime(zone, now.year, now.month, now.day);
       var scheduled = 0;
+      var workingDays = 0;
       var guard = 0;
-      while (scheduled < windowDays && guard < 14) {
+      while (workingDays < windowDays && guard < 14) {
         guard++;
-        final isToday =
-            day.year == now.year &&
-            day.month == now.month &&
-            day.day == now.day;
-        final isLaunchDay = day.year == ly && day.month == lm && day.day == ld;
         final workingDay =
             day.weekday >= DateTime.monday && day.weekday <= DateTime.friday;
-        // Monday: the week's notification at the week's turn, also when
-        // today's question is already answered.
-        final weekly = day.weekday == DateTime.monday;
-        final at = weekly
-            ? tz.TZDateTime(zone, day.year, day.month, day.day, _weekTurnHour)
-            : tz.TZDateTime(
-                zone,
-                day.year,
-                day.month,
-                day.day,
-                settings.time.hour,
-                settings.time.minute,
-              );
-        if (workingDay &&
-            !isLaunchDay &&
-            at.isAfter(now) &&
-            (weekly || !(isToday && skipToday))) {
-          await _schedule(
-            at,
-            weekly
-                ? OpknapperStrings.weeklyReminder
-                : OpknapperStrings.dailyReminder,
-            open: weekly ? null : 'post',
-          );
-          scheduled++;
+        if (workingDay) {
+          workingDays++;
+          final isToday =
+              day.year == now.year &&
+              day.month == now.month &&
+              day.day == now.day;
+          final isLaunchDay =
+              day.year == ly && day.month == lm && day.day == ld;
+          // Monday: the week turns. Thursday: the week is nearly over. The
+          // other working days only with the daily option.
+          final kind = day.weekday == DateTime.monday
+              ? _Reminder.week
+              : day.weekday == DateTime.thursday
+              ? _Reminder.weekEnd
+              : settings.daily
+              ? _Reminder.day
+              : null;
+          final at = kind == _Reminder.week
+              ? tz.TZDateTime(
+                  zone,
+                  day.year,
+                  day.month,
+                  day.day,
+                  _weekTurnHour,
+                )
+              : tz.TZDateTime(
+                  zone,
+                  day.year,
+                  day.month,
+                  day.day,
+                  settings.time.hour,
+                  settings.time.minute,
+                );
+          // Today's daily reminder goes once today's vraag is answered; the
+          // week's two come all the same.
+          final answeredToday = kind == _Reminder.day && isToday && skipToday;
+          if (kind != null &&
+              !isLaunchDay &&
+              at.isAfter(now) &&
+              !answeredToday) {
+            await _schedule(
+              at,
+              switch (kind) {
+                _Reminder.week => OpknapperStrings.weeklyReminder,
+                _Reminder.weekEnd => OpknapperStrings.weekEndReminder,
+                _Reminder.day => OpknapperStrings.dailyReminder,
+              },
+              open: kind == _Reminder.week ? null : 'post',
+            );
+            scheduled++;
+          }
         }
         day = tz.TZDateTime(zone, day.year, day.month, day.day + 1);
       }
       DebugLogger.log(
         'window-scheduled',
         scope: _scope,
-        data: {'count': scheduled, 'time': settings.timeLabel},
+        data: {
+          'count': scheduled,
+          'time': settings.timeLabel,
+          'daily': settings.daily,
+        },
       );
     } catch (error, stackTrace) {
       DebugLogger.error(

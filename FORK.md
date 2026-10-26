@@ -306,7 +306,7 @@ carried a branding-string swap. Current known inline-touch files:
     the drawer, goes to `/opknapper`) instead of switching to a panel.
   - `lib/features/notifications/views/notification_settings_page.dart`,
     `lib/core/services/native_sheet_hydration_service.dart` and
-    `lib/main.dart` — the Game's daily notification (switch and time) as a
+    `lib/main.dart` — the Game's reminders (two switches and a time) as a
     group of the Notifications settings, Flutter and native (iOS 26).
   - `lib/features/navigation/widgets/responsive_drawer_layout.dart` and
     `drawer_shell_page.dart` — `swipeToOpenEnabled`: on the game page

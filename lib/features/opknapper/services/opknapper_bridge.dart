@@ -12,7 +12,9 @@
 //   hello                       → {ok, app, version, platform, bridge, reminders}
 //   seen                        → the game was opened; renews the reminders
 //   answered                    → today's dagbrief is in; drops today's reminder
-//   reminders {enabled, time?}  → turns the reminder on or off ('HH:mm')
+//   reminders {enabled, time?, daily?}
+//                               → turns the reminders on or off ('HH:mm');
+//                                 `daily` the daily option, when sent
 //   haptic {style}              → light | medium | heavy | selection |
 //                                 success | warning | error
 //   openChat {prompt}           → a new EOchat chat with the prompt typed
@@ -101,7 +103,12 @@ class OpknapperBridge {
         case 'reminders':
           final enabled = message['enabled'] == true;
           final time = OpknapperReminderSettings.parseTime(message['time']);
-          final granted = await _reminders.setEnabled(enabled, time: time);
+          final daily = message['daily'];
+          final granted = await _reminders.setEnabled(
+            enabled,
+            time: time,
+            daily: daily is bool ? daily : null,
+          );
           return {..._withReminders(), 'granted': granted};
         case 'haptic':
           final style = message['style'];

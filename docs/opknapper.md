@@ -9,8 +9,8 @@ what a web page on an iPhone can't do itself. Written 15 Oct 2026.*
 
 - **A tab,** *Game* (paw print), last in the bottom bar. It has no panel
   of its own: tapping it closes the sidebar and opens the game in the main
-  pane. The daily notification lives in Instellingen → Meldingen, as
-  *Stuur een melding bij nieuwe opdrachten* with a time, working days only.
+  pane. The reminders live in Instellingen → Meldingen, as *Meldingen over
+  je week* (Monday and Thursday), *Ook elke werkdag* and a time.
 - **The game page,** `/opknapper`, inside the drawer shell beside chat,
   notes and channels: the app's own top bar (sidebar button, title, reload)
   over a web view of `ForkOverrides.opknapperUrl`
@@ -71,18 +71,25 @@ browser.
 
 ## Reminders
 
-A new opdracht comes each working day. A web view can't take Web Push, so the
-app schedules local notifications itself, with no server
-(ai-hub-webapp 50, T32's first step).
+The game's week turns on Monday at 09:00, and a Vraag van de dag comes each
+working day and waits four. A web view can't take Web Push, so the app
+schedules local notifications itself, with no server (ai-hub-webapp 50, T32's
+first step).
 
-- **A rolling window:** the next five working days at the chosen time, Dutch
-  clock (`Europe/Amsterdam`), rebuilt whenever the game is opened (`seen`) or
-  a dagbrief is answered (`answered`, which drops today's). A colleague who
-  stays away a week stops hearing from the app until they come back — an
-  invitation, never a broadcast.
-- **Mondays: the week's notification** at 09:00, when the game's week turns
-  (*Met welke collega ben jij gematcht?*), in place of the daily one, also
-  when today's question is already answered.
+- **Two a week by default:** Monday at 09:00, when the week turns (*Met welke
+  collega ben jij gematcht?*), and Thursday at the chosen time, before the
+  week is over (*De week is bijna om*). Nobody has to come daily, so the app
+  doesn't ask daily.
+- **Daily, if the colleague wants it:** *Ook elke werkdag* adds Tuesday,
+  Wednesday and Friday at the chosen time (*Er staat een nieuwe vraag klaar*);
+  off by default. Turning it on with the reminders off turns them on too.
+- **A rolling window:** what falls in the next six working days (so the next
+  Monday and Thursday always do), Dutch clock
+  (`Europe/Amsterdam`), rebuilt whenever the game is opened (`seen`) or a
+  dagbrief is answered (`answered`, which drops today's daily reminder; the
+  week's two come all the same). A colleague who stays away a week stops
+  hearing from the app until they come back — an invitation, never a
+  broadcast.
 - **Launch: once, Monday 26 Oct 2026 at 14:00** (the game's first Monday,
   after the AI team's morning check), in place of that day's reminders. Scheduled from the first start of the
   build on, also before the release, so it reaches colleagues who don't open
@@ -91,7 +98,7 @@ app schedules local notifications itself, with no server
   page does (`reminders`). Turning it on asks the OS for permission; with the
   default on, the game asks once on its first open (`seen`). A refused
   permission leaves the choice on.
-- **A daily tap** opens `/opknapper?open=post`, the weekly and launch taps
+- **A daily or Thursday tap** opens `/opknapper?open=post`, Monday's and the launch taps
   `/opknapper`; if the game is already open the page
   gets an `eochat:open` event instead of a reload.
 - Ids `0x4F500000 + day`, so they never collide with message notifications,
@@ -113,7 +120,7 @@ frame, is answered. Unknown actions answer `{ok: false}`.
 | `hello` | — | `{app, version, platform, bridge, reminders}` |
 | `seen` | — | renews the reminder window |
 | `answered` | — | today's dagbrief is in; drops today's reminder |
-| `reminders` | `enabled`, `time` (`HH:mm`) | turns the reminder on or off; `granted` |
+| `reminders` | `enabled`, `time` (`HH:mm`), `daily`? | turns the reminders on or off, the daily option with it when sent; `granted` |
 | `haptic` | `style`: light · medium · heavy · selection · success · warning · error | a real haptic |
 | `openChat` | `prompt` | a new EOchat chat, prompt typed |
 | `openExternal` | `url` | the system browser |

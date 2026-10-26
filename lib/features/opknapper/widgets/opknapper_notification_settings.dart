@@ -1,5 +1,6 @@
-// Fork-only (EOchat): the Game's daily notification, on the Notifications
-// settings page. One switch and a time, with what to expect as the footer.
+// Fork-only (EOchat): the Game's reminders, on the Notifications settings
+// page. The week's two (Monday and Thursday) on one switch, the daily option
+// on another, and a time, with what to expect as the footer.
 
 import 'dart:async';
 
@@ -49,6 +50,22 @@ class OpknapperNotificationSettings extends ConsumerWidget {
             ),
             if (settings.enabled)
               UtilityRow(
+                key: const ValueKey<String>('opknapper-reminder-daily'),
+                title: OpknapperStrings.reminderDailyTitle,
+                subtitle: OpknapperStrings.reminderDailySubtitle,
+                toggled: settings.daily,
+                trailing: AdaptiveSwitch(
+                  value: settings.daily,
+                  onChanged: settings.loaded
+                      ? (value) => unawaited(_toggleDaily(ref, value))
+                      : null,
+                ),
+                onTap: settings.loaded
+                    ? () => unawaited(_toggleDaily(ref, !settings.daily))
+                    : null,
+              ),
+            if (settings.enabled)
+              UtilityRow(
                 key: const ValueKey<String>('opknapper-reminder-time'),
                 title: OpknapperStrings.reminderTime,
                 status: Text(settings.timeLabel),
@@ -77,6 +94,10 @@ class OpknapperNotificationSettings extends ConsumerWidget {
         type: AdaptiveSnackBarType.warning,
       );
     }
+  }
+
+  Future<void> _toggleDaily(WidgetRef ref, bool value) async {
+    await ref.read(opknapperRemindersProvider.notifier).setDaily(value);
   }
 
   Future<void> _pickTime(BuildContext context, WidgetRef ref) async {
