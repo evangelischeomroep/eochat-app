@@ -928,6 +928,14 @@
   "@failedToUpdateArchive": {
     "description": "Error notice when archiving/unarchiving fails."
   },
+  "markAsUnread": "Označiť ako neprečítaný",
+  "@markAsUnread": {
+    "description": "Context action that marks a chat unread so it shows the unread dot again."
+  },
+  "failedToMarkChatUnread": "Chat sa nepodarilo označiť ako neprečítaný",
+  "@failedToMarkChatUnread": {
+    "description": "Error notice when marking a chat unread fails."
+  },
   "unarchive": "Obnoviť z archívu",
   "@unarchive": {
     "description": "Action to unarchive an item."
@@ -5133,6 +5141,8 @@
   "reasoningEffortMaximum": "Maximálna",
   "reasoningEffortNone": "Žiadna",
   "customReasoningEffort": "Vlastná úroveň",
+  "retryWithoutReasoningEffort": "Opakovať bez úrovne uvažovania",
+  "reasoningEffortClearIncomplete": "Nastavenia úrovne uvažovania sa nepodarilo úplne vymazať – tento pokus pokračuje bez nej.",
   "customReasoningEffortHint": "Zadajte úroveň podporovanú poskytovateľom",
   "proxyServerVerificationFailed": "Server Open WebUI sa nepodarilo overiť. Relácia proxy mohla vypršať alebo je neplatná. Skúste to znova.",
   "proxyManualSignInRequired": "Overenie zlyhalo. Skúste sa prihlásiť manuálne.",
@@ -5483,6 +5493,13 @@
   "saveImage": "Uložiť obrázok",
   "imageSaved": "Obrázok bol uložený",
   "imageSaveFailed": "Obrázok sa nepodarilo uložiť.",
+  "videoSaved": "Video bolo uložené",
+  "videoSaveFailed": "Video sa nepodarilo uložiť.",
+  "videoFullscreen": "Celá obrazovka",
+  "videoDownload": "Stiahnuť video",
+  "videoPlay": "Prehrať",
+  "videoPause": "Pozastaviť",
+  "videoOpenInBrowser": "Otvoriť v prehliadači",
   "settingsTitle": "Nastavenia",
   "profileTitle": "Profil",
   "aiAndMemoryTitle": "AI a pamäť",
@@ -6185,5 +6202,9 @@
   "accountsAddressConfirmTitle": "Overiť túto adresu?",
   "accountsAddressConfirmMessage": "Aby Conduit overil, že {host} je tento server, pošle mu reláciu účtu uloženého v tomto zariadení. Pokračujte, len ak tejto adrese dôverujete.",
   "accountsAddressConfirmAction": "Overiť adresu",
-  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}"
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}",
+  "chatHandoffPromptTitle": "Prepnúť na {model}?",
+  "chatHandoffPromptMessage": "Váš server navrhuje pokračovať v novom chate s modelom {model}. Navrhnutá správa počká v poli na písanie, kým ju neodošlete.",
+  "chatHandoffStartNewChat": "Začať nový chat",
+  "chatHandoffStayHere": "Zostať tu"
 }

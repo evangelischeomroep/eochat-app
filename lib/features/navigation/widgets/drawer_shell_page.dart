@@ -16,6 +16,7 @@ import '../../../shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit_core/features/chat/providers/chat_providers.dart';
 
 import '../providers/sidebar_providers.dart';
+import '../utils/chat_list_back.dart';
 import 'responsive_drawer_layout.dart';
 import '../../../shared/widgets/sidebar_layout_contract.dart';
 import 'sidebar_page.dart';
@@ -76,9 +77,27 @@ class DrawerShellPage extends ConsumerWidget {
         } catch (_) {}
       },
       drawer: const SidebarPage(),
-      layoutBuilder: (layout) => MacDesktopShortcuts(child: layout),
-      child: child,
+      layoutBuilder: (layout) => SidebarOverlayDismissListener(
+        child: MacDesktopShortcuts(child: layout),
+      ),
+      child: NestedNavigatorBackScope(child: child),
     );
+  }
+}
+
+/// Closes the overlay sidebar when [sidebarOverlayDismissRequestProvider]
+/// asks. It sits under the drawer, where the drawer's controller is in scope.
+class SidebarOverlayDismissListener extends ConsumerWidget {
+  const SidebarOverlayDismissListener({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(sidebarOverlayDismissRequestProvider, (_, _) {
+      closeSidebarDrawerIfOverlay(context);
+    });
+    return child;
   }
 }
 

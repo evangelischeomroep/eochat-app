@@ -928,6 +928,14 @@
   "@failedToUpdateArchive": {
     "description": "Error notice when archiving/unarchiving fails."
   },
+  "markAsUnread": "未読にする",
+  "@markAsUnread": {
+    "description": "Context action that marks a chat unread so it shows the unread dot again."
+  },
+  "failedToMarkChatUnread": "チャットを未読にできませんでした",
+  "@failedToMarkChatUnread": {
+    "description": "Error notice when marking a chat unread fails."
+  },
   "unarchive": "アーカイブ解除",
   "@unarchive": {
     "description": "Action to unarchive an item."
@@ -4827,6 +4835,8 @@
   "reasoningEffortMaximum": "Maximum",
   "reasoningEffortNone": "なし",
   "customReasoningEffort": "Custom effort",
+  "retryWithoutReasoningEffort": "Effort を使わずに再試行",
+  "reasoningEffortClearIncomplete": "Effort 設定を完全に解除できませんでした。この再試行では使わずに続行します。",
   "customReasoningEffortHint": "Enter a provider-supported effort",
   "proxyServerVerificationFailed": "Could not verify the Open WebUI server. The proxy session may have expired or be invalid. Please try again.",
   "proxyManualSignInRequired": "Authentication failed. Please try signing in manually.",
@@ -5183,6 +5193,13 @@
   "saveImage": "画像を保存",
   "imageSaved": "画像を保存しました",
   "imageSaveFailed": "画像を保存できませんでした。",
+  "videoSaved": "動画を保存しました",
+  "videoSaveFailed": "動画を保存できませんでした。",
+  "videoFullscreen": "全画面",
+  "videoDownload": "動画をダウンロード",
+  "videoPlay": "再生",
+  "videoPause": "一時停止",
+  "videoOpenInBrowser": "ブラウザーで開く",
   "settingsTitle": "設定",
   "profileTitle": "プロフィール",
   "aiAndMemoryTitle": "AIとメモリ",
@@ -5885,5 +5902,9 @@
   "accountsAddressConfirmTitle": "このアドレスを確認しますか？",
   "accountsAddressConfirmMessage": "{host} がこのサーバーであることを確かめるため、Conduit はこのデバイスに保存されたアカウントのセッションをそこへ送信します。このアドレスを信頼できる場合のみ続行してください。",
   "accountsAddressConfirmAction": "アドレスを確認",
-  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}"
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}",
+  "chatHandoffPromptTitle": "{model} に切り替えますか？",
+  "chatHandoffPromptMessage": "サーバーが {model} との新しいチャットで続けることを提案しています。提案されたメッセージは、送信するまで入力欄に残ります。",
+  "chatHandoffStartNewChat": "新しいチャットを開始",
+  "chatHandoffStayHere": "このままにする"
 }

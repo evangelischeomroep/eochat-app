@@ -20,6 +20,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
+import 'package:clock/clock.dart' show clock;
 import 'package:dio/dio.dart' show CancelToken;
 import 'package:drift/drift.dart' show Value;
 import 'package:meta/meta.dart';
@@ -152,7 +153,11 @@ import 'package:conduit_core/features/integrations/personal_tool_execution.dart'
 import 'package:conduit_core/features/integrations/personal_connection_client.dart';
 import 'package:conduit_core/features/integrations/personal_connection_settings.dart';
 import 'package:conduit_core/features/integrations/providers/personal_connections_providers.dart'
-    show personalSelectionNoticeProvider;
+    show
+        PersonalConnectionsAccess,
+        PersonalConnectionsBlock,
+        personalConnectionsAccessProvider,
+        personalSelectionNoticeProvider;
 import 'package:conduit_core/utils/system_prompt.dart';
 import 'package:conduit_core/features/direct_connections/services/direct_chat_storage.dart';
 import 'package:conduit_core/features/web_search/web_search.dart';

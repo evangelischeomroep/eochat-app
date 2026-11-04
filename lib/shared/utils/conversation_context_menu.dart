@@ -137,10 +137,23 @@ class _ConduitContextMenuState extends State<ConduitContextMenu> {
         final size = widget.stabilizePreviewSize ? _childSize : null;
         Widget preview = previewChild;
         if (animation.value > 0 && size != null) {
+          final mediaQuery = MediaQuery.of(context);
+          // Only constrain the open preview, keeping the source layout stable.
+          final maxHeight =
+              animation.value > CupertinoContextMenu.animationOpensAt
+              ? (mediaQuery.size.height - mediaQuery.padding.vertical) / 2
+              : size.height;
           preview = SizedBox(
             width: size.width,
-            height: size.height,
-            child: previewChild,
+            height: size.height.clamp(0.0, maxHeight),
+            child: ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.topCenter,
+                minHeight: size.height,
+                maxHeight: size.height,
+                child: previewChild,
+              ),
+            ),
           );
         }
 
@@ -217,12 +230,16 @@ List<ConduitContextMenuAction> buildConversationActions({
   );
 }
 
+/// [canMarkUnread] offers "Mark as unread" for an Open WebUI chat. Callers
+/// pass it only where an unread dot shows and the chat is read and not open;
+/// the server version still gates it.
 List<ConduitContextMenuAction> buildConversationActionsWithFolders({
   required BuildContext context,
   required WidgetRef ref,
   required dynamic conversation,
   required bool foldersEnabled,
   required List<Folder> folders,
+  bool canMarkUnread = false,
 }) {
   if (conversation == null) {
     return [];
@@ -239,6 +256,10 @@ List<ConduitContextMenuAction> buildConversationActionsWithFolders({
       foldersEnabled &&
       (folders.any((folder) => folder.id != currentFolderId) ||
           currentFolderId != null);
+  final showMarkUnread =
+      canMarkUnread &&
+      !isOnDevice &&
+      ref.watch(chatMarkUnreadSupportedProvider);
 
   Future<void> togglePin() async {
     final errorMessage = l10n.failedToUpdatePin;
@@ -254,6 +275,16 @@ List<ConduitContextMenuAction> buildConversationActionsWithFolders({
     final errorMessage = l10n.failedToUpdateArchive;
     try {
       await chat.archiveConversation(ref, selectionId, !isArchived);
+    } catch (_) {
+      if (!context.mounted) return;
+      await _showConversationError(context, errorMessage);
+    }
+  }
+
+  Future<void> markUnread() async {
+    final errorMessage = l10n.failedToMarkChatUnread;
+    try {
+      await chat.markConversationUnread(ref, selectionId);
     } catch (_) {
       if (!context.mounted) return;
       await _showConversationError(context, errorMessage);
@@ -334,6 +365,15 @@ List<ConduitContextMenuAction> buildConversationActionsWithFolders({
       onBeforeClose: () => ConduitHaptics.selectionClick(),
       onSelected: rename,
     ),
+    if (showMarkUnread)
+      ConduitContextMenuAction(
+        cupertinoIcon: CupertinoIcons.envelope_badge,
+        sfSymbol: 'message.badge',
+        materialIcon: Icons.mark_chat_unread_rounded,
+        label: l10n.markAsUnread,
+        onBeforeClose: () => ConduitHaptics.selectionClick(),
+        onSelected: markUnread,
+      ),
     if (canMove)
       ConduitContextMenuAction(
         cupertinoIcon: CupertinoIcons.folder,

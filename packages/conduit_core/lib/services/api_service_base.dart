@@ -1633,7 +1633,10 @@ abstract class _ApiServiceBase {
     void addRequestFiles(Iterable<Map<String, dynamic>> requestFiles) {
       for (final file in requestFiles) {
         final normalizedFile = Map<String, dynamic>.from(file);
-        if (isImageFile(normalizedFile)) {
+        // Generated videos are tool output like generated images, which
+        // were all typed `image` until videos got their own type. Uploaded
+        // videos are typed `file` and are still sent.
+        if (isImageFile(normalizedFile) || normalizedFile['type'] == 'video') {
           continue;
         }
 
@@ -1705,7 +1708,7 @@ abstract class _ApiServiceBase {
     final effort = params['reasoning_effort'];
     final isAutomaticEffort =
         effort is String && effort.trim().toLowerCase() == 'automatic';
-    final supportsReasoningEffort = modelSupportsReasoningEffort(
+    final advertisesEffort = modelAdvertisesReasoningEffort(
       modelId: model,
       supportedParameters: modelItem?['supported_parameters'],
       capabilities: _coerceJsonMap(modelItem?['capabilities']),
@@ -1717,7 +1720,34 @@ abstract class _ApiServiceBase {
             (openAiModel is Map ? openAiModel['id'] : null),
       },
     );
-    if (isAutomaticEffort || !supportsReasoningEffort) {
+    // An explicit refusal wins over everything: the server said this model
+    // cannot take the parameter. A model that does not advertise support gets
+    // only its own pick, the value its picker shows (issue #779); a chat-saved
+    // or global value, which may have been chosen for another model, never
+    // reaches it (issue #611). A default the chat saved (Automatic) still
+    // outranks the pick, as it does for every model: a comparison is admitted
+    // on it and sends this request's value to all of its answers.
+    final refusesEffort = modelExplicitlyRejectsReasoningEffort(
+      _coerceJsonMap(modelItem?['capabilities']),
+    );
+    final pick = reasoningEffort?.trim();
+    final hasOwnPick =
+        pick != null && pick.isNotEmpty && pick.toLowerCase() != 'automatic';
+    final saved = chatParams?[kChatParamReasoningEffort];
+    final chatSavedDefault =
+        (chatParams?.containsKey(kChatParamReasoningEffort) ?? false) &&
+        (saved is! String ||
+            saved.trim().isEmpty ||
+            saved.trim().toLowerCase() == 'automatic');
+    if (refusesEffort) {
+      params.remove('reasoning_effort');
+    } else if (!advertisesEffort) {
+      if (hasOwnPick && !chatSavedDefault) {
+        params['reasoning_effort'] = reasoningEffort;
+      } else {
+        params.remove('reasoning_effort');
+      }
+    } else if (isAutomaticEffort) {
       params.remove('reasoning_effort');
     }
     data['params'] = params;

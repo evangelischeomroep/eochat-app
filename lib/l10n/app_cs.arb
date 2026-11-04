@@ -928,6 +928,14 @@
   "@failedToUpdateArchive": {
     "description": "Error notice when archiving/unarchiving fails."
   },
+  "markAsUnread": "Označit jako nepřečtené",
+  "@markAsUnread": {
+    "description": "Context action that marks a chat unread so it shows the unread dot again."
+  },
+  "failedToMarkChatUnread": "Chat se nepodařilo označit jako nepřečtený",
+  "@failedToMarkChatUnread": {
+    "description": "Error notice when marking a chat unread fails."
+  },
   "unarchive": "Obnovit z archivu",
   "@unarchive": {
     "description": "Action to unarchive an item."
@@ -5133,6 +5141,8 @@
   "reasoningEffortMaximum": "Maximum",
   "reasoningEffortNone": "Žádná",
   "customReasoningEffort": "Custom effort",
+  "retryWithoutReasoningEffort": "Zkusit znovu bez Effortu",
+  "reasoningEffortClearIncomplete": "Nastavení Effortu se nepodařilo úplně vymazat – tento pokus pokračuje bez něj.",
   "customReasoningEffortHint": "Enter a provider-supported effort",
   "proxyServerVerificationFailed": "Could not verify the Open WebUI server. The proxy session may have expired or be invalid. Please try again.",
   "proxyManualSignInRequired": "Authentication failed. Please try signing in manually.",
@@ -5483,6 +5493,13 @@
   "saveImage": "Uložit obrázek",
   "imageSaved": "Obrázek uložen",
   "imageSaveFailed": "Obrázek se nepodařilo uložit.",
+  "videoSaved": "Video uloženo",
+  "videoSaveFailed": "Video se nepodařilo uložit.",
+  "videoFullscreen": "Celá obrazovka",
+  "videoDownload": "Stáhnout video",
+  "videoPlay": "Přehrát",
+  "videoPause": "Pozastavit",
+  "videoOpenInBrowser": "Otevřít v prohlížeči",
   "settingsTitle": "Nastavení",
   "profileTitle": "Profil",
   "aiAndMemoryTitle": "AI a paměť",
@@ -6185,5 +6202,9 @@
   "accountsAddressConfirmTitle": "Ověřit tuto adresu?",
   "accountsAddressConfirmMessage": "Aby Conduit ověřil, že {host} je tento server, pošle mu relaci účtu uloženého v tomto zařízení. Pokračujte, jen pokud této adrese důvěřujete.",
   "accountsAddressConfirmAction": "Ověřit adresu",
-  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}"
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}",
+  "chatHandoffPromptTitle": "Přepnout na {model}?",
+  "chatHandoffPromptMessage": "Váš server navrhuje pokračovat v novém chatu s modelem {model}. Navržená zpráva počká v poli pro psaní, dokud ji neodešlete.",
+  "chatHandoffStartNewChat": "Začít nový chat",
+  "chatHandoffStayHere": "Zůstat tady"
 }

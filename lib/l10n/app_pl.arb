@@ -297,6 +297,11 @@
   "@customReasoningEffort": {
     "description": "Action for entering a provider-specific reasoning effort."
   },
+  "retryWithoutReasoningEffort": "Ponów bez nakładu rozumowania",
+  "@retryWithoutReasoningEffort": {
+    "description": "Action on a failed response that clears the model's reasoning effort and retries."
+  },
+  "reasoningEffortClearIncomplete": "Nie udało się całkowicie wyczyścić nakładu rozumowania — ponowienie próby przebiegnie bez niego.",
   "customReasoningEffortHint": "Wpisz nakład obsługiwany przez dostawcę",
   "@customReasoningEffortHint": {
     "description": "Hint for a provider-specific reasoning effort value."
@@ -1134,6 +1139,14 @@
   "failedToUpdateArchive": "Nie udało się zaktualizować archiwum",
   "@failedToUpdateArchive": {
     "description": "Error notice when archiving/unarchiving fails."
+  },
+  "markAsUnread": "Oznacz jako nieprzeczytany",
+  "@markAsUnread": {
+    "description": "Context action that marks a chat unread so it shows the unread dot again."
+  },
+  "failedToMarkChatUnread": "Nie udało się oznaczyć czatu jako nieprzeczytanego",
+  "@failedToMarkChatUnread": {
+    "description": "Error notice when marking a chat unread fails."
   },
   "unarchive": "Przywróć z archiwum",
   "@unarchive": {
@@ -6955,6 +6968,13 @@
   "saveImage": "Zapisz obraz",
   "imageSaved": "Obraz zapisany",
   "imageSaveFailed": "Nie udało się zapisać obrazu.",
+  "videoSaved": "Wideo zapisane",
+  "videoSaveFailed": "Nie udało się zapisać wideo.",
+  "videoFullscreen": "Pełny ekran",
+  "videoDownload": "Pobierz wideo",
+  "videoPlay": "Odtwórz",
+  "videoPause": "Wstrzymaj",
+  "videoOpenInBrowser": "Otwórz w przeglądarce",
   "settingsTitle": "Ustawienia",
   "profileTitle": "Profil",
   "aiAndMemoryTitle": "AI i pamięć",
@@ -7921,5 +7941,33 @@
       }
     }
   },
-  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}"
+  "composerActiveToolsCount": "{count, plural, one{{count} tool on} other{{count} tools on}}",
+  "chatHandoffPromptTitle": "Przełączyć na „{model}”?",
+  "@chatHandoffPromptTitle": {
+    "description": "Title of the dialog asking whether to follow the Open WebUI server's suggestion to continue in a new chat with another model.",
+    "placeholders": {
+      "model": {
+        "type": "String",
+        "example": "Code Assistant"
+      }
+    }
+  },
+  "chatHandoffPromptMessage": "Twój serwer proponuje kontynuowanie w nowym czacie z modelem „{model}”. Proponowana wiadomość poczeka w polu wpisywania, aż ją wyślesz.",
+  "@chatHandoffPromptMessage": {
+    "description": "Message of the dialog asking whether to continue in a new chat with the model the Open WebUI server suggested. Nothing is sent until the user sends it.",
+    "placeholders": {
+      "model": {
+        "type": "String",
+        "example": "Code Assistant"
+      }
+    }
+  },
+  "chatHandoffStartNewChat": "Rozpocznij nowy czat",
+  "@chatHandoffStartNewChat": {
+    "description": "Confirm button that opens a new chat with the model the Open WebUI server suggested."
+  },
+  "chatHandoffStayHere": "Zostań tutaj",
+  "@chatHandoffStayHere": {
+    "description": "Cancel button that keeps the user in the current chat instead of following the Open WebUI server's suggestion."
+  }
 }

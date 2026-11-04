@@ -67,6 +67,8 @@ import 'package:conduit_core/features/hermes/services/hermes_session_provenance.
 
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
+import '../../navigation/providers/chat_back_provider.dart';
+import '../../navigation/utils/chat_list_back.dart';
 
 import 'package:conduit_core/utils/debug_logger.dart';
 
@@ -371,35 +373,6 @@ List<String>? chatLocalFilePickerExtensions(
   hermesResponsesFiles: hermesResponsesFiles,
 );
 
-@visibleForTesting
-Future<void> handleChatBackNavigation({
-  required bool hasInputFocus,
-  required VoidCallback dismissInputFocus,
-  required bool Function() canNavigateBack,
-  required VoidCallback navigateBack,
-  required Future<bool> Function() confirmExit,
-  required bool Function() isMounted,
-  required bool isAndroid,
-  required VoidCallback exitApplication,
-}) async {
-  if (hasInputFocus) {
-    dismissInputFocus();
-    return;
-  }
-
-  if (!isMounted()) return;
-  if (canNavigateBack()) {
-    navigateBack();
-    return;
-  }
-
-  final shouldExit = await confirmExit();
-  if (!shouldExit || !isMounted()) return;
-  if (isAndroid) {
-    exitApplication();
-  }
-}
-
 /// Refreshes only an unchanged OpenWebUI-owned active conversation.
 ///
 /// Native Hermes and direct-local shells can legally share a raw id with a
@@ -564,6 +537,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final ChatMessageSendAdmissionGuard _messageSendAdmission =
       ChatMessageSendAdmissionGuard();
   bool _screenContextSubmissionScheduled = false;
+  // A page summary waits until the page has chosen its first model, or it
+  // would be sent on whichever model happens to be listed first.
+  bool _initialModelChosen = false;
   String? _screenContextInFlight;
   Timer? _screenContextRetryTimer;
   String? _screenContextRetryContext;
@@ -922,12 +898,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
 
-      // Initialize Android Assistant Handler
-      ref.read(androidAssistantProvider);
-
       // First, ensure a model is selected
-      await _checkAndAutoSelectModel();
+      try {
+        await _checkAndAutoSelectModel();
+      } finally {
+        _initialModelChosen = true;
+      }
       if (!mounted) return;
+
+      // The assistant can store a page to summarize before this page exists,
+      // on a cold start, or while it chose its model. Send it now.
+      final waitingContext = ref.read(screenContextProvider);
+      if (waitingContext != null && waitingContext.isNotEmpty) {
+        _resetScreenContextRetry(context: waitingContext);
+        _scheduleScreenContextSubmission();
+      }
 
       // Then check for demo conversation in reviewer mode
       await _checkAndLoadDemoConversation();
@@ -1119,7 +1104,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _scheduleScreenContextSubmission() {
-    if (_screenContextSubmissionScheduled || _screenContextInFlight != null) {
+    if (!_initialModelChosen ||
+        _screenContextSubmissionScheduled ||
+        _screenContextInFlight != null) {
       return;
     }
     _screenContextSubmissionScheduled = true;
@@ -3497,7 +3484,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   /// Current text of every row in a grouped response, in display order.
   ///
-  /// Read at tap time rather than cached with the layout metadata, whose
+  /// Read on demand rather than cached with the layout metadata, whose
   /// signature deliberately ignores message content.
   String _joinGroupedResponseText(WidgetRef rowRef, List<String> groupIds) {
     final parts = <String>[];
@@ -4083,26 +4070,19 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         if (didPop) return;
 
         // First, if any input has focus, clear focus and consume back press.
-        // Also covers native platform inputs which don't participate in
-        // Flutter's focus tree (composerHasFocusProvider tracks them).
-        final hasNativeFocus = ref.read(composerHasFocusProvider);
-        final currentFocus = FocusManager.instance.primaryFocus;
         await handleChatBackNavigation(
-          hasInputFocus:
-              hasNativeFocus || (currentFocus != null && currentFocus.hasFocus),
+          hasInputFocus: backClearsInputFocus(
+            composerHasFocus: ref.read(composerHasFocusProvider),
+          ),
           dismissInputFocus: _dismissComposerFocus,
           canNavigateBack: () => Navigator.of(context).canPop(),
           navigateBack: () => Navigator.of(context).pop(),
-          confirmExit: () => ThemedDialogs.confirm(
-            context,
-            title: l10n.appTitle,
-            message: l10n.endYourSession,
-            confirmText: l10n.confirm,
-            cancelText: l10n.cancel,
-            isDestructive: Platform.isAndroid,
-          ),
+          openChatList: () =>
+              ref.read(chatBackOpensListProvider) &&
+              openChatListForBack(context),
+          confirmExit: () => confirmAppExit(context),
           isMounted: () => context.mounted,
-          isAndroid: Platform.isAndroid,
+          isAndroid: chatBackIsAndroid,
           exitApplication: SystemNavigator.pop,
         );
       },

@@ -469,10 +469,23 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
     });
   }
 
+  /// Shows or hides a folder's contents on this device only. Opening one for
+  /// the user, after a new subfolder or a move, stays here, as on the web.
   void _setFolderExpanded(String folderId, bool isExpanded) {
     final current = {...ref.read(expandedFoldersProvider)};
     current[folderId] = isExpanded;
     ref.read(expandedFoldersProvider.notifier).set(current);
+  }
+
+  /// The user opened or closed a folder: shown at once, and kept on the
+  /// server for the next launch and other clients.
+  void _toggleFolderExpanded(String folderId, bool isExpanded) {
+    _setFolderExpanded(folderId, isExpanded);
+    unawaited(
+      ref
+          .read(foldersProvider.notifier)
+          .saveFolderExpanded(folderId, isExpanded),
+    );
   }
 
   void _openFolderPage(String folderId) {
@@ -1385,7 +1398,7 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
                     isCompact: true,
                     onPressed: () {
                       ConduitHaptics.selectionClick();
-                      _setFolderExpanded(folderId, !isExpanded);
+                      _toggleFolderExpanded(folderId, !isExpanded);
                     },
                   ),
                 ],
@@ -1867,6 +1880,9 @@ class _ChatsDrawerState extends ConsumerState<ChatsDrawer>
               conversation: conversation,
               foldersEnabled: foldersEnabled,
               folders: folders,
+              // Search results are a server snapshot that would keep showing
+              // the chat read, and leaving the open chat marks it read again.
+              canMarkUnread: _query.isEmpty && !unread && !isActive,
             ),
       previewBuilder: buildConversationTileContextPreview,
       child: tileWidget,

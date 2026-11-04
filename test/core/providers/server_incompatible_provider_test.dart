@@ -41,7 +41,7 @@ void main() {
     test('warns when the active server\'s config is unsupported', () async {
       final container = await _container(
         activeServer: _server('A'),
-        config: const BackendConfig(version: '0.12.4', serverId: 'A'),
+        config: const BackendConfig(version: '0.12.5', serverId: 'A'),
       );
       addTearDown(container.dispose);
 
@@ -65,7 +65,7 @@ void main() {
         // the still-cached A config must not warn for B.
         final container = await _container(
           activeServer: _server('B'),
-          config: const BackendConfig(version: '0.12.4', serverId: 'A'),
+          config: const BackendConfig(version: '0.12.5', serverId: 'A'),
         );
         addTearDown(container.dispose);
 
@@ -80,7 +80,7 @@ void main() {
       // warning about a supported server because of a stale cache.
       final container = await _container(
         activeServer: _server('A'),
-        config: const BackendConfig(version: '0.12.4'),
+        config: const BackendConfig(version: '0.12.5'),
       );
       addTearDown(container.dispose);
 
@@ -90,7 +90,7 @@ void main() {
     test('fails open when there is no active server', () async {
       final container = await _container(
         activeServer: null,
-        config: const BackendConfig(version: '0.12.4', serverId: 'A'),
+        config: const BackendConfig(version: '0.12.5', serverId: 'A'),
       );
       addTearDown(container.dispose);
 
@@ -102,6 +102,44 @@ void main() {
       addTearDown(container.dispose);
 
       expect(container.read(serverIncompatibleProvider), isFalse);
+    });
+  });
+
+  group('chatMarkUnreadSupportedProvider', () {
+    test('hides mark-unread on a server older than 0.11.0', () async {
+      final container = await _container(
+        activeServer: _server('A'),
+        config: const BackendConfig(version: '0.10.2', serverId: 'A'),
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(chatMarkUnreadSupportedProvider), isFalse);
+    });
+
+    test('offers mark-unread from 0.11.0', () async {
+      final container = await _container(
+        activeServer: _server('A'),
+        config: const BackendConfig(version: '0.11.0', serverId: 'A'),
+      );
+      addTearDown(container.dispose);
+
+      expect(container.read(chatMarkUnreadSupportedProvider), isTrue);
+    });
+
+    test('fails open on another server\'s config or no version', () async {
+      final stale = await _container(
+        activeServer: _server('B'),
+        config: const BackendConfig(version: '0.10.2', serverId: 'A'),
+      );
+      addTearDown(stale.dispose);
+      final unknown = await _container(
+        activeServer: _server('A'),
+        config: const BackendConfig(serverId: 'A'),
+      );
+      addTearDown(unknown.dispose);
+
+      expect(stale.read(chatMarkUnreadSupportedProvider), isTrue);
+      expect(unknown.read(chatMarkUnreadSupportedProvider), isTrue);
     });
   });
 }

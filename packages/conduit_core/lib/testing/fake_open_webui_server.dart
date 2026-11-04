@@ -67,6 +67,7 @@ class _ChatRecord {
     this.folderId,
     this.pinned = false,
     this.archived = false,
+    this.lastReadAt,
   });
 
   final String id;
@@ -77,6 +78,7 @@ class _ChatRecord {
   String? folderId;
   bool pinned;
   bool archived;
+  int? lastReadAt;
 }
 
 /// Internal mutable note row, shaped like the vendored `Note` table
@@ -228,7 +230,7 @@ class FakeOpenWebUiServer {
             'title': c.title,
             'updated_at': c.updatedAt,
             'created_at': c.createdAt,
-            'last_read_at': null,
+            'last_read_at': c.lastReadAt,
           },
         )
         .toList();
@@ -388,6 +390,25 @@ class FakeOpenWebUiServer {
     return record.pinned;
   }
 
+  /// Mirrors `POST /api/v1/chats/{id}/unread` (`mark_chat_unread_by_id`):
+  /// stores `last_read_at = 0`. False on a missing id (the route raises 404).
+  bool markChatUnread(String id) {
+    final record = _chats[id];
+    if (record == null) return false;
+    record.lastReadAt = 0;
+    return true;
+  }
+
+  /// Mirrors the `last_read_at` chat socket event
+  /// (`update_chat_last_read_at_by_id`): stamps the chat read at the server
+  /// clock. False on a missing id.
+  bool markChatRead(String id) {
+    final record = _chats[id];
+    if (record == null) return false;
+    record.lastReadAt = _now();
+    return true;
+  }
+
   /// Mirrors `POST /api/v1/chats/{id}/pin` (`pin_chat_by_id` ->
   /// `toggle_chat_pinned_by_id`): a STATELESS TOGGLE that IGNORES the body.
   /// Returns the `ChatResponse` after the flip; null on a missing id.
@@ -484,6 +505,15 @@ class FakeOpenWebUiServer {
     final folder = _folders[id];
     if (folder == null) return;
     folder['parent_id'] = parentId;
+    folder['updated_at'] = _now();
+  }
+
+  /// Mirrors `POST /api/v1/folders/{id}/update/expanded`
+  /// (`update_folder_is_expanded_by_id_and_user_id`). No-op on a missing id.
+  void updateFolderExpanded(String id, bool isExpanded) {
+    final folder = _folders[id];
+    if (folder == null) return;
+    folder['is_expanded'] = isExpanded;
     folder['updated_at'] = _now();
   }
 
@@ -698,6 +728,7 @@ class FakeOpenWebUiServer {
     String? folderId,
     bool pinned = false,
     bool archived = false,
+    int? lastReadAt,
   }) {
     if (folderId != null) {
       seedFolder(folderId);
@@ -712,6 +743,7 @@ class FakeOpenWebUiServer {
       folderId: folderId,
       pinned: pinned,
       archived: archived,
+      lastReadAt: lastReadAt,
     );
   }
 

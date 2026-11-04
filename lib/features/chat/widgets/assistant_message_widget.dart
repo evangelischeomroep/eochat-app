@@ -4,7 +4,9 @@ import 'dart:io' show Platform;
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/config/fork_overrides.dart';
 import '../../../shared/theme/theme_extensions.dart';
@@ -21,8 +23,11 @@ import '../providers/text_to_speech_provider.dart';
 
 import 'package:conduit_core/features/chat/providers/queued_completion_provider.dart';
 import 'package:conduit_core/features/chat/providers/streaming_haptic_memory.dart';
+import 'package:conduit_core/features/chat/providers/reasoning_effort_provider.dart'
+    show kAutomaticReasoningEffort, reasoningEffortForModel;
 
 import 'enhanced_image_attachment.dart';
+import 'enhanced_video_attachment.dart';
 import 'image_gallery_scope.dart';
 
 import 'package:conduit/l10n/app_localizations.dart';
@@ -43,6 +48,7 @@ import 'package:conduit_core/features/chat/providers/chat_providers.dart'
         ComparisonMergeException,
         ComparisonMergeFailure,
         chatBranchSiblingsProvider,
+        clearReasoningEffortForRetry,
         comparisonMergeCommandAvailableProvider,
         comparisonMergeProvider,
         stopComparisonAnswerProvider,
@@ -54,7 +60,10 @@ import 'package:conduit_core/features/chat/providers/chat_providers.dart'
         streamingContentProvider,
         chatMessagesProvider;
 import 'package:conduit_core/providers/app_providers.dart'
-    show activeConversationProvider;
+    show activeConversationProvider, modelsProvider, selectedModelProvider;
+import 'package:conduit_core/models/model.dart' show Model;
+import 'package:conduit_core/models/openwebui_chat_settings.dart'
+    show kChatParamReasoningEffort;
 
 import '../../../shared/utils/external_link_launcher.dart';
 
@@ -98,7 +107,7 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
   final bool isStreaming;
   final bool showFollowUps;
 
-  /// Another user's chat (shared folder): only copy/listen/version browsing.
+  /// Another user's chat: only copy/share/listen/version browsing.
   final bool readOnly;
   final bool animateOnMount;
   final String? modelName;
@@ -118,10 +127,11 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
   /// row when this is false — only the buttons move.
   final bool showActionBar;
 
-  /// Supplies the full text of the grouped response for read-aloud.
+  /// Supplies the full text of the grouped response for read-aloud and sharing.
   ///
-  /// Called at tap time, not during build, so a row never has to observe its
-  /// siblings. Null means this row speaks its own content.
+  /// It reads rather than watches, so a row never has to observe its siblings.
+  /// Called at tap time, and when a settled footer checks there is anything
+  /// to share. Null means this row speaks its own content.
   final String Function()? resolveGroupedResponseText;
   final List<String?> versionModelNames;
   final List<String?> versionModelIconUrls;
@@ -171,6 +181,7 @@ class AssistantMessageWidget extends ConsumerStatefulWidget {
 
 class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     with TickerProviderStateMixin, WidgetsBindingObserver {
+  final _overflowButtonKey = GlobalKey();
   late AnimationController _fadeController;
   late AnimationController _streamingContentFadeController;
   late CurvedAnimation _streamingContentFade;
@@ -1587,6 +1598,16 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
                 icon: Platform.isIOS ? CupertinoIcons.refresh : Icons.refresh,
                 isCompact: true,
               ),
+              if (info.isFailed && _isQueuedReasoningEffortRejection(info))
+                ConduitButton(
+                  onPressed: () => _retryQueuedWithoutReasoningEffort(info),
+                  text: l10n.retryWithoutReasoningEffort,
+                  icon: Platform.isIOS
+                      ? CupertinoIcons.slash_circle
+                      : Icons.highlight_off,
+                  isCompact: true,
+                  isSecondary: true,
+                ),
               ConduitButton(
                 onPressed: () => _cancelQueuedCompletion(info),
                 text: l10n.cancel,
@@ -1605,6 +1626,37 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     unawaited(() async {
       try {
         await ref.read(queuedCompletionActionsProvider).retry(info);
+      } catch (error, stackTrace) {
+        _handleQueuedCompletionActionError(error, stackTrace);
+      }
+    }());
+  }
+
+  /// Recovery for a completion the provider rejected for its frozen
+  /// `reasoning_effort`: clear the opt-ins for later turns and re-arm the op
+  /// with the parameter stripped from its stored settings snapshot. The
+  /// clearing is best effort here — the replay itself is fixed by the strip,
+  /// so a failed clear must not block the retry. It is still said out loud:
+  /// an unconfirmed clear can leave an opt-in effective for later sends, and
+  /// which half failed (model pick, chat override) the boolean cannot say.
+  void _retryQueuedWithoutReasoningEffort(QueuedCompletionInfo info) {
+    unawaited(() async {
+      try {
+        final cleared = await clearReasoningEffortForRetry(
+          ref,
+          _modelForQueuedRetry(),
+        );
+        if (!mounted) return;
+        if (!cleared) {
+          AdaptiveSnackBar.show(
+            context,
+            message: AppLocalizations.of(context)!.reasoningEffortClearIncomplete,
+            type: AdaptiveSnackBarType.warning,
+          );
+        }
+        await ref
+            .read(queuedCompletionActionsProvider)
+            .retryWithoutReasoningEffort(info);
       } catch (error, stackTrace) {
         _handleQueuedCompletionActionError(error, stackTrace);
       }
@@ -1706,6 +1758,16 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
   }
 
   Widget _buildMarkdownImage(Uri uri, String? title, String? alt) {
+    if (inferFileTypeFromUrl(uri.toString()) == 'video') {
+      return RepaintBoundary(
+        child: EnhancedVideoAttachment(
+          key: ValueKey('md_video_$uri'),
+          attachmentId: uri.toString(),
+          constraints: const BoxConstraints(maxWidth: 500),
+          filenameHint: title ?? alt,
+        ),
+      );
+    }
     return RepaintBoundary(
       child: EnhancedImageAttachment(
         attachmentId: uri.toString(),
@@ -1946,7 +2008,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     // Separate images and non-image files
     // Match OpenWebUI: type === 'image' OR content_type starts with 'image/'
     final imageFiles = allFiles.where(isImageFile).toList();
-    final nonImageFiles = allFiles.where((file) => !isImageFile(file)).toList();
+    final videoFiles = allFiles.where(isVideoFile).toList();
+    final nonImageFiles = allFiles
+        .where((file) => !isImageFile(file) && !isVideoFile(file))
+        .toList();
 
     final widgets = <Widget>[];
 
@@ -1958,6 +2023,15 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           child: _buildImagesFromFiles(imageFiles),
         ),
       );
+    }
+
+    // Videos play inline; generated clips (mp4 et al.) must not render as
+    // broken image placeholders.
+    if (videoFiles.isNotEmpty) {
+      if (widgets.isNotEmpty) {
+        widgets.add(const SizedBox(height: Spacing.sm));
+      }
+      widgets.add(_buildVideosFromFiles(videoFiles));
     }
 
     // Add non-image files
@@ -1984,6 +2058,43 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
       if (getFileUrl(file) case final url?)
         ImageViewerItem(attachmentId: url, httpHeaders: _headersForFile(file)),
   ];
+
+  Widget _buildVideosFromFiles(List<dynamic> videoFiles) {
+    return Wrap(
+      key: const ValueKey('assistant-file-video-stack'),
+      spacing: Spacing.sm,
+      runSpacing: Spacing.sm,
+      children: videoFiles.map<Widget>((file) {
+        final fileUrl = getFileUrl(file);
+        if (fileUrl == null) return const SizedBox.shrink();
+        // A legacy /api/v1/files/{id} URL names the file-info endpoint; play
+        // the content endpoint on the same host instead. Only the path
+        // changes, so a query such as a signed token is kept.
+        final fileUri = Uri.tryParse(fileUrl);
+        final attachmentId =
+            fileUri != null &&
+                _fileIdPattern.hasMatch(fileUri.path) &&
+                !fileUri.path.endsWith('/content')
+            ? fileUri.replace(path: '${fileUri.path}/content').toString()
+            : fileUrl;
+        return RepaintBoundary(
+          child: EnhancedVideoAttachment(
+            key: ValueKey('gen_video_$attachmentId'),
+            attachmentId: attachmentId,
+            httpHeaders: _headersForFile(file),
+            constraints: const BoxConstraints(maxWidth: 500),
+            filenameHint:
+                file['filename'] as String? ?? file['name'] as String?,
+            contentType: file['content_type'] as String?,
+            sizeBytes: switch (file['size']) {
+              final num size => size.toInt(),
+              _ => null,
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
 
   Widget _buildImagesFromFiles(List<dynamic> imageFiles) {
     final imageCount = imageFiles.length;
@@ -2128,10 +2239,10 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
         ? _buildFooterActions()
         : const <_AssistantFooterAction>[];
     final forcedOverflowActions = actions
-        .where((action) => action.id == 'delete')
+        .where((action) => action.id == 'share' || action.id == 'delete')
         .toList(growable: false);
     final inlineCandidateActions = actions
-        .where((action) => action.id != 'delete')
+        .where((action) => action.id != 'share' && action.id != 'delete')
         .toList(growable: false);
     final visibleActions = inlineCandidateActions
         .take(maxInlineActions)
@@ -2340,6 +2451,140 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     return _errorScanResult;
   }
 
+  // Issue #779: an explicit effort opt-in on a model that does not advertise
+  // support can be rejected by the upstream provider. When the failure names
+  // the parameter, the footer offers to clear the opt-in and retry.
+  static final _reasoningEffortRejectionPattern = RegExp(
+    r'reasoning[_\s-]*effort',
+    caseSensitive: false,
+  );
+
+  /// Resolves [modelId] against the model list, or the model selected now
+  /// when the id is absent or already the selected one. Null when the id
+  /// names a model that left the list — then only the chat-wide override can
+  /// still be cleared.
+  Model? _modelByIdOrSelected(String? modelId) {
+    final selected = ref.read(selectedModelProvider);
+    if (modelId == null || modelId.isEmpty || selected?.id == modelId) {
+      return selected;
+    }
+    for (final model in ref.read(modelsProvider).value ?? const <Model>[]) {
+      if (model.id == modelId) return model;
+    }
+    return null;
+  }
+
+  String? get _answerModelId {
+    final message = widget.message is ChatMessage
+        ? widget.message as ChatMessage
+        : null;
+    return message?.model;
+  }
+
+  /// The model a live regeneration routes this answer through: ordinary
+  /// answers run on the model selected now, while a comparison answer
+  /// regenerates with its own model.
+  Model? _modelForRegeneratedAnswer() {
+    final group = _comparisonGroup;
+    if (group == null || !group.isComparison) {
+      return ref.read(selectedModelProvider);
+    }
+    return _modelByIdOrSelected(_answerModelId);
+  }
+
+  /// The model the queued completion replays under: always the one the
+  /// answer (the queued op's placeholder) carries, never whichever model is
+  /// selected now — a parked turn re-drains with its stored model.
+  Model? _modelForQueuedRetry() => _modelByIdOrSelected(_answerModelId);
+
+  /// The chat's own saved `reasoning_effort`, which a model that advertises
+  /// support is sent over the picker's value.
+  bool get _chatHasReasoningEffortOverride {
+    final params = ref.read(activeConversationProvider)?.chatParams;
+    final value = params == null ? null : params[kChatParamReasoningEffort];
+    return value is String &&
+        value.trim().isNotEmpty &&
+        value.trim().toLowerCase() != kAutomaticReasoningEffort;
+  }
+
+  /// Whether the chat saved a default (Automatic) for `reasoning_effort`,
+  /// which outranks every model's own pick.
+  bool get _chatSavedReasoningEffortDefault {
+    final params = ref.read(activeConversationProvider)?.chatParams;
+    return params != null &&
+        params.containsKey(kChatParamReasoningEffort) &&
+        !_chatHasReasoningEffortOverride;
+  }
+
+  bool _isReasoningEffortRejection(String errorText, Model? retryModel) {
+    if (!_reasoningEffortRejectionPattern.hasMatch(errorText)) return false;
+    // An explicitly refusing model never takes the parameter: the request
+    // boundary strips it whatever the opt-ins say. A retry through such a
+    // model therefore cannot fail on the value, and offering recovery would
+    // discard the user's pick and the chat-wide override on an error that
+    // cannot be about the never-sent parameter (issue #779). A model that
+    // left the list is unknown, not refusing — recovery stays available.
+    if (retryModel?.explicitlyRejectsReasoningEffort ?? false) return false;
+    // A model that does not advertise support is sent only its own pick
+    // (issue #611); one that does is sent the chat's saved value over the
+    // picker's. A model that left the list may have been sent either.
+    final pickerOptIn =
+        retryModel != null &&
+        !retryModel.advertisesReasoningEffort &&
+        !_chatSavedReasoningEffortDefault &&
+        reasoningEffortForModel(ref.read, retryModel) !=
+            kAutomaticReasoningEffort;
+    final chatOptIn =
+        (retryModel == null || retryModel.advertisesReasoningEffort) &&
+        _chatHasReasoningEffortOverride;
+    return pickerOptIn || chatOptIn;
+  }
+
+  /// Like [_isReasoningEffortRejection] for a parked queued completion,
+  /// additionally qualified from the request itself: the replay sends the
+  /// snapshot frozen at enqueue time, so the rejected value can still be on
+  /// the wire after the picker and the chat override went back to automatic
+  /// (issue #779). The error text alone never qualifies —
+  /// unrelated failures can mention the parameter — and a raw snapshot value
+  /// alone never qualifies either, because the request boundary strips it
+  /// for models that explicitly refuse reasoning effort; that guard lives
+  /// in [_isReasoningEffortRejection] and is applied to the frozen value
+  /// here as well.
+  bool _isQueuedReasoningEffortRejection(QueuedCompletionInfo info) {
+    final errorText = info.lastError ?? '';
+    if (!_reasoningEffortRejectionPattern.hasMatch(errorText)) return false;
+    final retryModel = _modelForQueuedRetry();
+    if (_isReasoningEffortRejection(errorText, retryModel)) return true;
+    if (retryModel?.explicitlyRejectsReasoningEffort ?? false) return false;
+    // As above: a model that does not advertise support was sent only the
+    // picker's frozen value, never the chat's.
+    final frozen = retryModel == null || retryModel.advertisesReasoningEffort
+        ? info.frozenReasoningEffort
+        : info.frozenPickedReasoningEffort;
+    return frozen != null;
+  }
+
+  Future<void> _retryWithoutReasoningEffort() async {
+    // "Automatic" clears the local pick and, for a model that was sent it,
+    // the chat's saved override. The retry may only start once the clears
+    // are confirmed: regenerating with a swallowed persistence failure would
+    // resend the rejected value.
+    final cleared = await clearReasoningEffortForRetry(
+      ref,
+      _modelForRegeneratedAnswer(),
+    );
+    if (!mounted) return;
+    if (!cleared) {
+      AdaptiveSnackBar.show(
+        context,
+        message: AppLocalizations.of(context)!.errorMessage,
+        type: AdaptiveSnackBarType.error,
+      );
+      return;
+    }
+    widget.onRegenerate?.call();
+  }
+
   List<_AssistantFooterAction> _buildFooterActions() {
     final l10n = AppLocalizations.of(context)!;
     // Watch only the playback fields the footer renders so Listen/Stop stays
@@ -2391,6 +2636,13 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final bool canRegenerate =
         widget.onRegenerate != null &&
         (!isChatStreaming || currentStreamingMessageCompleted);
+    final bool canRetryWithoutEffort =
+        isErrorMessage &&
+        canRegenerate &&
+        _isReasoningEffortRejection(
+          '${activeError ?? ''}\n$_displayedContent',
+          _modelForRegeneratedAnswer(),
+        );
 
     // Branch actions need a real message id. The providers below are what make
     // them exclusive to the user's own durable chat, so the widget adds no
@@ -2455,7 +2707,9 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
             ? CupertinoIcons.doc_on_doc
             : Icons.content_copy_outlined,
         label: l10n.copy,
-        onTap: _responseCompleted ? widget.onCopy : null,
+        onTap: _responseCompleted && widget.onCopy != null
+            ? () => unawaited(_copyResponse())
+            : null,
         sfSymbol: 'doc.on.doc',
       ),
       if (shouldShowTtsButton)
@@ -2479,6 +2733,16 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           label: isErrorMessage ? l10n.retry : l10n.regenerate,
           onTap: canRegenerate ? widget.onRegenerate : null,
           sfSymbol: 'arrow.clockwise',
+        ),
+      if (canRetryWithoutEffort)
+        _AssistantFooterAction(
+          id: 'retry-without-effort',
+          icon: Platform.isIOS
+              ? CupertinoIcons.slash_circle
+              : Icons.highlight_off,
+          label: l10n.retryWithoutReasoningEffort,
+          onTap: () => unawaited(_retryWithoutReasoningEffort()),
+          sfSymbol: 'slash.circle',
         ),
       if (mergeIsRunningHere)
         _AssistantFooterAction(
@@ -2518,6 +2782,14 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
           ),
           sfSymbol: 'arrow.triangle.branch',
         ),
+      if (_shareableResponseText().isNotEmpty)
+        _AssistantFooterAction(
+          id: 'share',
+          icon: Platform.isIOS ? CupertinoIcons.share : Icons.share_outlined,
+          label: l10n.shareSystemSheet,
+          onTap: _responseCompleted ? () => unawaited(_shareResponse()) : null,
+          sfSymbol: 'square.and.arrow.up',
+        ),
       if (!widget.readOnly)
         _AssistantFooterAction(
           id: 'delete',
@@ -2529,6 +2801,68 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     ];
 
     return actions;
+  }
+
+  // Share is offered only when the text it would send is not empty: a reply
+  // stopped mid-thought holds nothing but its reasoning block. The clipboard
+  // rules are several full-content passes and the footer rebuilds far more
+  // often than the content changes, so memoize by content.
+  String? _shareTextSource;
+  String _shareTextResult = '';
+
+  /// The version on screen, or the whole grouped answer, cleaned the way Copy
+  /// cleans it.
+  String _shareableResponseText() {
+    final rawText = _activeVersionIndex >= 0
+        ? _displayedContent
+        : widget.resolveGroupedResponseText?.call() ?? _displayedContent;
+    if (rawText != _shareTextSource) {
+      _shareTextSource = rawText;
+      _shareTextResult = ConduitMarkdownPreprocessor.sanitizeForClipboard(
+        rawText,
+      );
+    }
+    return _shareTextResult;
+  }
+
+  /// The parent copies the stored answer. A version being previewed exists
+  /// only on screen, so copy it here, as the text Share would send.
+  Future<void> _copyResponse() async {
+    if (_activeVersionIndex < 0) {
+      widget.onCopy?.call();
+      return;
+    }
+    try {
+      await Clipboard.setData(ClipboardData(text: _shareableResponseText()));
+    } catch (_) {
+      if (!mounted) return;
+      AdaptiveSnackBar.show(
+        context,
+        message: AppLocalizations.of(context)!.errorMessage,
+        type: AdaptiveSnackBarType.error,
+      );
+    }
+  }
+
+  Future<void> _shareResponse() async {
+    final text = _shareableResponseText();
+    if (!_responseCompleted || text.isEmpty) return;
+    final renderObject = _overflowButtonKey.currentContext?.findRenderObject();
+    final origin = renderObject is RenderBox && renderObject.hasSize
+        ? renderObject.localToGlobal(Offset.zero) & renderObject.size
+        : null;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(text: text, sharePositionOrigin: origin),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AdaptiveSnackBar.show(
+        context,
+        message: AppLocalizations.of(context)!.errorMessage,
+        type: AdaptiveSnackBarType.error,
+      );
+    }
   }
 
   Widget _buildActionButton({
@@ -2588,6 +2922,7 @@ class _AssistantMessageWidgetState extends ConsumerState<AssistantMessageWidget>
     final theme = context.conduitTheme;
 
     return AdaptiveTooltip(
+      key: _overflowButtonKey,
       message: l10n.more,
       waitDuration: const Duration(milliseconds: 600),
       child: Semantics(

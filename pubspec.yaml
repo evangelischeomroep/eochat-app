@@ -92,8 +92,9 @@ dependencies:
   stupid_simple_sheet: ^0.9.1+1
   
   # Platform Features
-  # Keep exact until VAD declares Record 7 support; see dependency_overrides.
-  vad: 0.0.8
+  # vad 0.0.8 with Silero v5's frame context restored; see its README.
+  vad:
+    path: third_party/vad
   record: ^7.1.1
   audio_session: ^0.2.2
   permission_handler: ^13.0.2
@@ -149,6 +150,7 @@ dependencies:
   # Document model + markdown/HTML codecs backing the Fleather note editor.
   parchment: ^1.27.0
   flutter_webrtc: ^1.6.2+hotfix.4
+  video_player: ^2.14.1
 
 # Required while mermaid_flutter declares mermaid_core from the hosted source:
 # Pub cannot combine that source with Conduit's unpublished path package, even
@@ -157,10 +159,6 @@ dependencies:
 dependency_overrides:
   mermaid_core:
     path: third_party/mermaid/packages/mermaid_core
-  # VAD 0.0.8 still declares record ^6.1.2. Conduit supplies its own Record 7
-  # PCM stream instead of using VAD's internal recorder. Remove this override
-  # once VAD publishes Record 7 support (upstream issue #22).
-  record: 7.1.1
   # objective_c 9.6.1's build hook references Architecture.arm64e, which no
   # published code_assets release defines, so native-assets compilation fails
   # on macOS for every flutter test/run. Drop once a code_assets with arm64e
@@ -185,6 +183,8 @@ dev_dependencies:
   # Used only in tests to mock the microphone permission platform channel.
   permission_handler_platform_interface: ^4.3.0
   plugin_platform_interface: ^2.1.8
+  # Used only in tests to fake the video player platform.
+  video_player_platform_interface: ^6.9.0
 
 flutter:
   config:

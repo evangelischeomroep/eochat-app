@@ -344,6 +344,33 @@ carried a branding-string swap. Current known inline-touch files:
   it. The terminal tab carries a folder (`folder` / `folder.fill`,
   `Icons.folder*`) and its label `sidebarTerminalTab` reads *Files* /
   *Bestanden* (en/nl ARB): users know it as the file browser.
+- Android Assistant (new in v4.2.2): upstream added a real Android Assist/
+  voice-interaction implementation — `AssistantLaunch.kt`
+  (`AssistantLaunchAction`/`AssistantLaunchQueue`, used unqualified from
+  `MainActivity.kt` and `ConduitVoiceInteractionSession.kt`),
+  `ConduitAssistSessionService.kt` (the `sessionService` upstream's
+  `voice_interaction_service.xml` meta-data names) and
+  `ConduitRecognitionService.kt` (the `recognitionService` it names, forwarding
+  speech recognition to whatever the phone shipped with — Android drops an
+  assistant whose declared recognizer class can't be found). All three moved
+  from `app.cogwheel.conduit` to `package nl.eo.eochat`: the two services are
+  manifest-registered (`<service android:name=".ConduitAssistSessionService">`
+  etc.), and AGP resolves that relative syntax against `namespace =
+  "nl.eo.eochat"` in `android/app/build.gradle.kts`, so a class left at
+  `app.cogwheel.conduit` would 404 at runtime; `AssistantLaunchAction`/`Queue`
+  moved alongside them because the fork's own `ConduitVoiceInteractionSession.kt`
+  and upstream's new call sites in `MainActivity.kt` already referenced them
+  with no import, i.e. assuming the same package. `voice_interaction_service.xml`
+  and `AndroidManifest.xml` (`android:label` on the recognition service) follow
+  the same `nl.eo.eochat` naming. The two new Robolectric tests
+  (`AssistantComponentsTest.kt`, `AssistantLaunchTest.kt`) stayed at
+  `app.cogwheel.conduit` (fork test convention: tests are never rebranded) and
+  got explicit `import nl.eo.eochat.*` lines for the moved symbols — Kotlin's
+  `internal` is module-scoped, not package-scoped, so this compiles fine
+  cross-package. `AssistantComponentsTest.kt`'s hardcoded
+  `private val conduit = "app.cogwheel.conduit"` became `"nl.eo.eochat"`,
+  which is what makes its own assertions (and its `recognitionDelegate`/
+  `RecognizerCandidate` own-package filtering) correct again under the rename.
 
 If a new fork behavior needs another upstream file, document why in the PR.
 

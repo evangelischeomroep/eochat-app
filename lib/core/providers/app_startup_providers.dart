@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:riverpod/riverpod.dart';
@@ -32,6 +33,7 @@ import 'package:conduit_core/features/notes/providers/notes_providers.dart'
     show activeNoteProvider;
 import 'package:conduit_core/features/prompts/providers/prompts_providers.dart'
     show activePromptCommandProvider;
+import '../../platform/android_assistant_handler.dart';
 import '../../platform/app_intents_service.dart';
 import '../../platform/carplay_service.dart';
 import '../../platform/home_widget_service.dart';
@@ -1106,6 +1108,15 @@ class AppStartupFlow extends _$AppStartupFlow {
       () => ref.read(shareReceiverInitializerProvider),
       label: 'share-receiver',
     );
+    // The assistant can open the app before any chat page exists, and its
+    // handler then runs what was asked once the app can do it.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _scheduleAfterDelay(
+        const Duration(milliseconds: 88),
+        () => ref.read(androidAssistantProvider),
+        label: 'android-assistant',
+      );
+    }
   }
 
   void _scheduleStartupTasks() {
